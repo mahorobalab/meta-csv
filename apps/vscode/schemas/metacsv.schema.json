@@ -103,6 +103,32 @@
               }
             }
           }
+        },
+        "activeFilter": {
+          "type": "string",
+          "description": "Persisted filter query string applied on open."
+        },
+        "filterContextRows": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "default": 0,
+          "description": "Number of surrounding context rows to keep around matched rows (grep -C)."
+        },
+        "filterPresets": {
+          "type": "array",
+          "description": "Named filter presets for one-click switching.",
+          "items": {
+            "type": "object",
+            "required": ["name", "query"],
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string" },
+              "query": { "type": "string" },
+              "contextRows": { "type": "integer", "minimum": 0, "maximum": 100 },
+              "collapseColumn": { "type": "string" }
+            }
+          }
         }
       }
     },

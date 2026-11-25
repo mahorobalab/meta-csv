@@ -6,3 +6,8 @@ Push だけで Windows / Mac（ユニバーサル）の Tauri ビルドやテス
 
 3.エディタ機能のさらなる磨き込み
 列ヘッダーのラベル編集 GUI、Enum ドロップダウン選択、条件付き書式（rules）の GUI 編集、外部ファイル変更時の自動リロード、Shift-JIS 保存の完全対応など。
+
+
+・GitHub Pages Wasmで動く？
+
+・GitHub Release

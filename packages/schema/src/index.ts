@@ -24,8 +24,18 @@ export interface SortSpec {
   direction: SortDirection;
 }
 
+export interface FilterPreset {
+  name: string;
+  query: string;
+  contextRows?: number;
+  collapseColumn?: string;
+}
+
 export interface ViewConfig {
   sort?: SortSpec[];
+  activeFilter?: string;
+  filterContextRows?: number;
+  filterPresets?: FilterPreset[];
 }
 
 export interface CellStyle {

@@ -17,14 +17,17 @@ import {
   DEFAULT_HEADER_HEIGHT,
   DEFAULT_ROW_HEIGHT,
   type CellStyle,
+  type FilterPreset,
   type MetaCsvDocument,
   type RangeStyleRule,
   type SortSpec,
 } from '@meta-csv/schema';
 import {
   UndoRedoHistory,
+  applyViewFilter,
   buildSortedRowIndices,
   createStyleResolverContext,
+  doesCellMatchFilterTerms,
   parseMetaJsonc,
   patchMetaJsonc,
   resolveCellStyle,
@@ -33,10 +36,13 @@ import {
   type FileSystemAdapter,
   type ParseProgress,
   type ParsedCsvData,
+  type ParsedFilterTerm,
   type SearchMatch,
 } from '@meta-csv/core';
 import { buildGridTheme } from './theme';
 import { parseCsvInWorker } from './parseInWorker';
+import { FilterBar, type FilterColumnOption } from './FilterBar';
+import { useInputHistory } from './useInputHistory';
 
 export interface MetaCsvEditorProps {
   adapter: FileSystemAdapter;
@@ -74,8 +80,32 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
+  const [showSearchHistory, setShowSearchHistory] = useState(false);
   const [matches, setMatches] = useState<SearchMatch[]>([]);
   const [activeMatchIdx, setActiveMatchIdx] = useState(0);
+  const searchHistory = useInputHistory('metacsv.searchHistory');
+  const filteredSearchHistory = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return searchHistory.items;
+    return searchHistory.items.filter(
+      (item) => item.toLowerCase().includes(q) && item.toLowerCase() !== q,
+    );
+  }, [searchHistory.items, searchQuery]);
+
+  useEffect(() => {
+    const trimmed = searchQuery.trim();
+    if (!trimmed) return;
+    const t = window.setTimeout(() => {
+      searchHistory.push(trimmed);
+    }, 1500);
+    return () => window.clearTimeout(t);
+  }, [searchQuery, searchHistory.push]);
+
+  // Filter state (Google-like query + grep -C context + consecutive dedupe)
+  const [filterQuery, setFilterQuery] = useState('');
+  const [debouncedFilterQuery, setDebouncedFilterQuery] = useState('');
+  const [filterContextRows, setFilterContextRows] = useState(0);
+  const [collapseColKey, setCollapseColKey] = useState('');
 
   // Selection state
   const [selection, setSelection] = useState<GridSelection>({
@@ -112,6 +142,9 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
         setMeta(parsedMeta);
         metaTextRef.current = payload.metaText;
         onMetaTextChange?.(payload.metaText ?? '');
+        setFilterQuery(parsedMeta.view?.activeFilter ?? '');
+        setDebouncedFilterQuery(parsedMeta.view?.activeFilter ?? '');
+        setFilterContextRows(parsedMeta.view?.filterContextRows ?? 0);
 
         const { parsed, autoWidths: widths, elapsedMs } = await parseCsvInWorker(
           payload.csvBytes,
@@ -213,11 +246,85 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
     return list;
   }, [csvData, meta.columns]);
 
-  // View row indices (non-destructive sort)
-  const viewRowIndices = useMemo(() => {
+  // Debounce filter query input (220ms) for smooth typing even on 1M rows
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      setDebouncedFilterQuery(filterQuery);
+    }, 220);
+    return () => window.clearTimeout(t);
+  }, [filterQuery]);
+
+  // Column name + alias lookup for FilterBar (supports both raw column keys and .meta.jsonc labels)
+  const filterColumnOptions: FilterColumnOption[] = useMemo(() => {
+    if (!csvData) return [];
+    return csvData.columnKeys.map((key, idx) => ({
+      index: idx,
+      key,
+      label: meta.columns?.[key]?.label ?? csvData.headers[idx] ?? `column ${idx + 1}`,
+    }));
+  }, [csvData, meta.columns]);
+
+  const filterColumnLookup = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const col of filterColumnOptions) {
+      map.set(col.key, col.index);
+      map.set(col.key.toLowerCase(), col.index);
+      map.set(col.label, col.index);
+      map.set(col.label.toLowerCase(), col.index);
+    }
+    return map;
+  }, [filterColumnOptions]);
+
+  // Step 1: View sort indices (non-destructive)
+  const sortedRowIndices = useMemo(() => {
     if (!csvData) return new Int32Array(0);
     return buildSortedRowIndices(rowsRef.current, csvData.columnKeys, meta.view?.sort);
   }, [csvData, meta.view?.sort, dataVersion]);
+
+  // Step 2: Apply Excel-surpassing filter (Regex / NOT / compare / grep -C / dedupe)
+  const filterState = useMemo(() => {
+    if (!csvData) {
+      return {
+        indices: new Int32Array(0),
+        matchedRowSet: null as Set<number> | null,
+        matchedCount: 0,
+        collapsedCounts: null as Map<number, number> | null,
+        positiveTerms: [] as ParsedFilterTerm[],
+        error: undefined as string | undefined,
+        elapsedMs: 0,
+      };
+    }
+    const collapseIdx =
+      collapseColKey !== '' ? (filterColumnLookup.get(collapseColKey) ?? null) : null;
+    if (!debouncedFilterQuery.trim() && collapseIdx === null) {
+      return {
+        indices: sortedRowIndices,
+        matchedRowSet: null,
+        matchedCount: sortedRowIndices.length,
+        collapsedCounts: null,
+        positiveTerms: [] as ParsedFilterTerm[],
+        error: undefined,
+        elapsedMs: 0,
+      };
+    }
+    const t0 = performance.now();
+    const res = applyViewFilter(rowsRef.current, sortedRowIndices, {
+      query: debouncedFilterQuery,
+      contextRows: filterContextRows,
+      collapseColIndex: collapseIdx,
+      columnLookup: filterColumnLookup,
+    });
+    return { ...res, elapsedMs: Math.round(performance.now() - t0) };
+  }, [
+    csvData,
+    sortedRowIndices,
+    debouncedFilterQuery,
+    filterContextRows,
+    collapseColKey,
+    filterColumnLookup,
+  ]);
+
+  const viewRowIndices = filterState.indices;
 
   // Style resolver context
   const styleCtx = useMemo(() => {
@@ -310,8 +417,21 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
         activeMatch.dataRow === dataRow &&
         activeMatch.col === actualCol;
 
+      // Highlight context-only rows subtly when grep -C context mode is active
+      const isContextOnlyRow =
+        filterState.matchedRowSet !== null && !filterState.matchedRowSet.has(dataRow);
+      const isFilterHit =
+        !isContextOnlyRow &&
+        filterState.positiveTerms.length > 0 &&
+        doesCellMatchFilterTerms(val, actualCol, filterState.positiveTerms);
+      const collapsedDupes =
+        collapseColKey !== '' && colKey === collapseColKey
+          ? filterState.collapsedCounts?.get(dataRow)
+          : undefined;
+      const displayVal = collapsedDupes ? `${val} (+${collapsedDupes} dupes)` : val;
+
       let themeOverride: Partial<Theme> | undefined;
-      if (resolvedStyle || isSearchHit || colMeta?.readonly) {
+      if (resolvedStyle || isSearchHit || isFilterHit || colMeta?.readonly || isContextOnlyRow) {
         const fontSize = resolvedStyle?.fontSize ?? meta.table?.fontSize ?? DEFAULT_FONT_SIZE;
         const fontPrefix = [
           resolvedStyle?.italic ? 'italic' : '',
@@ -330,11 +450,22 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
           ...(colMeta?.readonly && !resolvedStyle?.color
             ? { textDark: themeMode === 'dark' ? '#94a3b8' : '#64748b' }
             : {}),
+          ...(isContextOnlyRow
+            ? {
+                textDark: themeMode === 'dark' ? '#64748b' : '#94a3b8',
+                bgCell: themeMode === 'dark' ? '#18181b' : '#f8fafc',
+              }
+            : {}),
+          ...(isFilterHit
+            ? {
+                bgCell: 'rgba(14, 165, 233, 0.20)',
+              }
+            : {}),
           ...(isSearchHit
             ? {
                 bgCell: isCurrentHit
-                  ? 'rgba(250, 204, 21, 0.55)'
-                  : 'rgba(250, 204, 21, 0.24)',
+                  ? 'rgba(250, 204, 21, 0.58)'
+                  : 'rgba(250, 204, 21, 0.28)',
               }
             : {}),
         };
@@ -343,14 +474,27 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
       return {
         kind: GridCellKind.Text,
         data: val,
-        displayData: val,
+        displayData: displayVal,
         allowOverlay: !colMeta?.readonly,
         allowWrapping: colMeta?.wrap ?? false,
         contentAlign: colMeta?.align,
         themeOverride,
       };
     },
-    [visibleColIndices, viewRowIndices, csvData, meta, styleCtx, matchSet, activeMatch, themeMode],
+    [
+      visibleColIndices,
+      viewRowIndices,
+      csvData,
+      meta,
+      styleCtx,
+      matchSet,
+      activeMatch,
+      themeMode,
+      filterState.matchedRowSet,
+      filterState.collapsedCounts,
+      filterState.positiveTerms,
+      collapseColKey,
+    ],
   );
 
   // Cell edit handler
@@ -685,22 +829,171 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
           View / Columns ▾
         </button>
 
-        {/* Search box */}
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search..."
-          style={{
-            padding: '4px 8px',
-            fontSize: 12,
-            borderRadius: 4,
-            border: `1px solid ${toolbarBorder}`,
-            background: isDark ? '#1e1e1e' : '#ffffff',
-            color: toolbarFg,
-            width: 150,
-          }}
-        />
+        {/* Search box with inline clear & history dropdown */}
+        <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+          <input
+            type="text"
+            value={searchQuery}
+            onFocus={() => {
+              if (searchHistory.items.length > 0) setShowSearchHistory(true);
+            }}
+            onBlur={() => setShowSearchHistory(false)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              if (searchHistory.items.length > 0) setShowSearchHistory(true);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                setShowSearchHistory(false);
+              } else if (e.key === 'Enter' && searchQuery.trim()) {
+                searchHistory.push(searchQuery);
+                setShowSearchHistory(false);
+                if (matches.length > 0) {
+                  setActiveMatchIdx((i) => (i + 1) % matches.length);
+                }
+              }
+            }}
+            placeholder="Search..."
+            style={{
+              padding: '4px 40px 4px 8px',
+              fontSize: 12,
+              borderRadius: 4,
+              border: `1px solid ${toolbarBorder}`,
+              background: isDark ? '#1e1e1e' : '#ffffff',
+              color: toolbarFg,
+              width: 170,
+            }}
+          />
+          {searchQuery.length > 0 && (
+            <button
+              type="button"
+              aria-label="Clear search"
+              onClick={() => setSearchQuery('')}
+              style={{
+                position: 'absolute',
+                right: 20,
+                border: 'none',
+                background: 'transparent',
+                color: toolbarFg,
+                opacity: 0.6,
+                cursor: 'pointer',
+                fontSize: 13,
+                lineHeight: 1,
+                padding: '2px 4px',
+              }}
+            >
+              ×
+            </button>
+          )}
+          <button
+            type="button"
+            title="Search history"
+            onClick={() => setShowSearchHistory((s) => !s)}
+            style={{
+              position: 'absolute',
+              right: 2,
+              border: 'none',
+              background: 'transparent',
+              color: toolbarFg,
+              opacity: searchHistory.items.length > 0 ? 0.75 : 0.35,
+              cursor: 'pointer',
+              fontSize: 11,
+              lineHeight: 1,
+              padding: '3px 4px',
+            }}
+          >
+            ▾
+          </button>
+
+          {showSearchHistory && (filteredSearchHistory.length > 0 || searchQuery.trim().length === 0) && (
+            <div
+              onMouseDown={(e) => e.preventDefault()}
+              style={{
+                position: 'absolute',
+                top: 'calc(100% + 2px)',
+                left: 0,
+                width: 240,
+                zIndex: 55,
+                maxHeight: 240,
+                overflowY: 'auto',
+                padding: 8,
+                borderRadius: 6,
+                background: isDark ? '#1f1f23' : '#ffffff',
+                border: `1px solid ${toolbarBorder}`,
+                boxShadow: '0 8px 24px rgba(0,0,0,0.32)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 4,
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
+                <strong style={{ fontSize: 11 }}>
+                  Search History ({filteredSearchHistory.length}/{searchHistory.items.length})
+                </strong>
+                {searchHistory.items.length > 0 && (
+                  <button
+                    type="button"
+                    style={{ ...btnStyle, padding: '1px 6px', fontSize: 11 }}
+                    onClick={() => searchHistory.clear()}
+                  >
+                    Clear History
+                  </button>
+                )}
+              </div>
+              {filteredSearchHistory.length === 0 ? (
+                <div style={{ fontSize: 11, opacity: 0.65 }}>No history yet.</div>
+              ) : (
+                filteredSearchHistory.map((item) => (
+                  <div
+                    key={item}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      padding: '3px 6px',
+                      borderRadius: 4,
+                      background: isDark ? '#27272a' : '#f8fafc',
+                    }}
+                  >
+                    <span
+                      style={{
+                        flex: 1,
+                        cursor: 'pointer',
+                        fontSize: 11,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                      title={item}
+                      onClick={() => {
+                        setSearchQuery(item);
+                        setShowSearchHistory(false);
+                      }}
+                    >
+                      {item}
+                    </span>
+                    <button
+                      type="button"
+                      title="Remove"
+                      onClick={() => searchHistory.remove(item)}
+                      style={{
+                        border: 'none',
+                        background: 'transparent',
+                        color: toolbarFg,
+                        opacity: 0.55,
+                        cursor: 'pointer',
+                        fontSize: 12,
+                        padding: '0 3px',
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
         {searchQuery.trim() && (
           <>
             <span>
@@ -858,6 +1151,43 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
           </div>
         )}
       </div>
+
+      {/* Filter Bar (Regex / NOT / Numeric Compare / grep -C / Dedupe / Facets / Presets) */}
+      {csvData && (
+        <FilterBar
+          query={filterQuery}
+          onQueryChange={setFilterQuery}
+          contextRows={filterContextRows}
+          onContextRowsChange={setFilterContextRows}
+          collapseColKey={collapseColKey}
+          onCollapseColKeyChange={setCollapseColKey}
+          columns={filterColumnOptions}
+          rows={rowsRef.current}
+          activeIndices={viewRowIndices}
+          totalRows={rowsRef.current.length}
+          matchedCount={filterState.matchedCount}
+          filterElapsedMs={filterState.elapsedMs}
+          filterError={filterState.error}
+          presets={meta.view?.filterPresets ?? []}
+          onSavePreset={(preset: FilterPreset) => {
+            const existing = (meta.view?.filterPresets ?? []).filter(
+              (p) => p.name !== preset.name,
+            );
+            patchMeta(['view', 'filterPresets'], [...existing, preset]);
+          }}
+          onDeletePreset={(name: string) => {
+            const next = (meta.view?.filterPresets ?? []).filter((p) => p.name !== name);
+            patchMeta(['view', 'filterPresets'], next.length > 0 ? next : undefined);
+          }}
+          onApplyPreset={(preset: FilterPreset) => {
+            setFilterQuery(preset.query);
+            setDebouncedFilterQuery(preset.query);
+            setFilterContextRows(preset.contextRows ?? 0);
+            setCollapseColKey(preset.collapseColumn ?? '');
+          }}
+          themeMode={themeMode}
+        />
+      )}
 
       {/* Grid container */}
       <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>

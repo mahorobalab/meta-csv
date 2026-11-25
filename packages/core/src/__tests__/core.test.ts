@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   UndoRedoHistory,
+  applyViewFilter,
   buildSortedRowIndices,
+  computeColumnFacets,
   createStyleResolverContext,
   parseCsvBytes,
   parseMetaJsonc,
@@ -116,5 +118,60 @@ describe('@meta-csv/core', () => {
     history.redo(rows);
     expect(rows.length).toBe(2);
     expect(rows[1]).toEqual(['new', 'row']);
+  });
+
+  it('supports regex, NOT, numeric compare, grep -C context, dedupe, and facets', () => {
+    const rows = [
+      ['1', 'AppA', 'ok', '100'],
+      ['2', 'AppA', 'ok', '200'],
+      ['3', 'AppB', 'blocked', '50000'],
+      ['4', 'AppC', 'review', '80000'],
+      ['5', 'AppA', 'ok', '300'],
+    ];
+    const base = Int32Array.from([0, 1, 2, 3, 4]);
+    const lookup = new Map([
+      ['id', 0],
+      ['app', 1],
+      ['status', 2],
+      ['amount', 3],
+    ]);
+
+    // Regex + NOT + numeric compare
+    const res1 = applyViewFilter(rows, base, {
+      query: 'status:/^(blocked|review)$/ -app:AppC amount:>=50000',
+      columnLookup: lookup,
+    });
+    expect(Array.from(res1.indices)).toEqual([2]);
+
+    // OR operator
+    const resOr = applyViewFilter(rows, base, {
+      query: 'status:=blocked OR app:=AppC',
+      columnLookup: lookup,
+    });
+    expect(Array.from(resOr.indices)).toEqual([2, 3]);
+
+    // Context rows (grep -C 1) around row index 2 -> keeps 1, 2, 3
+    const res2 = applyViewFilter(rows, base, {
+      query: 'status:=blocked',
+      contextRows: 1,
+      columnLookup: lookup,
+    });
+    expect(Array.from(res2.indices)).toEqual([1, 2, 3]);
+    expect(res2.matchedRowSet?.has(2)).toBe(true);
+    expect(res2.matchedRowSet?.has(1)).toBe(false);
+
+    // Consecutive duplicate collapse on status column (rows 0 and 1 are both 'ok')
+    const res3 = applyViewFilter(rows, base, {
+      query: '',
+      collapseColIndex: 2,
+      columnLookup: lookup,
+    });
+    expect(Array.from(res3.indices)).toEqual([0, 2, 3, 4]);
+    expect(res3.collapsedCounts?.get(0)).toBe(1);
+
+    // Facet ranking
+    const facets = computeColumnFacets(rows, base, 2);
+    expect(facets.entries[0]).toEqual({ value: 'ok', count: 3 });
+    expect(facets.uniqueCount).toBe(3);
   });
 });

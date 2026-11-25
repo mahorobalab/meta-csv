@@ -1,0 +1,5 @@
+# 開発用プレイグラウンド起動 (http://127.0.0.1:15173)
+pnpm.cmd dev
+
+# デスクトップアプリ起動 (Tauri v2)
+pnpm.cmd dev:desktop
