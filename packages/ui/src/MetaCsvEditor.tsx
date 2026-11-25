@@ -25,18 +25,18 @@ import {
   UndoRedoHistory,
   buildSortedRowIndices,
   createStyleResolverContext,
-  estimateColumnWidths,
-  parseCsvBytes,
   parseMetaJsonc,
   patchMetaJsonc,
   resolveCellStyle,
   searchVisibleRows,
   serializeCsv,
   type FileSystemAdapter,
+  type ParseProgress,
   type ParsedCsvData,
   type SearchMatch,
 } from '@meta-csv/core';
 import { buildGridTheme } from './theme';
+import { parseCsvInWorker } from './parseInWorker';
 
 export interface MetaCsvEditorProps {
   adapter: FileSystemAdapter;
@@ -67,7 +67,10 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
   const [dirtyCsv, setDirtyCsv] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string>('Loading...');
   const [dataVersion, setDataVersion] = useState(0);
+  const [reloadTick, setReloadTick] = useState(0);
   const [showViewMenu, setShowViewMenu] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState<ParseProgress | null>(null);
+  const [showProgressOverlay, setShowProgressOverlay] = useState(false);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -82,50 +85,69 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
 
   const gridRef = useRef<DataEditorRef | null>(null);
   const rowsRef = useRef<string[][]>([]);
-  const rawBytesRef = useRef<Uint8Array | null>(null);
   const historyRef = useRef(new UndoRedoHistory());
   const metaSaveTimerRef = useRef<number | null>(null);
   const metaTextRef = useRef<string | null>(null);
 
-  // Load from adapter
+  // Load from adapter & parse in Web Worker (releasing raw CSV bytes right after parse)
   useEffect(() => {
     let cancelled = false;
     setStatusMsg('Loading CSV...');
+    setLoadingProgress({ phase: 'decoding', percent: 0, rowsParsed: 0 });
+    setShowProgressOverlay(false);
     historyRef.current.clear();
     setDirtyCsv(false);
 
+    // Only show the overlay if loading takes longer than 150ms (avoids flicker on small files)
+    const overlayTimer = window.setTimeout(() => {
+      if (!cancelled) setShowProgressOverlay(true);
+    }, 150);
+
     adapter
       .load()
-      .then((payload) => {
+      .then(async (payload) => {
         if (cancelled) return;
-        rawBytesRef.current = payload.csvBytes;
         const parsedMeta = parseMetaJsonc(payload.metaText);
-        const t0 = performance.now();
-        const parsedCsv = parseCsvBytes(payload.csvBytes, parsedMeta.csv);
-        const elapsed = Math.round(performance.now() - t0);
-
-        rowsRef.current = parsedCsv.rows;
         setFileName(payload.fileName);
-        setCsvData(parsedCsv);
-        setAutoWidths(estimateColumnWidths(parsedCsv.headers, parsedCsv.rows));
         setMeta(parsedMeta);
         metaTextRef.current = payload.metaText;
         onMetaTextChange?.(payload.metaText ?? '');
+
+        const { parsed, autoWidths: widths, elapsedMs } = await parseCsvInWorker(
+          payload.csvBytes,
+          parsedMeta.csv,
+          (prog) => {
+            if (!cancelled) setLoadingProgress(prog);
+          },
+        );
+        if (cancelled) return;
+
+        rowsRef.current = parsed.rows;
+        setCsvData(parsed);
+        setAutoWidths(widths);
         setDataVersion((v) => v + 1);
         setStatusMsg(
-          `${parsedCsv.rows.length.toLocaleString()} rows × ${parsedCsv.headers.length} cols (${elapsed} ms)`,
+          `${parsed.rows.length.toLocaleString()} rows × ${parsed.headers.length} cols (${elapsedMs} ms)`,
         );
       })
       .catch((err) => {
         if (!cancelled) {
           setStatusMsg(`Load error: ${String(err)}`);
         }
+      })
+      .finally(() => {
+        window.clearTimeout(overlayTimer);
+        if (!cancelled) {
+          setLoadingProgress(null);
+          setShowProgressOverlay(false);
+        }
       });
 
     return () => {
       cancelled = true;
+      window.clearTimeout(overlayTimer);
     };
-  }, [adapter]);
+  }, [adapter, reloadTick]);
 
   const applyParsedMetaAndReparseIfNeeded = useCallback(
     (nextText: string | null) => {
@@ -133,15 +155,11 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
       metaTextRef.current = nextText;
       setMeta(nextMeta);
 
-      if (rawBytesRef.current && csvData) {
+      if (csvData) {
         const prevHasHeader = csvData.dialect.hasHeader;
         const nextHasHeader = nextMeta.csv?.hasHeader ?? true;
         if (prevHasHeader !== nextHasHeader) {
-          const reparsed = parseCsvBytes(rawBytesRef.current, nextMeta.csv);
-          rowsRef.current = reparsed.rows;
-          setCsvData(reparsed);
-          setAutoWidths(estimateColumnWidths(reparsed.headers, reparsed.rows));
-          setDataVersion((v) => v + 1);
+          setReloadTick((t) => t + 1);
         }
       }
     },
@@ -393,7 +411,6 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
     if (!csvData) return;
     const bytes = serializeCsv(csvData.headers, rowsRef.current, csvData.dialect);
     await adapter.saveCsv(bytes);
-    rawBytesRef.current = bytes;
     setDirtyCsv(false);
     setStatusMsg(
       `Saved ${fileName} (${rowsRef.current.length.toLocaleString()} rows)`,
@@ -844,6 +861,51 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
 
       {/* Grid container */}
       <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+        {showProgressOverlay && loadingProgress && (
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              zIndex: 50,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 10,
+              background: isDark ? 'rgba(24, 24, 27, 0.82)' : 'rgba(248, 250, 252, 0.85)',
+              backdropFilter: 'blur(2px)',
+              color: toolbarFg,
+            }}
+          >
+            <div style={{ fontSize: 14, fontWeight: 600 }}>
+              {loadingProgress.phase === 'decoding'
+                ? 'Reading CSV file...'
+                : loadingProgress.phase === 'parsing'
+                  ? `Parsing CSV... (${loadingProgress.rowsParsed.toLocaleString()} rows)`
+                  : 'Finalizing grid...'}
+            </div>
+            <div
+              style={{
+                width: 280,
+                height: 8,
+                borderRadius: 4,
+                overflow: 'hidden',
+                background: isDark ? '#333338' : '#cbd5e1',
+              }}
+            >
+              <div
+                style={{
+                  width: `${Math.max(4, loadingProgress.percent)}%`,
+                  height: '100%',
+                  background: '#3b82f6',
+                  transition: 'width 80ms linear',
+                }}
+              />
+            </div>
+            <div style={{ fontSize: 12, opacity: 0.75 }}>{loadingProgress.percent}%</div>
+          </div>
+        )}
+
         {csvData && (
           <DataEditor
             ref={gridRef}

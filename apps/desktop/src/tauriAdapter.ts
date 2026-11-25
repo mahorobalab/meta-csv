@@ -1,46 +1,30 @@
 import { invoke } from '@tauri-apps/api/core';
 import type { CsvFilePayload, FileSystemAdapter } from '@meta-csv/core';
 
-interface RustCsvPayload {
-  fileName: string;
-  csvBase64: string;
-  metaText: string | null;
-}
-
-function base64ToBytes(base64: string): Uint8Array {
-  const bin = atob(base64);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) {
-    bytes[i] = bin.charCodeAt(i);
-  }
-  return bytes;
-}
-
-function bytesToBase64(bytes: Uint8Array): string {
-  const chunkSize = 0x8000;
-  const parts: string[] = [];
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    const sub = bytes.subarray(i, i + chunkSize);
-    parts.push(String.fromCharCode(...sub));
-  }
-  return btoa(parts.join(''));
+function extractFileName(filePath: string): string {
+  const parts = filePath.split(/[\\/]/);
+  return parts[parts.length - 1] || 'untitled.csv';
 }
 
 export function createTauriAdapter(filePath: string): FileSystemAdapter {
   return {
     async load(): Promise<CsvFilePayload> {
-      const res = await invoke<RustCsvPayload>('load_csv_with_meta', { path: filePath });
+      const [buffer, metaText] = await Promise.all([
+        invoke<ArrayBuffer>('load_csv_bytes', { path: filePath }),
+        invoke<string | null>('load_meta_text', { path: filePath }),
+      ]);
       return {
-        fileName: res.fileName,
-        csvBytes: base64ToBytes(res.csvBase64),
-        metaText: res.metaText,
+        fileName: extractFileName(filePath),
+        csvBytes: new Uint8Array(buffer),
+        metaText,
       };
     },
 
     async saveCsv(bytes: Uint8Array): Promise<void> {
-      await invoke('save_csv_bytes', {
-        path: filePath,
-        csvBase64: bytesToBase64(bytes),
+      await invoke('save_csv_raw', bytes, {
+        headers: {
+          'x-file-path': encodeURIComponent(filePath),
+        },
       });
     },
 
