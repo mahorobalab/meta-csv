@@ -1,0 +1,8 @@
+1.VS Code / Antigravity 拡張の .vsix パッケージ化
+F5 起動ではなく、普段使っている IDE にそのままインストールして spec_setting.csv 等で実戦ドッグフーディング開始できます。
+
+2.GitHub プッシュ & CI/CD（GitHub Actions）構築
+Push だけで Windows / Mac（ユニバーサル）の Tauri ビルドやテストが自動実行されるワークフローを整備します。
+
+3.エディタ機能のさらなる磨き込み
+列ヘッダーのラベル編集 GUI、Enum ドロップダウン選択、条件付き書式（rules）の GUI 編集、外部ファイル変更時の自動リロード、Shift-JIS 保存の完全対応など。
