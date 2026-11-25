@@ -1,0 +1,83 @@
+{
+  "name": "meta-csv",
+  "displayName": "MetaCSV",
+  "description": "High-performance CSV editor & viewer with JSONC sidecar metadata (.meta.jsonc)",
+  "version": "0.1.0",
+  "publisher": "meta-csv",
+  "private": true,
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other",
+    "Visualization"
+  ],
+  "activationEvents": [
+    "onCustomEditor:metaCsv.editor",
+    "onCommand:metaCsv.openWithEditor"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "customEditors": [
+      {
+        "viewType": "metaCsv.editor",
+        "displayName": "MetaCSV Editor",
+        "selector": [
+          { "filenamePattern": "*.csv" },
+          { "filenamePattern": "*.tsv" }
+        ],
+        "priority": "option"
+      }
+    ],
+    "commands": [
+      {
+        "command": "metaCsv.openWithEditor",
+        "title": "MetaCSV: Open with MetaCSV Editor"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "metaCsv.openWithEditor",
+          "when": "resourceExtname == .csv || resourceExtname == .tsv",
+          "group": "navigation"
+        }
+      ]
+    },
+    "languages": [
+      {
+        "id": "jsonc",
+        "extensions": [".meta.jsonc"]
+      }
+    ],
+    "jsonValidation": [
+      {
+        "fileMatch": ["*.meta.jsonc"],
+        "url": "./schemas/metacsv.schema.json"
+      }
+    ]
+  },
+  "scripts": {
+    "build:ext": "esbuild src/extension.ts --bundle --platform=node --format=cjs --outfile=dist/extension.js --external:vscode --sourcemap",
+    "build:webview": "vite build",
+    "build": "pnpm run build:ext && pnpm run build:webview",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.webview.json --noEmit",
+    "test": "echo \"no tests in vscode\""
+  },
+  "dependencies": {
+    "@meta-csv/core": "workspace:*",
+    "@meta-csv/schema": "workspace:*",
+    "@meta-csv/ui": "workspace:*",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@types/vscode": "^1.85.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "esbuild": "^0.25.12",
+    "vite": "^6.2.2"
+  }
+}

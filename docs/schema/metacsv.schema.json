@@ -1,0 +1,287 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://meta-csv.dev/schemas/v0.1/metacsv.schema.json",
+  "title": "MetaCSV Metadata",
+  "description": "Sidecar metadata (.meta.jsonc) for MetaCSV editor and viewer.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema URL for editor completion and validation."
+    },
+    "version": {
+      "type": "string",
+      "const": "0.1",
+      "description": "MetaCSV schema version."
+    },
+    "csv": {
+      "type": "object",
+      "description": "CSV dialect settings. Omit properties to use auto-detection.",
+      "additionalProperties": false,
+      "properties": {
+        "hasHeader": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether the first row is a header row."
+        },
+        "delimiter": {
+          "type": "string",
+          "enum": [",", "\t", ";", "|"],
+          "description": "Column delimiter character."
+        },
+        "encoding": {
+          "type": "string",
+          "enum": ["utf-8", "utf-8-bom", "shift-jis"],
+          "description": "Character encoding preserved on save."
+        },
+        "lineEnding": {
+          "type": "string",
+          "enum": ["lf", "crlf"],
+          "description": "Line ending preserved on save."
+        }
+      }
+    },
+    "table": {
+      "type": "object",
+      "description": "Table-wide appearance and layout settings.",
+      "additionalProperties": false,
+      "properties": {
+        "fontFamily": {
+          "type": "string",
+          "description": "Font family used in cells."
+        },
+        "fontSize": {
+          "type": "number",
+          "minimum": 8,
+          "maximum": 48,
+          "default": 13,
+          "description": "Base font size in pixels."
+        },
+        "defaultRowHeight": {
+          "type": "number",
+          "minimum": 18,
+          "maximum": 400,
+          "default": 28,
+          "description": "Default row height in pixels."
+        },
+        "headerHeight": {
+          "type": "number",
+          "minimum": 20,
+          "maximum": 200,
+          "default": 32,
+          "description": "Header row height in pixels."
+        },
+        "freezeColumns": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Number of leftmost columns to pin/freeze."
+        }
+      }
+    },
+    "view": {
+      "type": "object",
+      "description": "Persistent view state (does not mutate CSV data).",
+      "additionalProperties": false,
+      "properties": {
+        "sort": {
+          "type": "array",
+          "description": "View-only sort order applied when opening the file.",
+          "items": {
+            "type": "object",
+            "required": ["column", "direction"],
+            "additionalProperties": false,
+            "properties": {
+              "column": {
+                "type": "string",
+                "description": "Column header name (if hasHeader=true) or 0-based index string (if hasHeader=false)."
+              },
+              "direction": {
+                "type": "string",
+                "enum": ["asc", "desc"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "styles": {
+      "type": "object",
+      "description": "Named reusable style palette (similar to Excel styles.xml). Referenced by name from columns, rules, ranges, rows, or cells.",
+      "additionalProperties": {
+        "$ref": "#/definitions/cellStyle"
+      }
+    },
+    "columns": {
+      "type": "object",
+      "description": "Per-column settings keyed by header name (hasHeader=true) or 0-based index string (hasHeader=false).",
+      "additionalProperties": {
+        "$ref": "#/definitions/columnConfig"
+      }
+    },
+    "rules": {
+      "type": "array",
+      "description": "Conditional formatting rules evaluated in order.",
+      "items": {
+        "$ref": "#/definitions/conditionalRule"
+      }
+    },
+    "ranges": {
+      "type": "array",
+      "description": "Rectangular range style overrides evaluated in order (similar to Excel sqref).",
+      "items": {
+        "type": "object",
+        "required": ["ref", "style"],
+        "additionalProperties": false,
+        "properties": {
+          "ref": {
+            "type": "string",
+            "pattern": "^[0-9]+:[0-9]+\\.\\.[0-9]+:[0-9]+$",
+            "description": "0-based inclusive range in '<startRow>:<startCol>..<endRow>:<endCol>' format (e.g. '10:0..13:5')."
+          },
+          "style": {
+            "$ref": "#/definitions/styleRef"
+          }
+        }
+      }
+    },
+    "rows": {
+      "type": "object",
+      "description": "Per-row overrides keyed by 0-based data row index string.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "height": {
+            "type": "number",
+            "minimum": 18,
+            "maximum": 800,
+            "description": "Row height in pixels."
+          },
+          "style": {
+            "$ref": "#/definitions/styleRef"
+          }
+        }
+      }
+    },
+    "cells": {
+      "type": "object",
+      "description": "Per-cell style overrides keyed by '<rowIndex>:<colKey>' (e.g. '14:0' or '14:status').",
+      "additionalProperties": {
+        "$ref": "#/definitions/styleRef"
+      }
+    }
+  },
+  "definitions": {
+    "styleRef": {
+      "description": "Either a named style key defined in top-level 'styles', or an inline cellStyle object.",
+      "oneOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "$ref": "#/definitions/cellStyle"
+        }
+      ]
+    },
+    "cellStyle": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "bold": { "type": "boolean" },
+        "italic": { "type": "boolean" },
+        "color": {
+          "type": "string",
+          "description": "CSS color string for text (e.g. '#ff5555')."
+        },
+        "backgroundColor": {
+          "type": "string",
+          "description": "CSS color string for cell background (e.g. 'rgba(0, 122, 204, 0.15)')."
+        },
+        "fontFamily": { "type": "string" },
+        "fontSize": { "type": "number", "minimum": 8, "maximum": 48 }
+      }
+    },
+    "columnConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "type": "string",
+          "description": "Display alias shown in the column header."
+        },
+        "width": {
+          "type": "number",
+          "minimum": 24,
+          "maximum": 2000,
+          "description": "Column width in pixels."
+        },
+        "visible": {
+          "type": "boolean",
+          "default": true
+        },
+        "align": {
+          "type": "string",
+          "enum": ["left", "center", "right"]
+        },
+        "wrap": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether long text wraps within the cell."
+        },
+        "readonly": {
+          "type": "boolean",
+          "default": false
+        },
+        "type": {
+          "type": "string",
+          "enum": ["text", "number", "boolean", "enum", "date"],
+          "default": "text"
+        },
+        "options": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Allowed values when type is 'enum'."
+        },
+        "style": {
+          "$ref": "#/definitions/styleRef"
+        }
+      }
+    },
+    "conditionalRule": {
+      "type": "object",
+      "required": ["when", "style"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Optional human-readable rule description."
+        },
+        "target": {
+          "type": "string",
+          "enum": ["cell", "row"],
+          "default": "cell",
+          "description": "Apply style to the matched cell only, or the entire row."
+        },
+        "when": {
+          "type": "object",
+          "required": ["column", "operator"],
+          "additionalProperties": false,
+          "properties": {
+            "column": { "type": "string" },
+            "operator": {
+              "type": "string",
+              "enum": ["equals", "notEquals", "contains", "startsWith", "regex", "empty", "notEmpty"]
+            },
+            "value": { "type": "string" }
+          }
+        },
+        "style": {
+          "$ref": "#/definitions/styleRef"
+        }
+      }
+    }
+  }
+}

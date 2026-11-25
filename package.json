@@ -1,0 +1,15 @@
+{
+  "name": "meta-csv-monorepo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --filter @meta-csv/playground dev",
+    "dev:desktop": "pnpm --filter @meta-csv/desktop tauri:dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.2"
+  }
+}

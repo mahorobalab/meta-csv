@@ -1,0 +1,16 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run MetaCSV Extension",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/apps/vscode",
+        "${workspaceFolder}/../meta-csv-data"
+      ],
+      "outFiles": ["${workspaceFolder}/apps/vscode/dist/**/*.js"],
+      "preLaunchTask": "build-vscode-extension"
+    }
+  ]
+}
