@@ -13,6 +13,17 @@
       "preLaunchTask": "build-vscode-extension"
     },
     {
+      "name": "Run MetaText Editor Extension (macOS)",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/apps/vscode",
+        "${workspaceFolder}/../metatext-data"
+      ],
+      "outFiles": ["${workspaceFolder}/apps/vscode/dist/**/*.js"],
+      "preLaunchTask": "build-vscode-extension"
+    },
+    {
       "name": "Run MetaText Editor Desktop (.exe)",
       "type": "node-terminal",
       "request": "launch",
@@ -30,6 +41,25 @@
       "type": "node-terminal",
       "request": "launch",
       "command": "pnpm.cmd dev:desktop"
+    },
+    {
+      "name": "Run MetaText Editor Desktop (macOS)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "\"${workspaceFolder}/apps/desktop/src-tauri/target/release/metatext-editor\""
+    },
+    {
+      "name": "Build & Run MetaText Editor Desktop (macOS)",
+      "type": "node-terminal",
+      "request": "launch",
+      "preLaunchTask": "build-desktop-mac",
+      "command": "\"${workspaceFolder}/apps/desktop/src-tauri/target/release/metatext-editor\""
+    },
+    {
+      "name": "Run MetaText Editor Desktop (Tauri Dev - macOS)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "PATH=\"/opt/homebrew/opt/rustup/bin:$PATH\" pnpm dev:desktop"
     }
   ]
 }

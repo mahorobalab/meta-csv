@@ -4,13 +4,22 @@
     {
       "label": "build-vscode-extension",
       "type": "shell",
-      "command": "pnpm.cmd --filter meta-csv build",
+      "command": "pnpm --filter meta-csv build",
+      "windows": {
+        "command": "pnpm.cmd --filter meta-csv build"
+      },
       "problemMatcher": []
     },
     {
       "label": "build-desktop-exe",
       "type": "shell",
       "command": "pnpm.cmd build:desktop",
+      "problemMatcher": []
+    },
+    {
+      "label": "build-desktop-mac",
+      "type": "shell",
+      "command": "PATH=\"/opt/homebrew/opt/rustup/bin:$PATH\" pnpm build:desktop",
       "problemMatcher": []
     }
   ]

@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "identifier": "dev.metacsv.desktop",
   "build": {
-    "beforeDevCommand": "pnpm.cmd dev",
+    "beforeDevCommand": "pnpm dev",
     "devUrl": "http://127.0.0.1:15174",
-    "beforeBuildCommand": "pnpm.cmd build",
+    "beforeBuildCommand": "pnpm build",
     "frontendDist": "../dist"
   },
   "app": {
