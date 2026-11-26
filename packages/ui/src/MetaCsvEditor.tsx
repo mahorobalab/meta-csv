@@ -91,6 +91,7 @@ import {
   formatCellValue,
   indexToExcelColumn,
   isValidNumberFormat,
+  iterateSerializedCsvChunks,
   parseMetaJsonc,
   patchMetaJsonc,
   resolveCellStyle,
@@ -186,6 +187,10 @@ export interface MetaCsvEditorProps {
   onNewFile?: () => void;
   onOpenFile?: () => void;
   onSaveAs?: (bytes: Uint8Array, metaText: string) => Promise<boolean | void> | boolean | void;
+  onSaveAsStream?: (
+    chunks: Iterable<Uint8Array>,
+    metaText: string,
+  ) => Promise<boolean | void> | boolean | void;
   onCloseFile?: () => void;
   fileMenuItems?: React.ReactNode;
   settingsExtraSection?: React.ReactNode;
@@ -219,6 +224,7 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
       onNewFile,
       onOpenFile,
       onSaveAs,
+      onSaveAsStream,
       onCloseFile,
       fileMenuItems,
       settingsExtraSection,
@@ -542,6 +548,22 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
       window.clearTimeout(overlayTimer);
     };
   }, [adapter, reloadTick]);
+
+  // Keep displayed fileName in sync when filePath changes (e.g., after in-place Save As)
+  useEffect(() => {
+    if (!filePath) return;
+    const parts = filePath.split(/[\\/]/);
+    const nextName = parts[parts.length - 1];
+    if (nextName) setFileName(nextName);
+  }, [filePath]);
+
+  // Release large row buffers immediately on unmount so GC can reclaim memory sooner
+  useEffect(() => {
+    return () => {
+      rowsRef.current = [];
+      historyRef.current.clear();
+    };
+  }, []);
 
   const applyParsedMetaAndReparseIfNeeded = useCallback(
     (nextText: string | null) => {
@@ -2427,25 +2449,83 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
       setStatusMsg('Read-Only mode — unlock to save changes');
       return;
     }
-    const bytes = serializeCurrentCsv();
-    if (!bytes) return;
-    await adapter.saveCsv(bytes);
+    if (!csvData) return;
+    const isCsvOrTsv = !csvData.format || csvData.format === 'csv' || csvData.format === 'tsv';
+    if (isCsvOrTsv && adapter.saveCsvStream) {
+      const chunkRows = 20_000;
+      const totalRows = rowsRef.current.length;
+      const showProgress = totalRows >= 50_000;
+      if (showProgress) {
+        setStatusMsg(`Saving ${fileName} (0%)...`);
+      }
+      const chunkGen = iterateSerializedCsvChunks(
+        csvData.headers,
+        rowsRef.current,
+        csvData.dialect,
+        chunkRows,
+      );
+      const trackedChunks = (function* () {
+        let processedRows = 0;
+        for (const chunk of chunkGen) {
+          yield chunk;
+          if (showProgress) {
+            processedRows = Math.min(totalRows, processedRows + chunkRows);
+            const pct = Math.min(99, Math.round((processedRows / Math.max(1, totalRows)) * 100));
+            setStatusMsg(`Saving ${fileName} (${pct}%)...`);
+          }
+        }
+      })();
+      await adapter.saveCsvStream(trackedChunks);
+    } else {
+      const bytes = serializeCurrentCsv();
+      if (!bytes) return;
+      await adapter.saveCsv(bytes);
+    }
     setDirtyCsv(false);
     setStatusMsg(
       `Saved ${fileName} (${rowsRef.current.length.toLocaleString()} rows)`,
     );
-  }, [isReadOnly, adapter, serializeCurrentCsv, fileName]);
+  }, [isReadOnly, csvData, adapter, serializeCurrentCsv, fileName]);
 
   const handleSaveAs = useCallback(async () => {
-    if (!onSaveAs) return;
-    const bytes = serializeCurrentCsv();
-    if (!bytes) return;
-    const saved = await onSaveAs(bytes, metaTextRef.current ?? '');
+    if (!onSaveAs && !onSaveAsStream) return;
+    if (!csvData) return;
+    const isCsvOrTsv = !csvData.format || csvData.format === 'csv' || csvData.format === 'tsv';
+    let saved: boolean | void = false;
+    if (isCsvOrTsv && onSaveAsStream) {
+      const chunkRows = 20_000;
+      const totalRows = rowsRef.current.length;
+      const showProgress = totalRows >= 50_000;
+      const trackedChunks = (function* () {
+        if (showProgress) {
+          setStatusMsg(`Saving as new file (0%)...`);
+        }
+        let processedRows = 0;
+        for (const chunk of iterateSerializedCsvChunks(
+          csvData.headers,
+          rowsRef.current,
+          csvData.dialect,
+          chunkRows,
+        )) {
+          yield chunk;
+          if (showProgress) {
+            processedRows = Math.min(totalRows, processedRows + chunkRows);
+            const pct = Math.min(99, Math.round((processedRows / Math.max(1, totalRows)) * 100));
+            setStatusMsg(`Saving as new file (${pct}%)...`);
+          }
+        }
+      })();
+      saved = await onSaveAsStream(trackedChunks, metaTextRef.current ?? '');
+    } else if (onSaveAs) {
+      const bytes = serializeCurrentCsv();
+      if (!bytes) return;
+      saved = await onSaveAs(bytes, metaTextRef.current ?? '');
+    }
     if (saved !== false) {
       setDirtyCsv(false);
       setStatusMsg('Saved as new file');
     }
-  }, [onSaveAs, serializeCurrentCsv]);
+  }, [csvData, onSaveAs, onSaveAsStream, serializeCurrentCsv]);
 
   const handleNewFileAction = useCallback(() => {
     if (!onNewFile) return;

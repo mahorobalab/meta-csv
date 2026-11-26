@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { Check, Code2, Copy, FileSpreadsheet, Info, Moon, Plus, Settings, X } from 'lucide-react';
-import type { FileSystemAdapter } from '@meta-csv/core';
 import {
   AboutModal,
   MetaCsvEditor,
@@ -16,7 +15,12 @@ import {
   type NativeClipboardBridge,
   type ThemePreference,
 } from '@meta-csv/ui';
-import { createTauriAdapter, createUntitledDesktopAdapter } from './tauriAdapter';
+import {
+  createTauriAdapter,
+  createUntitledDesktopAdapter,
+  saveFileStreamViaTauri,
+  type DesktopFileSystemAdapter,
+} from './tauriAdapter';
 
 interface DesktopAppSettings extends EditorAppSettings {
   theme: ThemePreference;
@@ -30,7 +34,7 @@ interface DesktopTab {
   filePath: string | null;
   fileName: string;
   dirty: boolean;
-  adapter: FileSystemAdapter;
+  adapter: DesktopFileSystemAdapter;
   sleeping: boolean;
   lastAccessedAt: number;
   fileBytes: number;
@@ -212,8 +216,9 @@ export const App: React.FC = () => {
       }
 
       const normDest = normalizePathKey(selected);
-      const nextAdapter = createTauriAdapter(selected);
       const nextName = extractFileName(selected);
+      // Update adapter path in-place so MetaCsvEditor does NOT reload/re-parse the entire file
+      currentTab?.adapter.setFilePath(selected);
 
       setTabs((prev) => {
         const next = prev
@@ -227,7 +232,66 @@ export const App: React.FC = () => {
                   dirty: false,
                   sleeping: false,
                   fileBytes: bytes.byteLength,
-                  adapter: nextAdapter,
+                }
+              : t,
+          );
+        return applyMemoryBudget(next, tabId);
+      });
+      setActiveTabId(tabId);
+      updateLastDirectory(selected);
+      return true;
+    },
+    [updateLastDirectory, applyMemoryBudget],
+  );
+
+  const saveTabAsStream = useCallback(
+    async (
+      tabId: string,
+      chunks: Iterable<Uint8Array>,
+      metaText: string,
+    ): Promise<boolean> => {
+      const currentTab = tabsRef.current.find((t) => t.id === tabId);
+      const defaultPath =
+        currentTab?.filePath ??
+        (lastDirRef.current ? `${lastDirRef.current}\\untitled.csv` : 'untitled.csv');
+      const selected = await save({
+        defaultPath,
+        filters: [
+          { name: 'CSV', extensions: ['csv'] },
+          { name: 'TSV', extensions: ['tsv'] },
+          { name: 'JSONL', extensions: ['jsonl', 'ndjson'] },
+          { name: 'Log / Text', extensions: ['log', 'txt'] },
+          { name: 'All Files', extensions: ['*'] },
+        ],
+      });
+      if (typeof selected !== 'string' || selected.length === 0) {
+        return false;
+      }
+      const totalBytes = await saveFileStreamViaTauri(selected, chunks);
+      if (metaText.trim().length > 0) {
+        await invoke('save_meta_text', {
+          path: selected,
+          metaText,
+        });
+      }
+
+      const normDest = normalizePathKey(selected);
+      const nextName = extractFileName(selected);
+      // Update adapter path in-place so MetaCsvEditor does NOT reload/re-parse the entire file
+      currentTab?.adapter.setFilePath(selected);
+
+      setTabs((prev) => {
+        const next = prev
+          .filter((t) => t.id === tabId || !t.filePath || normalizePathKey(t.filePath) !== normDest)
+          .map((t) =>
+            t.id === tabId
+              ? {
+                  ...t,
+                  filePath: selected,
+                  fileName: nextName,
+                  dirty: false,
+                  sleeping: false,
+                  fileBytes: totalBytes,
                 }
               : t,
           );
@@ -305,8 +369,9 @@ export const App: React.FC = () => {
 
   const handleNewTab = useCallback(() => {
     const id = `tab-${nextTabIdRef.current++}`;
-    const adapter = createUntitledDesktopAdapter((bytes, metaText) =>
-      saveTabAs(id, bytes, metaText),
+    const adapter = createUntitledDesktopAdapter(
+      (bytes, metaText) => saveTabAs(id, bytes, metaText),
+      (chunks, metaText) => saveTabAsStream(id, chunks, metaText),
     );
     const tab: DesktopTab = {
       id,
@@ -320,7 +385,7 @@ export const App: React.FC = () => {
     };
     setTabs((prev) => applyMemoryBudget([...prev, tab], id));
     setActiveTabId(id);
-  }, [saveTabAs, applyMemoryBudget]);
+  }, [saveTabAs, saveTabAsStream, applyMemoryBudget]);
 
   const closeTab = useCallback((tabId: string, skipConfirm = false) => {
     const target = tabsRef.current.find((t) => t.id === tabId);
@@ -753,6 +818,7 @@ export const App: React.FC = () => {
                     onNewFile={handleNewTab}
                     onOpenFile={() => void handleOpenFile()}
                     onSaveAs={(bytes, metaText) => saveTabAs(tab.id, bytes, metaText)}
+                    onSaveAsStream={(chunks, metaText) => saveTabAsStream(tab.id, chunks, metaText)}
                     onCloseFile={() => closeTab(tab.id, true)}
                     fileMenuItems={fileMenuItems}
                     settingsExtraSection={settingsExtraSection}

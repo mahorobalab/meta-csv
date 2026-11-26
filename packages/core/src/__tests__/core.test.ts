@@ -6,12 +6,14 @@ import {
   buildSortedRowIndices,
   computeColumnFacets,
   createStyleResolverContext,
+  detectEncoding,
   detectTargetFormat,
   estimateAutoRowHeight,
   estimateWrappedLineCount,
   formatCellValue,
   indexToExcelColumn,
   isValidNumberFormat,
+  iterateSerializedCsvChunks,
   parseCsvBytes,
   parseJsonlBytes,
   parseLogBytes,
@@ -555,5 +557,72 @@ describe('@meta-csv/core', () => {
     const afterAlign = patchMetaJsonc(afterNoOp, ['columns', 'amount', 'align'], 'right');
     const parsed = parseMetaJsonc(afterAlign);
     expect(parsed.columns?.amount?.align).toBe('right');
+  });
+
+  it('produces byte-identical output between iterateSerializedCsvChunks and serializeCsv', () => {
+    const concatChunks = (chunks: Iterable<Uint8Array>): Uint8Array => {
+      const list = Array.from(chunks);
+      const total = list.reduce((sum, c) => sum + c.length, 0);
+      const out = new Uint8Array(total);
+      let offset = 0;
+      for (const c of list) {
+        out.set(c, offset);
+        offset += c.length;
+      }
+      return out;
+    };
+
+    const headers = ['id', 'name', 'note'];
+    const rows = [
+      ['1', 'Alice, Jr.', 'line1\nline2'],
+      ['2', 'Bob "B"', 'plain'],
+      ['3', '日本語', 'trailing\rcr'],
+      ['4', '', 'last'],
+    ];
+
+    // UTF-8 BOM + CRLF + header, forced multi-chunk
+    const bomDialect = {
+      hasHeader: true,
+      delimiter: ',' as const,
+      encoding: 'utf-8-bom' as const,
+      lineEnding: 'crlf' as const,
+    };
+    expect(concatChunks(iterateSerializedCsvChunks(headers, rows, bomDialect, 2))).toEqual(
+      serializeCsv(headers, rows, bomDialect),
+    );
+
+    // UTF-8 + LF + TSV + no header, 1 row per chunk
+    const tsvDialect = {
+      hasHeader: false,
+      delimiter: '\t' as const,
+      encoding: 'utf-8' as const,
+      lineEnding: 'lf' as const,
+    };
+    expect(concatChunks(iterateSerializedCsvChunks(headers, rows, tsvDialect, 1))).toEqual(
+      serializeCsv(headers, rows, tsvDialect),
+    );
+
+    // Empty rows with header & without header
+    expect(concatChunks(iterateSerializedCsvChunks(headers, [], bomDialect, 2))).toEqual(
+      serializeCsv(headers, [], bomDialect),
+    );
+    const emptyNoHeader = { ...bomDialect, hasHeader: false };
+    expect(concatChunks(iterateSerializedCsvChunks([], [], emptyNoHeader, 2))).toEqual(
+      serializeCsv([], [], emptyNoHeader),
+    );
+  });
+
+  it('detects UTF-8 accurately even when a multi-byte character spans the 64KB sample boundary', () => {
+    // 65535 ASCII bytes + 3-byte Japanese char ('あ' = E3 81 82) -> split at byte 65536 (1 byte in)
+    const pad1 = 'a'.repeat(65535) + 'あいう';
+    expect(detectEncoding(new TextEncoder().encode(pad1))).toBe('utf-8');
+
+    // 65534 ASCII bytes + 3-byte Japanese char ('あ' = E3 81 82) -> split at byte 65536 (2 bytes in)
+    const pad2 = 'a'.repeat(65534) + 'あいう';
+    expect(detectEncoding(new TextEncoder().encode(pad2))).toBe('utf-8');
+
+    // Shift-JIS bytes ('あ' = 0x82 0xA0) are still detected as shift-jis
+    const sjis = new Uint8Array([0x82, 0xa0, 0x82, 0xa2, 0x0d, 0x0a]);
+    expect(detectEncoding(sjis)).toBe('shift-jis');
   });
 });

@@ -1,6 +1,9 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
+use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use tauri::ipc::{Request, Response};
 use tauri::{Manager, PhysicalPosition, PhysicalSize, Position, Size, Theme, WebviewWindow, WindowEvent};
@@ -325,6 +328,159 @@ fn save_csv_raw(request: Request<'_>) -> Result<(), String> {
     fs::write(&path, bytes).map_err(|e| format!("Failed to write CSV: {e}"))
 }
 
+struct WriteSession {
+    writer: BufWriter<fs::File>,
+    temp_path: PathBuf,
+    target_path: PathBuf,
+}
+
+struct WriteSessionStore {
+    next_id: AtomicU64,
+    sessions: Mutex<HashMap<u64, WriteSession>>,
+}
+
+impl WriteSessionStore {
+    fn new() -> Self {
+        Self {
+            next_id: AtomicU64::new(1),
+            sessions: Mutex::new(HashMap::new()),
+        }
+    }
+}
+
+#[tauri::command]
+fn begin_file_write(
+    path: String,
+    state: tauri::State<'_, WriteSessionStore>,
+) -> Result<u64, String> {
+    let target_path = PathBuf::from(&path);
+    let id = state.next_id.fetch_add(1, Ordering::Relaxed);
+    let file_name = target_path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("metatext");
+    let temp_name = format!(".{file_name}.metatext-tmp-{}-{id}", std::process::id());
+    let temp_path = target_path.with_file_name(temp_name);
+
+    let file = fs::File::create(&temp_path)
+        .map_err(|e| format!("Failed to create temp file for streaming write: {e}"))?;
+    let writer = BufWriter::with_capacity(256 * 1024, file);
+
+    let mut sessions = state
+        .sessions
+        .lock()
+        .map_err(|_| "Failed to lock write session store".to_string())?;
+    sessions.insert(
+        id,
+        WriteSession {
+            writer,
+            temp_path,
+            target_path,
+        },
+    );
+    Ok(id)
+}
+
+#[tauri::command]
+fn write_file_chunk(
+    request: Request<'_>,
+    state: tauri::State<'_, WriteSessionStore>,
+) -> Result<(), String> {
+    let write_id_str = request
+        .headers()
+        .get("x-write-id")
+        .and_then(|v| v.to_str().ok())
+        .ok_or_else(|| "Missing x-write-id header".to_string())?;
+    let write_id: u64 = write_id_str
+        .parse()
+        .map_err(|_| "Invalid x-write-id header".to_string())?;
+
+    let bytes = match request.body() {
+        tauri::ipc::InvokeBody::Raw(data) => data.as_slice(),
+        tauri::ipc::InvokeBody::Json(_) => {
+            return Err("Expected raw binary body for write_file_chunk".to_string())
+        }
+    };
+
+    let mut sessions = state
+        .sessions
+        .lock()
+        .map_err(|_| "Failed to lock write session store".to_string())?;
+    let session = sessions
+        .get_mut(&write_id)
+        .ok_or_else(|| format!("Unknown write session {write_id}"))?;
+
+    session
+        .writer
+        .write_all(bytes)
+        .map_err(|e| format!("Failed to write chunk: {e}"))
+}
+
+#[tauri::command]
+fn finish_file_write(
+    write_id: u64,
+    state: tauri::State<'_, WriteSessionStore>,
+) -> Result<(), String> {
+    let mut session = {
+        let mut sessions = state
+            .sessions
+            .lock()
+            .map_err(|_| "Failed to lock write session store".to_string())?;
+        sessions
+            .remove(&write_id)
+            .ok_or_else(|| format!("Unknown write session {write_id}"))?
+    };
+
+    let temp_path = session.temp_path;
+    let target_path = session.target_path;
+
+    if let Err(e) = session.writer.flush() {
+        drop(session.writer);
+        let _ = fs::remove_file(&temp_path);
+        return Err(format!("Failed to flush temp file: {e}"));
+    }
+    // Close file handle explicitly before renaming (required on Windows).
+    drop(session.writer);
+
+    if let Err(rename_err) = fs::rename(&temp_path, &target_path) {
+        if target_path.exists() {
+            fs::remove_file(&target_path).map_err(|e| {
+                let _ = fs::remove_file(&temp_path);
+                format!("Failed to replace target file: {e} (rename error: {rename_err})")
+            })?;
+            fs::rename(&temp_path, &target_path).map_err(|e| {
+                let _ = fs::remove_file(&temp_path);
+                format!("Failed to finalize temp file: {e}")
+            })?;
+        } else {
+            let _ = fs::remove_file(&temp_path);
+            return Err(format!("Failed to finalize temp file: {rename_err}"));
+        }
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+fn abort_file_write(
+    write_id: u64,
+    state: tauri::State<'_, WriteSessionStore>,
+) -> Result<(), String> {
+    let session = {
+        let mut sessions = state
+            .sessions
+            .lock()
+            .map_err(|_| "Failed to lock write session store".to_string())?;
+        sessions.remove(&write_id)
+    };
+    if let Some(session) = session {
+        let temp_path = session.temp_path;
+        drop(session.writer);
+        let _ = fs::remove_file(&temp_path);
+    }
+    Ok(())
+}
+
 #[tauri::command]
 fn save_meta_text(path: String, meta_text: String) -> Result<(), String> {
     let meta_path = format!("{path}.metatext.jsonc");
@@ -391,6 +547,7 @@ pub fn run() {
                 .map(|g| g.clone())
                 .unwrap_or_default();
             app.manage(store);
+            app.manage(WriteSessionStore::new());
 
             if let Some(window) = app.get_webview_window("main") {
                 restore_window_state(&window, &initial_settings);
@@ -427,6 +584,10 @@ pub fn run() {
             load_csv_bytes,
             load_meta_text,
             save_csv_raw,
+            begin_file_write,
+            write_file_chunk,
+            finish_file_write,
+            abort_file_write,
             save_meta_text,
             read_clipboard_text,
             write_clipboard_text,

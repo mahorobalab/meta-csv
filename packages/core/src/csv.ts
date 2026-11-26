@@ -64,8 +64,13 @@ export function detectEncoding(bytes: Uint8Array): CsvEncoding {
     return 'utf-8-bom';
   }
   try {
+    const sampleLimit = 65536;
+    const isTruncated = bytes.length > sampleLimit;
     const decoder = new TextDecoder('utf-8', { fatal: true });
-    decoder.decode(bytes.subarray(0, Math.min(bytes.length, 65536)));
+    decoder.decode(
+      isTruncated ? bytes.subarray(0, sampleLimit) : bytes,
+      { stream: isTruncated },
+    );
     return 'utf-8';
   } catch {
     return 'shift-jis';
@@ -239,6 +244,82 @@ export function serializeCsv(
     newline,
   });
   return encodeCsvText(text, dialect.encoding);
+}
+
+function serializeCsvRow(row: string[], delimiter: string): string {
+  const len = row.length;
+  if (len === 0) return '';
+  const parts = new Array<string>(len);
+  for (let c = 0; c < len; c++) {
+    const raw = row[c] ?? '';
+    if (
+      raw.indexOf(delimiter) !== -1 ||
+      raw.indexOf('"') !== -1 ||
+      raw.indexOf('\n') !== -1 ||
+      raw.indexOf('\r') !== -1
+    ) {
+      parts[c] = `"${raw.replace(/"/g, '""')}"`;
+    } else {
+      parts[c] = raw;
+    }
+  }
+  return parts.join(delimiter);
+}
+
+/**
+ * Lazily serialize CSV rows into bounded UTF-8 byte chunks without allocating
+ * a monolithic string or Uint8Array for the entire file.
+ * Produces byte-identical output to `serializeCsv`.
+ */
+export function* iterateSerializedCsvChunks(
+  headers: string[],
+  rows: string[][],
+  dialect: ResolvedCsvDialect,
+  chunkRows = 20_000,
+): Generator<Uint8Array> {
+  const safeChunkRows = Math.max(1, Math.floor(chunkRows));
+  const delimiter = dialect.delimiter;
+  const newline = dialect.lineEnding === 'crlf' ? '\r\n' : '\n';
+  const encoder = new TextEncoder();
+
+  let isFirstChunk = true;
+  let lines: string[] = [];
+
+  const encodeChunk = (text: string): Uint8Array => {
+    if (isFirstChunk) {
+      isFirstChunk = false;
+      return encodeCsvText(text, dialect.encoding);
+    }
+    return encoder.encode(text);
+  };
+
+  const flush = (): Uint8Array => {
+    const prefix = isFirstChunk ? '' : newline;
+    const text = prefix + lines.join(newline);
+    lines = [];
+    return encodeChunk(text);
+  };
+
+  if (dialect.hasHeader) {
+    lines.push(serializeCsvRow(headers, delimiter));
+    if (lines.length >= safeChunkRows) {
+      yield flush();
+    }
+  }
+
+  for (let r = 0; r < rows.length; r++) {
+    lines.push(serializeCsvRow(rows[r]!, delimiter));
+    if (lines.length >= safeChunkRows) {
+      yield flush();
+    }
+  }
+
+  if (lines.length > 0) {
+    yield flush();
+  } else if (isFirstChunk) {
+    // Empty file (no header, no rows): still emit BOM if utf-8-bom
+    yield encodeChunk('');
+  }
 }
 
 /**

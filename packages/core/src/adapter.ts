@@ -12,6 +12,11 @@ export interface FileSystemAdapter {
   load(): Promise<CsvFilePayload>;
   /** Persist CSV bytes (already encoded in the target encoding) */
   saveCsv(bytes: Uint8Array): Promise<void>;
+  /** Optional low-memory streaming save (preferred by Desktop Tauri for large files) */
+  saveCsvStream?(
+    chunks: Iterable<Uint8Array>,
+    onProgress?: (percent: number) => void,
+  ): Promise<void>;
   /** Persist .metatext.jsonc text (creating it if it does not exist) */
   saveMeta(jsoncText: string): Promise<void>;
   /** Optional subscription to external file updates */
