@@ -1,6 +1,7 @@
 export {
   MetaCsvEditor,
   type EditorStatusInfo,
+  type EditorViewSnapshot,
   type MetaCsvEditorHandle,
   type MetaCsvEditorProps,
 } from './MetaCsvEditor';

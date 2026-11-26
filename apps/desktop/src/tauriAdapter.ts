@@ -36,3 +36,37 @@ export function createTauriAdapter(filePath: string): FileSystemAdapter {
     },
   };
 }
+
+const DEFAULT_NEW_CSV = [',,,,', ',,,,', ',,,,', ',,,,', ',,,,'].join('\r\n');
+const DEFAULT_NEW_META = `{
+  "version": "0.1",
+  "format": "csv",
+  "csv": {
+    "hasHeader": false
+  }
+}
+`;
+
+export function createUntitledDesktopAdapter(
+  onSaveAsRequested: (bytes: Uint8Array, metaText: string) => Promise<boolean>,
+): FileSystemAdapter {
+  let metaText = DEFAULT_NEW_META;
+
+  return {
+    async load(): Promise<CsvFilePayload> {
+      return {
+        fileName: 'untitled.csv',
+        csvBytes: new TextEncoder().encode(DEFAULT_NEW_CSV),
+        metaText,
+      };
+    },
+
+    async saveCsv(bytes: Uint8Array): Promise<void> {
+      await onSaveAsRequested(bytes, metaText);
+    },
+
+    async saveMeta(jsoncText: string): Promise<void> {
+      metaText = jsoncText;
+    },
+  };
+}

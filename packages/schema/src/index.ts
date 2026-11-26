@@ -78,6 +78,7 @@ export interface CellStyle {
   backgroundColor?: string;
   fontFamily?: string;
   fontSize?: number;
+  wrap?: boolean;
 }
 
 export type StyleRef = string | CellStyle;

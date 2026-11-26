@@ -45,8 +45,9 @@ export interface FileLayoutSettingsProps {
   onFontSizeChange: (next: number) => void;
   defaultRowHeight: number;
   onDefaultRowHeightChange: (next: number) => void;
-  columns: Array<{ key: string; label: string; visible: boolean }>;
+  columns: Array<{ key: string; label: string; visible: boolean; wrap?: boolean }>;
   onToggleColumnVisible: (key: string, visible: boolean) => void;
+  onToggleColumnWrap?: (key: string, wrap: boolean) => void;
 }
 
 export interface SettingsModalProps {
@@ -90,27 +91,39 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     fileSettings?.logMatchedPresetId ?? 'custom',
   );
 
+  const hasFileSettings = Boolean(fileSettings);
+  const logColumnNamesKey = fileSettings?.logColumnNames?.join(',') ?? '';
+
+  // Reset initial tab only when modal opens (never on parent re-renders / onClose identity changes)
   useEffect(() => {
     if (!open) return;
-    setActiveTab(fileSettings ? 'file' : 'app');
+    setActiveTab(hasFileSettings ? 'file' : 'app');
+  }, [open, hasFileSettings]);
+
+  // Sync log parser draft fields when modal opens or file log config changes
+  useEffect(() => {
+    if (!open) return;
     setDraftLinePattern(fileSettings?.logLinePattern ?? '');
     setDraftColumnNamesText((fileSettings?.logColumnNames ?? []).join(', '));
     setDraftMultilinePattern(fileSettings?.logMultilinePattern ?? '');
     setDraftPresetId(fileSettings?.logMatchedPresetId ?? 'custom');
+  }, [
+    open,
+    fileSettings?.logLinePattern,
+    fileSettings?.logMultilinePattern,
+    fileSettings?.logMatchedPresetId,
+    logColumnNamesKey,
+  ]);
+
+  // Close on Escape
+  useEffect(() => {
+    if (!open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [
-    open,
-    onClose,
-    Boolean(fileSettings),
-    fileSettings?.logLinePattern,
-    fileSettings?.logMultilinePattern,
-    fileSettings?.logMatchedPresetId,
-    fileSettings?.logColumnNames?.join(','),
-  ]);
+  }, [open, onClose]);
 
   const draftColumnNames = useMemo(
     () =>
@@ -179,9 +192,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         zIndex: 100,
         background: 'rgba(0, 0, 0, 0.45)',
         display: 'flex',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         justifyContent: 'center',
-        padding: 16,
+        padding: '8vh 16px 16px',
       }}
     >
       <div
@@ -192,7 +205,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           width: '100%',
           maxWidth:
             fileSettings?.format === 'log' || fileSettings?.format === 'text' ? 540 : 460,
-          maxHeight: '88vh',
+          maxHeight: '84vh',
           overflowY: 'auto',
           borderRadius: 10,
           background: bg,
@@ -566,7 +579,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </label>
 
             <hr style={{ border: 'none', borderTop: `1px solid ${border}`, margin: '2px 0' }} />
-            <div style={{ fontWeight: 600, fontSize: 12 }}>Visible Columns</div>
+            <div style={{ fontWeight: 600, fontSize: 12 }}>Columns (Show / Wrap)</div>
             <div
               style={{
                 display: 'grid',
@@ -581,19 +594,41 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               }}
             >
               {fileSettings.columns.map((col) => (
-                <label
+                <div
                   key={col.key}
-                  style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12 }}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4, fontSize: 12 }}
                 >
-                  <input
-                    type="checkbox"
-                    checked={col.visible}
-                    onChange={(e) => fileSettings.onToggleColumnVisible(col.key, e.target.checked)}
-                  />
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {col.label}
-                  </span>
-                </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', minWidth: 0, flex: 1 }}>
+                    <input
+                      type="checkbox"
+                      checked={col.visible}
+                      onChange={(e) => fileSettings.onToggleColumnVisible(col.key, e.target.checked)}
+                    />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {col.label}
+                    </span>
+                  </label>
+                  {fileSettings.onToggleColumnWrap && (
+                    <button
+                      type="button"
+                      title={col.wrap ? 'Disable text wrap for this column' : 'Enable text wrap for this column'}
+                      onClick={() => fileSettings.onToggleColumnWrap?.(col.key, !col.wrap)}
+                      style={{
+                        padding: '1px 5px',
+                        fontSize: 10.5,
+                        borderRadius: 4,
+                        border: `1px solid ${col.wrap ? '#3b82f6' : border}`,
+                        background: col.wrap ? (isDark ? '#1e3a8a' : '#dbeafe') : 'transparent',
+                        color: col.wrap ? (isDark ? '#ffffff' : '#1d4ed8') : fg,
+                        opacity: col.wrap ? 1 : 0.6,
+                        cursor: 'pointer',
+                        flexShrink: 0,
+                      }}
+                    >
+                      Wrap
+                    </button>
+                  )}
+                </div>
               ))}
             </div>
           </div>
@@ -788,6 +823,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({
   const shortcuts: Array<[string, string]> = [
     ['Ctrl+M / Ctrl+F2', 'Toggle row marker'],
     ['F2 / Shift+F2', 'Jump to next / previous marker'],
+    ['Ctrl+Wheel / Ctrl+0', 'Zoom grid in/out / reset 100%'],
     ['Ctrl+S', 'Save file'],
     ['Ctrl+Z / Ctrl+Y', 'Undo / Redo'],
   ];

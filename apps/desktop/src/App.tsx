@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { open } from '@tauri-apps/plugin-dialog';
-import { Info, Settings } from 'lucide-react';
+import { open, save } from '@tauri-apps/plugin-dialog';
+import { FileSpreadsheet, Info, Moon, Plus, Settings, X } from 'lucide-react';
+import type { FileSystemAdapter } from '@meta-csv/core';
 import {
   AboutModal,
   MetaCsvEditor,
@@ -10,13 +11,43 @@ import {
   useSystemTheme,
   type EditorAppSettings,
   type EditorStatusInfo,
+  type EditorViewSnapshot,
+  type MetaCsvEditorHandle,
   type ThemePreference,
 } from '@meta-csv/ui';
-import { createTauriAdapter } from './tauriAdapter';
+import { createTauriAdapter, createUntitledDesktopAdapter } from './tauriAdapter';
 
 interface DesktopAppSettings extends EditorAppSettings {
   theme: ThemePreference;
   lastDirectory?: string | null;
+}
+
+interface DesktopTab {
+  id: string;
+  filePath: string | null;
+  fileName: string;
+  dirty: boolean;
+  adapter: FileSystemAdapter;
+  sleeping: boolean;
+  lastAccessedAt: number;
+  fileBytes: number;
+  viewSnapshot?: EditorViewSnapshot;
+}
+
+/**
+ * Automatic memory budget for Desktop multi-tab mode:
+ * Inactive, unmodified tabs backed by a file on disk are automatically put to sleep
+ * (unmounted to free JS heap memory, keeping only a tiny view snapshot) when either
+ * total mounted raw file bytes or total mounted tab count exceeds these limits.
+ */
+const MAX_AWAKE_TAB_BYTES = 40 * 1024 * 1024; // 40 MB raw file budget across mounted tabs
+const MAX_AWAKE_TABS = 5;
+
+function formatBytesShort(bytes: number): string {
+  if (bytes <= 0) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function getParentDirectory(filePath: string): string {
@@ -24,15 +55,266 @@ function getParentDirectory(filePath: string): string {
   return idx > 0 ? filePath.slice(0, idx) : '';
 }
 
+function extractFileName(filePath: string): string {
+  const parts = filePath.split(/[\\/]/);
+  return parts[parts.length - 1] || 'untitled.csv';
+}
+
+function normalizePathKey(p: string): string {
+  return p.replace(/\//g, '\\').toLowerCase();
+}
+
 export const App: React.FC = () => {
-  const [filePath, setFilePath] = useState<string | null>(null);
+  const [tabs, setTabs] = useState<DesktopTab[]>([]);
+  const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [themePref, setThemePref] = useState<ThemePreference>('system');
   const [lastDirectory, setLastDirectory] = useState<string | undefined>(undefined);
   const [appSettings, setAppSettings] = useState<EditorAppSettings>({});
   const [showEmptySettings, setShowEmptySettings] = useState(false);
   const [showEmptyAbout, setShowEmptyAbout] = useState(false);
+  const nextTabIdRef = useRef(1);
+  const lastDirRef = useRef<string | undefined>(undefined);
+  const tabsRef = useRef<DesktopTab[]>([]);
+  const editorRefs = useRef<Map<string, MetaCsvEditorHandle>>(new Map());
+  tabsRef.current = tabs;
+  lastDirRef.current = lastDirectory;
+
   const systemTheme = useSystemTheme();
   const resolvedTheme = resolveThemeMode(themePref, systemTheme);
+
+  const applyMemoryBudget = useCallback(
+    (list: DesktopTab[], nextActiveId: string | null): DesktopTab[] => {
+      const now = Date.now();
+      const updated = list.map((t) =>
+        t.id === nextActiveId ? { ...t, sleeping: false, lastAccessedAt: now } : t,
+      );
+
+      let awakeCount = 0;
+      let awakeBytes = 0;
+      for (const t of updated) {
+        if (!t.sleeping) {
+          awakeCount++;
+          awakeBytes += t.fileBytes;
+        }
+      }
+
+      if (awakeCount <= MAX_AWAKE_TABS && awakeBytes <= MAX_AWAKE_TAB_BYTES) {
+        return updated;
+      }
+
+      // Candidates for sleeping: mounted, inactive, unmodified, and backed by a file on disk (LRU order)
+      const candidates = updated
+        .filter((t) => !t.sleeping && t.id !== nextActiveId && !t.dirty && t.filePath !== null)
+        .sort((a, b) => a.lastAccessedAt - b.lastAccessedAt);
+
+      if (candidates.length === 0) return updated;
+
+      const sleepIds = new Set<string>();
+      for (const c of candidates) {
+        if (awakeCount <= MAX_AWAKE_TABS && awakeBytes <= MAX_AWAKE_TAB_BYTES) break;
+        sleepIds.add(c.id);
+        awakeCount--;
+        awakeBytes = Math.max(0, awakeBytes - c.fileBytes);
+      }
+
+      if (sleepIds.size === 0) return updated;
+
+      return updated.map((t) => {
+        if (!sleepIds.has(t.id)) return t;
+        const snapshot = editorRefs.current.get(t.id)?.captureViewSnapshot() ?? t.viewSnapshot;
+        return {
+          ...t,
+          sleeping: true,
+          viewSnapshot: snapshot,
+        };
+      });
+    },
+    [],
+  );
+
+  const activateTab = useCallback(
+    (tabId: string) => {
+      const prevActiveId = activeTabId;
+      const prevSnapshot =
+        prevActiveId && prevActiveId !== tabId
+          ? editorRefs.current.get(prevActiveId)?.captureViewSnapshot()
+          : undefined;
+      setActiveTabId(tabId);
+      setTabs((prev) => {
+        const withPrevSnapshot = prevSnapshot
+          ? prev.map((t) =>
+              t.id === prevActiveId ? { ...t, viewSnapshot: prevSnapshot } : t,
+            )
+          : prev;
+        return applyMemoryBudget(withPrevSnapshot, tabId);
+      });
+    },
+    [activeTabId, applyMemoryBudget],
+  );
+
+  const updateLastDirectory = useCallback((filePath: string) => {
+    const dir = getParentDirectory(filePath);
+    if (!dir) return;
+    setLastDirectory(dir);
+    invoke('update_app_settings', { lastDirectory: dir }).catch(() => {
+      // Ignore when running outside Tauri
+    });
+  }, []);
+
+  const saveTabAs = useCallback(
+    async (tabId: string, bytes: Uint8Array, metaText: string): Promise<boolean> => {
+      const currentTab = tabsRef.current.find((t) => t.id === tabId);
+      const defaultPath =
+        currentTab?.filePath ??
+        (lastDirRef.current ? `${lastDirRef.current}\\untitled.csv` : 'untitled.csv');
+      const selected = await save({
+        defaultPath,
+        filters: [
+          { name: 'CSV', extensions: ['csv'] },
+          { name: 'TSV', extensions: ['tsv'] },
+          { name: 'JSONL', extensions: ['jsonl', 'ndjson'] },
+          { name: 'Log / Text', extensions: ['log', 'txt'] },
+          { name: 'All Files', extensions: ['*'] },
+        ],
+      });
+      if (typeof selected !== 'string' || selected.length === 0) {
+        return false;
+      }
+      await invoke('save_csv_raw', bytes, {
+        headers: {
+          'x-file-path': encodeURIComponent(selected),
+        },
+      });
+      if (metaText.trim().length > 0) {
+        await invoke('save_meta_text', {
+          path: selected,
+          metaText,
+        });
+      }
+
+      const normDest = normalizePathKey(selected);
+      const nextAdapter = createTauriAdapter(selected);
+      const nextName = extractFileName(selected);
+
+      setTabs((prev) => {
+        const next = prev
+          .filter((t) => t.id === tabId || !t.filePath || normalizePathKey(t.filePath) !== normDest)
+          .map((t) =>
+            t.id === tabId
+              ? {
+                  ...t,
+                  filePath: selected,
+                  fileName: nextName,
+                  dirty: false,
+                  sleeping: false,
+                  fileBytes: bytes.byteLength,
+                  adapter: nextAdapter,
+                }
+              : t,
+          );
+        return applyMemoryBudget(next, tabId);
+      });
+      setActiveTabId(tabId);
+      updateLastDirectory(selected);
+      return true;
+    },
+    [updateLastDirectory, applyMemoryBudget],
+  );
+
+  const openFilePathsInTabs = useCallback(
+    (paths: string[]) => {
+      if (paths.length === 0) return;
+      let targetActiveId: string | null = null;
+      const existing = tabsRef.current;
+      const toAdd: DesktopTab[] = [];
+      const now = Date.now();
+
+      for (let i = 0; i < paths.length; i++) {
+        const p = paths[i]!;
+        const norm = normalizePathKey(p);
+        const found = existing.find((t) => t.filePath && normalizePathKey(t.filePath) === norm);
+        if (found) {
+          targetActiveId = found.id;
+        } else {
+          const alreadyAdded = toAdd.find(
+            (t) => t.filePath && normalizePathKey(t.filePath) === norm,
+          );
+          if (alreadyAdded) {
+            targetActiveId = alreadyAdded.id;
+          } else {
+            const id = `tab-${nextTabIdRef.current++}`;
+            // When opening multiple files at once, mount only the last (active) one initially
+            // and keep the rest sleeping until clicked, preventing memory spikes on bulk open.
+            const isLast = i === paths.length - 1;
+            toAdd.push({
+              id,
+              filePath: p,
+              fileName: extractFileName(p),
+              dirty: false,
+              adapter: createTauriAdapter(p),
+              sleeping: !isLast,
+              lastAccessedAt: now + i,
+              fileBytes: 0,
+            });
+            targetActiveId = id;
+          }
+        }
+      }
+
+      if (toAdd.length > 0 || targetActiveId) {
+        setTabs((prev) => applyMemoryBudget([...prev, ...toAdd], targetActiveId));
+      }
+      if (targetActiveId) {
+        setActiveTabId(targetActiveId);
+      }
+      updateLastDirectory(paths[paths.length - 1]!);
+    },
+    [updateLastDirectory, applyMemoryBudget],
+  );
+
+  const handleNewTab = useCallback(() => {
+    const id = `tab-${nextTabIdRef.current++}`;
+    const adapter = createUntitledDesktopAdapter((bytes, metaText) =>
+      saveTabAs(id, bytes, metaText),
+    );
+    const tab: DesktopTab = {
+      id,
+      filePath: null,
+      fileName: 'untitled.csv',
+      dirty: false,
+      adapter,
+      sleeping: false,
+      lastAccessedAt: Date.now(),
+      fileBytes: 0,
+    };
+    setTabs((prev) => applyMemoryBudget([...prev, tab], id));
+    setActiveTabId(id);
+  }, [saveTabAs, applyMemoryBudget]);
+
+  const closeTab = useCallback((tabId: string, skipConfirm = false) => {
+    const target = tabsRef.current.find((t) => t.id === tabId);
+    if (!target) return;
+    if (
+      !skipConfirm &&
+      target.dirty &&
+      !window.confirm(`Discard unsaved changes and close "${target.fileName}"?`)
+    ) {
+      return;
+    }
+
+    editorRefs.current.delete(tabId);
+    setTabs((prev) => {
+      const idx = prev.findIndex((t) => t.id === tabId);
+      if (idx === -1) return prev;
+      const next = prev.filter((t) => t.id !== tabId);
+      let nextActive = activeTabId;
+      if (activeTabId === tabId) {
+        nextActive = next.length === 0 ? null : next[Math.min(idx, next.length - 1)]!.id;
+        setActiveTabId(nextActive);
+      }
+      return applyMemoryBudget(next, nextActive);
+    });
+  }, [activeTabId, applyMemoryBudget]);
 
   useEffect(() => {
     invoke<DesktopAppSettings>('get_app_settings')
@@ -61,12 +343,41 @@ export const App: React.FC = () => {
 
     invoke<string | null>('get_initial_file')
       .then((initial) => {
-        if (initial) setFilePath(initial);
+        if (initial) openFilePathsInTabs([initial]);
       })
       .catch(() => {
         // Ignore when running outside Tauri
       });
-  }, []);
+  }, [openFilePathsInTabs]);
+
+  // Update native window title whenever active tab or its dirty state changes
+  const activeTab = tabs.find((t) => t.id === activeTabId) ?? null;
+  useEffect(() => {
+    const title = activeTab
+      ? `MetaText Editor - ${activeTab.fileName}${activeTab.dirty ? ' *' : ''}`
+      : 'MetaText Editor';
+    invoke('set_window_title', { title }).catch(() => {
+      // Ignore when running outside Tauri
+    });
+  }, [activeTab?.id, activeTab?.fileName, activeTab?.dirty]);
+
+  // Ctrl+Tab / Ctrl+Shift+Tab tab switching
+  useEffect(() => {
+    if (tabs.length <= 1) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Tab') {
+        e.preventDefault();
+        const idx = tabs.findIndex((t) => t.id === activeTabId);
+        if (idx === -1) return;
+        const nextIdx = e.shiftKey
+          ? (idx - 1 + tabs.length) % tabs.length
+          : (idx + 1) % tabs.length;
+        activateTab(tabs[nextIdx]!.id);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [tabs, activeTabId, activateTab]);
 
   const handleThemeChange = (next: ThemePreference) => {
     setThemePref(next);
@@ -82,14 +393,9 @@ export const App: React.FC = () => {
     });
   };
 
-  const adapter = useMemo(
-    () => (filePath ? createTauriAdapter(filePath) : null),
-    [filePath],
-  );
-
   const handleOpenFile = async () => {
     const selected = await open({
-      multiple: false,
+      multiple: true,
       defaultPath: lastDirectory,
       filters: [
         { name: 'CSV / TSV / JSONL / Log', extensions: ['csv', 'tsv', 'jsonl', 'ndjson', 'log', 'txt'] },
@@ -97,20 +403,18 @@ export const App: React.FC = () => {
       ],
     });
     if (typeof selected === 'string') {
-      setFilePath(selected);
-      const dir = getParentDirectory(selected);
-      if (dir) {
-        setLastDirectory(dir);
-        invoke('update_app_settings', { lastDirectory: dir }).catch(() => {
-          // Ignore when running outside Tauri
-        });
-      }
+      openFilePathsInTabs([selected]);
+    } else if (Array.isArray(selected) && selected.length > 0) {
+      openFilePathsInTabs(selected.filter((p): p is string => typeof p === 'string'));
     }
   };
 
   const isDark = resolvedTheme === 'dark';
   const barFg = isDark ? '#f8fafc' : '#0f172a';
   const border = isDark ? '#333338' : '#cbd5e1';
+  const tabBarBg = isDark ? '#18181b' : '#e2e8f0';
+  const tabActiveBg = isDark ? '#252526' : '#f8fafc';
+  const tabInactiveBg = isDark ? '#1f1f23' : '#edf2f7';
 
   const btnStyle: React.CSSProperties = {
     display: 'inline-flex',
@@ -125,10 +429,12 @@ export const App: React.FC = () => {
     cursor: 'pointer',
   };
 
-  if (adapter) {
+  if (tabs.length > 0) {
     return (
       <div
         style={{
+          display: 'flex',
+          flexDirection: 'column',
           width: '100vw',
           height: '100vh',
           overflow: 'hidden',
@@ -136,25 +442,211 @@ export const App: React.FC = () => {
           color: barFg,
         }}
       >
-        <MetaCsvEditor
-          adapter={adapter}
-          hostMode="desktop"
-          themeMode={resolvedTheme}
-          themePreference={themePref}
-          systemTheme={systemTheme}
-          onThemePreferenceChange={handleThemeChange}
-          appSettings={appSettings}
-          onAppSettingsChange={handleAppSettingsChange}
-          onOpenFile={() => void handleOpenFile()}
-          onStatusChange={(info: EditorStatusInfo) => {
-            const title = info.fileName
-              ? `MetaText Editor - ${info.fileName}${info.dirty ? ' *' : ''}`
-              : 'MetaText Editor';
-            invoke('set_window_title', { title }).catch(() => {
-              // Ignore when running outside Tauri
-            });
+        {/* Desktop-only Multi-Tab Bar */}
+        <div
+          role="tablist"
+          aria-label="Open Files"
+          style={{
+            display: 'flex',
+            alignItems: 'stretch',
+            height: 32,
+            background: tabBarBg,
+            borderBottom: `1px solid ${border}`,
+            overflowX: 'auto',
+            overflowY: 'hidden',
+            flexShrink: 0,
+            userSelect: 'none',
           }}
-        />
+        >
+          {tabs.map((tab) => {
+            const isTabActive = tab.id === activeTabId;
+            const sizeLabel = formatBytesShort(tab.fileBytes);
+            const tabTooltip = [
+              tab.filePath ?? tab.fileName,
+              sizeLabel ? `(${sizeLabel})` : '',
+              tab.sleeping ? '— Sleeping (memory freed; click to reload)' : '',
+            ]
+              .filter(Boolean)
+              .join(' ');
+            return (
+              <div
+                key={tab.id}
+                role="tab"
+                aria-selected={isTabActive}
+                title={tabTooltip}
+                onClick={() => activateTab(tab.id)}
+                onMouseDown={(e) => {
+                  if (e.button === 1) {
+                    e.preventDefault();
+                    closeTab(tab.id);
+                  }
+                }}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '0 8px 0 11px',
+                  maxWidth: 220,
+                  minWidth: 100,
+                  fontSize: 12,
+                  fontWeight: isTabActive ? 600 : 400,
+                  background: isTabActive ? tabActiveBg : tabInactiveBg,
+                  color: barFg,
+                  opacity: isTabActive ? 1 : tab.sleeping ? 0.56 : 0.78,
+                  borderRight: `1px solid ${border}`,
+                  borderTop: isTabActive ? '2px solid #3b82f6' : '2px solid transparent',
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                }}
+              >
+                {tab.sleeping ? (
+                  <Moon size={11} style={{ opacity: 0.75, flexShrink: 0 }} />
+                ) : (
+                  <FileSpreadsheet size={12} style={{ opacity: 0.7, flexShrink: 0 }} />
+                )}
+                <span
+                  style={{
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    flex: 1,
+                    fontStyle: tab.sleeping ? 'italic' : 'normal',
+                  }}
+                >
+                  {tab.fileName}
+                </span>
+                {tab.dirty && (
+                  <span
+                    title="Unsaved changes"
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: '50%',
+                      background: '#f59e0b',
+                      flexShrink: 0,
+                    }}
+                  />
+                )}
+                <button
+                  type="button"
+                  aria-label={`Close ${tab.fileName}`}
+                  title="Close tab (Ctrl+W)"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    closeTab(tab.id);
+                  }}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: 18,
+                    height: 18,
+                    padding: 0,
+                    border: 'none',
+                    borderRadius: 4,
+                    background: 'transparent',
+                    color: barFg,
+                    opacity: isTabActive ? 0.75 : 0.45,
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                  }}
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            );
+          })}
+
+          <button
+            type="button"
+            aria-label="New File Tab"
+            title="New File (Ctrl+N)"
+            onClick={handleNewTab}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 30,
+              padding: 0,
+              border: 'none',
+              background: 'transparent',
+              color: barFg,
+              opacity: 0.75,
+              cursor: 'pointer',
+              flexShrink: 0,
+            }}
+          >
+            <Plus size={14} />
+          </button>
+        </div>
+
+        {/* Keep awake tabs mounted; sleeping tabs are unmounted to free JS heap memory */}
+        <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+          {tabs.map((tab) => {
+            if (tab.sleeping) return null;
+            const isTabActive = tab.id === activeTabId;
+            return (
+              <div
+                key={tab.id}
+                style={{
+                  display: isTabActive ? 'block' : 'none',
+                  width: '100%',
+                  height: '100%',
+                }}
+              >
+                <MetaCsvEditor
+                  ref={(handle) => {
+                    if (handle) {
+                      editorRefs.current.set(tab.id, handle);
+                    } else {
+                      editorRefs.current.delete(tab.id);
+                    }
+                  }}
+                  adapter={tab.adapter}
+                  hostMode="desktop"
+                  isActive={isTabActive}
+                  initialViewSnapshot={tab.viewSnapshot}
+                  filePath={tab.filePath ?? undefined}
+                  themeMode={resolvedTheme}
+                  themePreference={themePref}
+                  systemTheme={systemTheme}
+                  onThemePreferenceChange={handleThemeChange}
+                  appSettings={appSettings}
+                  onAppSettingsChange={handleAppSettingsChange}
+                  onNewFile={handleNewTab}
+                  onOpenFile={() => void handleOpenFile()}
+                  onSaveAs={(bytes, metaText) => saveTabAs(tab.id, bytes, metaText)}
+                  onCloseFile={() => closeTab(tab.id, true)}
+                  onStatusChange={(info: EditorStatusInfo) => {
+                    const nextBytes = info.fileBytes ?? 0;
+                    setTabs((prev) => {
+                      const cur = prev.find((t) => t.id === tab.id);
+                      if (!cur) return prev;
+                      const changed =
+                        cur.dirty !== info.dirty ||
+                        (info.fileName && cur.fileName !== info.fileName) ||
+                        (nextBytes > 0 && cur.fileBytes !== nextBytes);
+                      if (!changed) return prev;
+                      const updated = prev.map((t) =>
+                        t.id === tab.id
+                          ? {
+                              ...t,
+                              dirty: info.dirty,
+                              fileName: info.fileName || t.fileName,
+                              fileBytes: nextBytes > 0 ? nextBytes : t.fileBytes,
+                            }
+                          : t,
+                      );
+                      return nextBytes > 0 && cur.fileBytes !== nextBytes
+                        ? applyMemoryBudget(updated, activeTabId)
+                        : updated;
+                    });
+                  }}
+                />
+              </div>
+            );
+          })}
+        </div>
       </div>
     );
   }
@@ -212,21 +704,35 @@ export const App: React.FC = () => {
         <div style={{ fontSize: 13, opacity: 0.75 }}>
           CSV / TSV / JSONL / LOG を開くと、隣の .metatext.jsonc を自動で読み書きします
         </div>
-        <button
-          type="button"
-          style={{
-            ...btnStyle,
-            padding: '8px 20px',
-            fontSize: 14,
-            fontWeight: 600,
-            background: '#2563eb',
-            borderColor: '#3b82f6',
-            color: '#ffffff',
-          }}
-          onClick={() => void handleOpenFile()}
-        >
-          ファイルを開く (CSV / JSONL / LOG)
-        </button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button
+            type="button"
+            style={{
+              ...btnStyle,
+              padding: '8px 20px',
+              fontSize: 14,
+              fontWeight: 600,
+              background: '#2563eb',
+              borderColor: '#3b82f6',
+              color: '#ffffff',
+            }}
+            onClick={() => void handleOpenFile()}
+          >
+            ファイルを開く (CSV / JSONL / LOG)
+          </button>
+          <button
+            type="button"
+            style={{
+              ...btnStyle,
+              padding: '8px 18px',
+              fontSize: 14,
+              fontWeight: 600,
+            }}
+            onClick={handleNewTab}
+          >
+            新規作成 (CSV)
+          </button>
+        </div>
       </div>
 
       <SettingsModal

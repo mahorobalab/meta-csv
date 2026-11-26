@@ -21,7 +21,7 @@ import {
   generateLargeCsvBytes,
 } from './datasets';
 
-type PresetKey = 'spec' | 'jsonl' | 'log' | 'large100k' | 'custom';
+type PresetKey = 'spec' | 'jsonl' | 'log' | 'large100k' | 'new' | 'custom';
 
 const STORAGE_KEY = 'metacsv:playground-settings:v1';
 
@@ -69,6 +69,7 @@ export const App: React.FC = () => {
   });
   const [metaText, setMetaText] = useState<string>(SPEC_SETTING_META);
   const [customFile, setCustomFile] = useState<File | null>(null);
+  const [newSeq, setNewSeq] = useState<number>(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const systemTheme = useSystemTheme();
@@ -116,6 +117,13 @@ export const App: React.FC = () => {
         metaText: LARGE_CSV_META,
       });
     }
+    if (preset === 'new') {
+      return createMemoryAdapter({
+        fileName: 'untitled.csv',
+        csvBytes: new TextEncoder().encode([',,,,', ',,,,', ',,,,', ',,,,', ',,,,'].join('\r\n')),
+        metaText: '{\n  "version": "0.1",\n  "format": "csv",\n  "csv": { "hasHeader": false }\n}\n',
+      });
+    }
     if (customFile) {
       return createFileAdapter(customFile, null);
     }
@@ -124,7 +132,7 @@ export const App: React.FC = () => {
       csvBytes: new TextEncoder().encode(SPEC_SETTING_CSV),
       metaText: SPEC_SETTING_META,
     });
-  }, [preset, customFile]);
+  }, [preset, customFile, newSeq]);
 
   const handleOpenLocalCsv = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -291,7 +299,35 @@ export const App: React.FC = () => {
           onAppSettingsChange={(patch) =>
             setAppSettings((prev) => ({ ...prev, ...patch }))
           }
+          onNewFile={() => {
+            setMetaText('{\n  "version": "0.1",\n  "format": "csv",\n  "csv": { "hasHeader": false }\n}\n');
+            setPreset('new');
+            setNewSeq((s) => s + 1);
+          }}
           onOpenFile={() => fileInputRef.current?.click()}
+          onSaveAs={(bytes) => {
+            const name = window.prompt('Save As file name:', 'export.csv')?.trim();
+            if (!name) return false;
+            const copy = new Uint8Array(bytes.byteLength);
+            copy.set(bytes);
+            const blob = new Blob([copy], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = name;
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+            return true;
+          }}
+          onCloseFile={() => {
+            setCustomFile(null);
+            setMetaText('{\n  "version": "0.1",\n  "format": "csv",\n  "csv": { "hasHeader": false }\n}\n');
+            setPreset('new');
+            setNewSeq((s) => s + 1);
+          }}
           fileMenuItems={fileMenuItems}
           settingsExtraSection={settingsExtraSection}
           onStatusChange={(info: EditorStatusInfo) => {

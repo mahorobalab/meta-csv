@@ -10,6 +10,9 @@ import {
   Bold,
   ChevronDown,
   ChevronUp,
+  Copy,
+  FilePlus,
+  FileText,
   FolderOpen,
   Info,
   Italic,
@@ -20,11 +23,13 @@ import {
   Plus,
   Redo2,
   Save,
+  SaveAll,
   Search,
   Settings,
   Sparkles,
   Undo2,
   Unlock,
+  WrapText,
   X,
 } from 'lucide-react';
 import {
@@ -36,6 +41,7 @@ import {
   type EditableGridCell,
   type GridCell,
   type GridColumn,
+  type GridMouseEventArgs,
   type GridSelection,
   type Item,
   type Theme,
@@ -65,6 +71,7 @@ import {
   createStyleResolverContext,
   detectTargetFormat,
   doesCellMatchFilterTerms,
+  estimateAutoRowHeight,
   indexToExcelColumn,
   parseMetaJsonc,
   patchMetaJsonc,
@@ -97,6 +104,19 @@ import {
 } from './ConditionalRulesModal';
 import { useInputHistory } from './useInputHistory';
 
+export interface EditorViewSnapshot {
+  scrollCol: number;
+  scrollRow: number;
+  selectedCell?: [number, number];
+  zoomScale: number;
+  filterQuery: string;
+  filterContextRows: number;
+  collapseColKey: string;
+  onlyMarked: boolean;
+  searchQuery: string;
+  showCellInspector: boolean;
+}
+
 export interface MetaCsvEditorHandle {
   saveCsv: () => Promise<void>;
   serializeCurrentCsv: () => Uint8Array | null;
@@ -104,6 +124,7 @@ export interface MetaCsvEditorHandle {
   redo: () => void;
   reload: () => void;
   markClean: () => void;
+  captureViewSnapshot: () => EditorViewSnapshot;
 }
 
 export interface EditorStatusInfo {
@@ -113,6 +134,7 @@ export interface EditorStatusInfo {
   visibleRows: number;
   cols: number;
   markerCount: number;
+  fileBytes?: number;
   format?: MetaTextFormat;
   readOnly?: boolean;
   encoding?: string;
@@ -122,6 +144,9 @@ export interface EditorStatusInfo {
 export interface MetaCsvEditorProps {
   adapter: FileSystemAdapter;
   hostMode?: EditorHostMode;
+  isActive?: boolean;
+  initialViewSnapshot?: EditorViewSnapshot;
+  filePath?: string;
   themeMode?: 'light' | 'dark';
   themePreference?: ThemePreference;
   systemTheme?: 'light' | 'dark';
@@ -129,7 +154,10 @@ export interface MetaCsvEditorProps {
   appSettings?: EditorAppSettings;
   onAppSettingsChange?: (patch: Partial<EditorAppSettings>) => void;
   onOpenSettings?: () => void;
+  onNewFile?: () => void;
   onOpenFile?: () => void;
+  onSaveAs?: (bytes: Uint8Array, metaText: string) => Promise<boolean | void> | boolean | void;
+  onCloseFile?: () => void;
   fileMenuItems?: React.ReactNode;
   settingsExtraSection?: React.ReactNode;
   onDocumentEdit?: (label: string) => void;
@@ -140,11 +168,16 @@ export interface MetaCsvEditorProps {
   onMetaTextChange?: (text: string) => void;
 }
 
+const AUTO_ROW_HEIGHT_ROW_LIMIT = 20_000;
+
 export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditorProps>(
   function MetaCsvEditor(
     {
       adapter,
       hostMode = 'web',
+      isActive = true,
+      initialViewSnapshot,
+      filePath,
       themeMode = 'dark',
       themePreference,
       systemTheme,
@@ -152,7 +185,10 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
       appSettings,
       onAppSettingsChange,
       onOpenSettings,
+      onNewFile,
       onOpenFile,
+      onSaveAs,
+      onCloseFile,
       fileMenuItems,
       settingsExtraSection,
       onDocumentEdit,
@@ -177,6 +213,28 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [showAboutModal, setShowAboutModal] = useState(false);
+  const [zoomScale, setZoomScale] = useState<number>(initialViewSnapshot?.zoomScale ?? 1);
+  const [showCellInspector, setShowCellInspector] = useState<boolean>(
+    initialViewSnapshot?.showCellInspector ?? false,
+  );
+  const [fileBytes, setFileBytes] = useState<number>(0);
+  const [showPathTooltip, setShowPathTooltip] = useState<boolean>(false);
+  const [hoverRowResize, setHoverRowResize] = useState<{
+    viewRow: number;
+    dataRow: number;
+    bottomLocalY: number;
+    topLocalY: number;
+    leftLocalX: number;
+    width: number;
+  } | null>(null);
+  const [rowResizeDrag, setRowResizeDrag] = useState<{
+    dataRow: number;
+    topLocalY: number;
+    startClientY: number;
+    startBaseHeight: number;
+    currentBaseHeight: number;
+    guideLocalY: number;
+  } | null>(null);
   const [loadingProgress, setLoadingProgress] = useState<ParseProgress | null>(null);
   const [showProgressOverlay, setShowProgressOverlay] = useState(false);
   const toolbarRef = useRef<HTMLDivElement | null>(null);
@@ -211,7 +269,7 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
   }, [dirtyCsv, onDirtyChange]);
 
   // Search state
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(initialViewSnapshot?.searchQuery ?? '');
   const [showSearchHistory, setShowSearchHistory] = useState(false);
   const [matches, setMatches] = useState<SearchMatch[]>([]);
   const [activeMatchIdx, setActiveMatchIdx] = useState(0);
@@ -234,14 +292,18 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
   }, [searchQuery, searchHistory.push]);
 
   // Filter state (Google-like query + grep -C context + consecutive dedupe)
-  const [filterQuery, setFilterQuery] = useState('');
-  const [debouncedFilterQuery, setDebouncedFilterQuery] = useState('');
-  const [filterContextRows, setFilterContextRows] = useState(0);
-  const [collapseColKey, setCollapseColKey] = useState('');
+  const [filterQuery, setFilterQuery] = useState(initialViewSnapshot?.filterQuery ?? '');
+  const [debouncedFilterQuery, setDebouncedFilterQuery] = useState(
+    initialViewSnapshot?.filterQuery ?? '',
+  );
+  const [filterContextRows, setFilterContextRows] = useState(
+    initialViewSnapshot?.filterContextRows ?? 0,
+  );
+  const [collapseColKey, setCollapseColKey] = useState(initialViewSnapshot?.collapseColKey ?? '');
   const [activeMarkerColor, setActiveMarkerColor] = useState<MarkerColor>(
     appSettings?.defaultMarkerColor ?? 'amber',
   );
-  const [onlyMarked, setOnlyMarked] = useState(false);
+  const [onlyMarked, setOnlyMarked] = useState(initialViewSnapshot?.onlyMarked ?? false);
 
   useEffect(() => {
     if (appSettings?.defaultMarkerColor) {
@@ -257,6 +319,13 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
 
   const gridRef = useRef<DataEditorRef | null>(null);
   const gridContainerRef = useRef<HTMLDivElement | null>(null);
+  const isActiveRef = useRef(isActive);
+  isActiveRef.current = isActive;
+  const visibleRegionRef = useRef<{ x: number; y: number }>({
+    x: initialViewSnapshot?.scrollCol ?? 0,
+    y: initialViewSnapshot?.scrollRow ?? 0,
+  });
+  const pendingRestoreSnapshotRef = useRef<EditorViewSnapshot | null>(initialViewSnapshot ?? null);
   const rowsRef = useRef<string[][]>([]);
   const historyRef = useRef(new UndoRedoHistory());
   const metaSaveTimerRef = useRef<number | null>(null);
@@ -275,7 +344,9 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
       prevAdapterRef.current = adapter;
       rowsRef.current = [];
       setCsvData(null);
-      setOnlyMarked(false);
+      if (!pendingRestoreSnapshotRef.current) {
+        setOnlyMarked(false);
+      }
     }
 
     setStatusMsg('Loading file...');
@@ -301,14 +372,17 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
           parsedMeta.readOnly ?? (resolvedFormat === 'jsonl' || resolvedFormat === 'log');
 
         setFileName(payload.fileName);
+        setFileBytes(payload.csvBytes.byteLength);
         setMeta(parsedMeta);
         setActiveFormat(resolvedFormat);
         setIsReadOnly(initialReadOnly);
         metaTextRef.current = normalizedMetaText;
         onMetaTextChange?.(normalizedMetaText);
-        setFilterQuery(parsedMeta.view?.activeFilter ?? '');
-        setDebouncedFilterQuery(parsedMeta.view?.activeFilter ?? '');
-        setFilterContextRows(parsedMeta.view?.filterContextRows ?? 0);
+        if (!pendingRestoreSnapshotRef.current) {
+          setFilterQuery(parsedMeta.view?.activeFilter ?? '');
+          setDebouncedFilterQuery(parsedMeta.view?.activeFilter ?? '');
+          setFilterContextRows(parsedMeta.view?.filterContextRows ?? 0);
+        }
         logConfigKeyRef.current = JSON.stringify({
           linePattern: parsedMeta.log?.linePattern,
           columnNames: parsedMeta.log?.columnNames,
@@ -811,6 +885,18 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
     return s;
   }, [matches]);
 
+  const effectiveDefaultFontSize =
+    meta.table?.fontSize ?? appSettings?.defaultFontSize ?? DEFAULT_FONT_SIZE;
+  const effectiveDefaultRowHeight =
+    meta.table?.defaultRowHeight ?? appSettings?.defaultRowHeight ?? DEFAULT_ROW_HEIGHT;
+
+  const scaledFontSize = Math.max(8, Math.min(40, Math.round(effectiveDefaultFontSize * zoomScale)));
+  const scaledDefaultRowHeight = Math.max(18, Math.round(effectiveDefaultRowHeight * zoomScale));
+  const scaledHeaderHeight = Math.max(
+    22,
+    Math.round((meta.table?.headerHeight ?? DEFAULT_HEADER_HEIGHT) * zoomScale),
+  );
+
   // Grid columns definition
   const columns: GridColumn[] = useMemo(() => {
     if (!csvData) return [];
@@ -825,22 +911,26 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
             ? ' ▲'
             : ' ▼'
           : '';
+      const baseWidth = colMeta?.width ?? autoWidths[actualColIdx] ?? 140;
       return {
         id: key,
         title: `${baseTitle}${sortIndicator}`,
-        width: colMeta?.width ?? autoWidths[actualColIdx] ?? 140,
+        width: Math.max(40, Math.round(baseWidth * zoomScale)),
       };
     });
-  }, [csvData, visibleColIndices, meta.columns, meta.view?.sort, autoWidths, getDefaultColumnTitle]);
-
-  const effectiveDefaultFontSize =
-    meta.table?.fontSize ?? appSettings?.defaultFontSize ?? DEFAULT_FONT_SIZE;
-  const effectiveDefaultRowHeight =
-    meta.table?.defaultRowHeight ?? appSettings?.defaultRowHeight ?? DEFAULT_ROW_HEIGHT;
+  }, [
+    csvData,
+    visibleColIndices,
+    meta.columns,
+    meta.view?.sort,
+    autoWidths,
+    getDefaultColumnTitle,
+    zoomScale,
+  ]);
 
   const gridTheme = useMemo(
-    () => buildGridTheme(themeMode, { ...meta.table, fontSize: effectiveDefaultFontSize }),
-    [themeMode, meta.table, effectiveDefaultFontSize],
+    () => buildGridTheme(themeMode, { ...meta.table, fontSize: scaledFontSize }),
+    [themeMode, meta.table, scaledFontSize],
   );
 
   // Cell content provider (runs only for visible viewport cells)
@@ -890,7 +980,8 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
         colMeta?.readonly ||
         isContextOnlyRow
       ) {
-        const fontSize = resolvedStyle?.fontSize ?? meta.table?.fontSize ?? DEFAULT_FONT_SIZE;
+        const rawStyleFontSize = resolvedStyle?.fontSize ?? effectiveDefaultFontSize;
+        const fontSize = Math.max(8, Math.min(40, Math.round(rawStyleFontSize * zoomScale)));
         const fontPrefix = [
           resolvedStyle?.italic ? 'italic' : '',
           resolvedStyle?.bold ? '700' : '',
@@ -935,16 +1026,18 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
         };
       }
 
+      const isColWrap =
+        colMeta?.wrap ??
+        (activeFormat === 'log' || activeFormat === 'text'
+          ? (meta.log?.wordWrap ?? false)
+          : false);
+
       return {
         kind: GridCellKind.Text,
         data: val,
         displayData: displayVal,
         allowOverlay: !isReadOnly && !colMeta?.readonly,
-        allowWrapping:
-          colMeta?.wrap ??
-          (activeFormat === 'log' || activeFormat === 'text'
-            ? (meta.log?.wordWrap ?? false)
-            : false),
+        allowWrapping: resolvedStyle?.wrap ?? (isColWrap || val.indexOf('\n') !== -1),
         contentAlign: colMeta?.align,
         themeOverride,
       };
@@ -965,6 +1058,8 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
       collapseColKey,
       isReadOnly,
       activeFormat,
+      effectiveDefaultFontSize,
+      zoomScale,
       dataVersion,
     ],
   );
@@ -1082,14 +1177,15 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
     [isReadOnly, csvData, columns.length, selection, viewRowIndices.length, visibleColIndices, meta.columns],
   );
 
-  // Column resize -> persist to .metatext.jsonc
+  // Column resize -> persist base (unzoomed) width to .metatext.jsonc
   const onColumnResize = useCallback(
     (column: GridColumn, newSize: number) => {
       if (!column.id) return;
-      const clamped = Math.max(40, Math.min(1600, Math.round(newSize)));
+      const baseSize = newSize / (zoomScale || 1);
+      const clamped = Math.max(40, Math.min(1600, Math.round(baseSize)));
       patchMeta(['columns', column.id, 'width'], clamped);
     },
-    [patchMeta],
+    [patchMeta, zoomScale],
   );
 
   // Header click -> cycle view sort (asc -> desc -> none) & persist to .metatext.jsonc
@@ -1135,6 +1231,37 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
       `Saved ${fileName} (${rowsRef.current.length.toLocaleString()} rows)`,
     );
   }, [isReadOnly, adapter, serializeCurrentCsv, fileName]);
+
+  const handleSaveAs = useCallback(async () => {
+    if (!onSaveAs) return;
+    const bytes = serializeCurrentCsv();
+    if (!bytes) return;
+    const saved = await onSaveAs(bytes, metaTextRef.current ?? '');
+    if (saved !== false) {
+      setDirtyCsv(false);
+      setStatusMsg('Saved as new file');
+    }
+  }, [onSaveAs, serializeCurrentCsv]);
+
+  const handleNewFileAction = useCallback(() => {
+    if (!onNewFile) return;
+    if (
+      hostMode !== 'desktop' &&
+      dirtyCsv &&
+      !window.confirm('Discard unsaved changes and create a new file?')
+    ) {
+      return;
+    }
+    onNewFile();
+  }, [onNewFile, hostMode, dirtyCsv]);
+
+  const handleCloseFileAction = useCallback(() => {
+    if (!onCloseFile) return;
+    if (dirtyCsv && !window.confirm('Discard unsaved changes and close this file?')) {
+      return;
+    }
+    onCloseFile();
+  }, [onCloseFile, dirtyCsv]);
 
   const applyUndoLocal = useCallback(() => {
     if (isReadOnly) return false;
@@ -1187,9 +1314,89 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
       markClean: () => {
         setDirtyCsv(false);
       },
+      captureViewSnapshot: (): EditorViewSnapshot => ({
+        scrollCol: visibleRegionRef.current.x,
+        scrollRow: visibleRegionRef.current.y,
+        selectedCell: selection.current
+          ? [selection.current.cell[0], selection.current.cell[1]]
+          : undefined,
+        zoomScale,
+        filterQuery,
+        filterContextRows,
+        collapseColKey,
+        onlyMarked,
+        searchQuery,
+        showCellInspector,
+      }),
     }),
-    [handleSaveCsv, serializeCurrentCsv, applyUndoLocal, applyRedoLocal],
+    [
+      handleSaveCsv,
+      serializeCurrentCsv,
+      applyUndoLocal,
+      applyRedoLocal,
+      selection,
+      zoomScale,
+      filterQuery,
+      filterContextRows,
+      collapseColKey,
+      onlyMarked,
+      searchQuery,
+      showCellInspector,
+    ],
   );
+
+  const applyPendingViewRestore = useCallback(() => {
+    const snap = pendingRestoreSnapshotRef.current;
+    if (!snap || !csvData || !gridRef.current) return;
+    pendingRestoreSnapshotRef.current = null;
+    const maxCol = Math.max(0, visibleColIndices.length - 1);
+    const maxRow = Math.max(0, viewRowIndices.length - 1);
+    const targetCol = Math.min(Math.max(0, snap.scrollCol), maxCol);
+    const targetRow = Math.min(Math.max(0, snap.scrollRow), maxRow);
+    visibleRegionRef.current = { x: targetCol, y: targetRow };
+
+    const doScroll = () => {
+      if (targetCol > 0 || targetRow > 0) {
+        gridRef.current?.scrollTo(targetCol, targetRow, 'both', 0, 0, {
+          hAlign: 'start',
+          vAlign: 'start',
+        });
+      }
+    };
+
+    // Reinforce across animation frames + short timeout so Glide Data Grid's
+    // internal ResizeObserver / InfiniteScroller has finished measuring viewport bounds.
+    window.requestAnimationFrame(() => {
+      doScroll();
+      window.requestAnimationFrame(() => {
+        doScroll();
+      });
+    });
+    window.setTimeout(doScroll, 60);
+
+    if (snap.selectedCell) {
+      const sc = Math.min(Math.max(0, snap.selectedCell[0]), maxCol);
+      const sr = Math.min(Math.max(0, snap.selectedCell[1]), maxRow);
+      setSelection({
+        columns: CompactSelection.empty(),
+        rows: CompactSelection.empty(),
+        current: {
+          cell: [sc, sr],
+          range: { x: sc, y: sr, width: 1, height: 1 },
+          rangeStack: [],
+        },
+      });
+    }
+  }, [csvData, visibleColIndices.length, viewRowIndices.length]);
+
+  // Fallback trigger once csvData is loaded (onVisibleRegionChanged also triggers immediately when layout is ready)
+  useEffect(() => {
+    if (!pendingRestoreSnapshotRef.current || !csvData) return;
+    const rafId = window.requestAnimationFrame(() => {
+      applyPendingViewRestore();
+    });
+    return () => window.cancelAnimationFrame(rafId);
+  }, [csvData, applyPendingViewRestore]);
 
   const handleAddRow = useCallback(() => {
     if (!csvData || isReadOnly) return;
@@ -1233,6 +1440,7 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
 
   // Keyboard shortcuts (F2 / Shift+F2 / Ctrl+M for Markers; Ctrl+S/Z/Y handled when not in VS Code)
   useEffect(() => {
+    if (!isActive) return;
     const onKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       const inTextInput =
@@ -1254,11 +1462,26 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
         return;
       }
 
+      if (!inTextInput && mod && e.key === '0' && zoomScale !== 1) {
+        e.preventDefault();
+        setZoomScale(1);
+        return;
+      }
+
       if (!mod || hostMode === 'vscode') return;
       const key = e.key.toLowerCase();
-      if (key === 's') {
+      if (key === 's' && e.shiftKey && onSaveAs) {
+        e.preventDefault();
+        void handleSaveAs();
+      } else if (key === 's' && !e.shiftKey) {
         e.preventDefault();
         void handleSaveCsv();
+      } else if (key === 'n' && !e.shiftKey && onNewFile) {
+        e.preventDefault();
+        handleNewFileAction();
+      } else if (key === 'w' && !e.shiftKey && onCloseFile) {
+        e.preventDefault();
+        handleCloseFileAction();
       } else if (key === 'z' && !e.shiftKey) {
         e.preventDefault();
         handleUndo();
@@ -1270,14 +1493,39 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [
+    isActive,
     hostMode,
     handleSaveCsv,
+    handleSaveAs,
+    handleNewFileAction,
+    handleCloseFileAction,
+    onSaveAs,
+    onNewFile,
+    onCloseFile,
     handleUndo,
     handleRedo,
     toggleMarkerOnSelection,
     jumpNextMarker,
     jumpPrevMarker,
+    zoomScale,
   ]);
+
+  // Ctrl/Cmd + Mouse Wheel zoom on the grid container (non-passive so browser zoom is prevented)
+  useEffect(() => {
+    const el = gridContainerRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const step = e.deltaY < 0 ? 0.1 : -0.1;
+      setZoomScale((prev) =>
+        Math.round(Math.max(0.6, Math.min(2.5, prev + step)) * 10) / 10,
+      );
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [csvData]);
 
   // Apply style to selected single cell (cells) OR multi-cell drag selection (ranges)
   const applyStyleToSelection = useCallback(
@@ -1360,19 +1608,313 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
     [selection, csvData, visibleColIndices, viewRowIndices, meta, patchMeta],
   );
 
+  const explicitRowHeightMap = useMemo(() => {
+    const map = new Map<number, number>();
+    if (meta.rows) {
+      for (const [k, v] of Object.entries(meta.rows)) {
+        if (v?.height !== undefined) {
+          const idx = Number(k);
+          if (Number.isInteger(idx) && idx >= 0) {
+            map.set(idx, v.height);
+          }
+        }
+      }
+    }
+    return map;
+  }, [meta.rows]);
+
   const selectedRowHeight =
     selectedDataRow !== undefined
-      ? (meta.rows?.[String(selectedDataRow)]?.height ?? effectiveDefaultRowHeight)
+      ? (explicitRowHeightMap.get(selectedDataRow) ?? effectiveDefaultRowHeight)
       : effectiveDefaultRowHeight;
 
-  const rowHeight = useCallback(
+  const selectedActualCol =
+    selection.current && csvData ? visibleColIndices[selection.current.cell[0]] : undefined;
+  const selectedColKey =
+    selectedActualCol !== undefined && csvData
+      ? (csvData.columnKeys[selectedActualCol] ?? String(selectedActualCol))
+      : undefined;
+  const selectedColLabel =
+    selectedColKey !== undefined && selectedActualCol !== undefined
+      ? (meta.columns?.[selectedColKey]?.label ?? getDefaultColumnTitle(selectedActualCol))
+      : undefined;
+  const selectedColWrap =
+    selectedColKey !== undefined
+      ? (meta.columns?.[selectedColKey]?.wrap ??
+          (activeFormat === 'log' || activeFormat === 'text'
+            ? (meta.log?.wordWrap ?? false)
+            : false))
+      : false;
+  const selectedCellStyle = useMemo(() => {
+    if (!styleCtx || selectedDataRow === undefined || selectedActualCol === undefined) {
+      return undefined;
+    }
+    return resolveCellStyle(
+      styleCtx,
+      selectedDataRow,
+      selectedActualCol,
+      rowsRef.current[selectedDataRow] ?? [],
+    );
+  }, [styleCtx, selectedDataRow, selectedActualCol, dataVersion]);
+  const selectedCellWrap = selectedCellStyle?.wrap ?? selectedColWrap;
+  const selectedCellValue =
+    selectedDataRow !== undefined && selectedActualCol !== undefined
+      ? (rowsRef.current[selectedDataRow]?.[selectedActualCol] ?? '')
+      : '';
+  const selectedCellLineCount = selectedCellValue
+    ? selectedCellValue.split(/\r?\n/).length
+    : 0;
+
+  const allowFullAutoRowHeight = (csvData?.rows.length ?? 0) <= AUTO_ROW_HEIGHT_ROW_LIMIT;
+
+  const hasMultilineRow = useMemo(() => {
+    if (!csvData || !allowFullAutoRowHeight) return false;
+    const rows = rowsRef.current;
+    for (let r = 0; r < rows.length; r++) {
+      const row = rows[r]!;
+      for (let c = 0; c < row.length; c++) {
+        if (row[c]!.indexOf('\n') !== -1) return true;
+      }
+    }
+    return false;
+  }, [csvData, allowFullAutoRowHeight, dataVersion]);
+
+  const { wrappedColSpecs, unwrappedVisibleColIndices } = useMemo(() => {
+    if (!csvData) {
+      return {
+        wrappedColSpecs: [] as Array<{ colIdx: number; widthPx: number }>,
+        unwrappedVisibleColIndices: [] as number[],
+      };
+    }
+    const defaultWrap =
+      activeFormat === 'log' || activeFormat === 'text'
+        ? (meta.log?.wordWrap ?? false)
+        : false;
+    const wrapped: Array<{ colIdx: number; widthPx: number }> = [];
+    const unwrapped: number[] = [];
+    for (let i = 0; i < visibleColIndices.length; i++) {
+      const colIdx = visibleColIndices[i]!;
+      const key = csvData.columnKeys[colIdx]!;
+      const colMeta = meta.columns?.[key];
+      const isWrap = colMeta?.wrap ?? defaultWrap;
+      if (isWrap) {
+        const baseW = colMeta?.width ?? autoWidths[colIdx] ?? 140;
+        wrapped.push({ colIdx, widthPx: Math.max(40, Math.round(baseW * zoomScale)) });
+      } else {
+        unwrapped.push(colIdx);
+      }
+    }
+    return { wrappedColSpecs: wrapped, unwrappedVisibleColIndices: unwrapped };
+  }, [csvData, visibleColIndices, meta.columns, meta.log?.wordWrap, activeFormat, autoWidths, zoomScale]);
+
+  const needsDynamicRowHeight =
+    explicitRowHeightMap.size > 0 ||
+    (allowFullAutoRowHeight && (hasMultilineRow || wrappedColSpecs.length > 0));
+
+  const dynamicRowHeight = useCallback(
     (viewRow: number) => {
       const dataRow = viewRowIndices[viewRow];
-      if (dataRow === undefined) return effectiveDefaultRowHeight;
-      return meta.rows?.[String(dataRow)]?.height ?? effectiveDefaultRowHeight;
+      if (dataRow === undefined) return scaledDefaultRowHeight;
+      const explicit = explicitRowHeightMap.get(dataRow);
+      if (explicit !== undefined) {
+        return Math.max(18, Math.round(explicit * zoomScale));
+      }
+      if (!allowFullAutoRowHeight) {
+        return scaledDefaultRowHeight;
+      }
+      const row = rowsRef.current[dataRow];
+      if (!row) return scaledDefaultRowHeight;
+      return estimateAutoRowHeight(
+        row,
+        wrappedColSpecs,
+        hasMultilineRow ? unwrappedVisibleColIndices : [],
+        {
+          defaultHeight: scaledDefaultRowHeight,
+          fontSize: scaledFontSize,
+          maxHeight: Math.round(240 * zoomScale),
+        },
+      );
     },
-    [viewRowIndices, meta.rows, effectiveDefaultRowHeight],
+    [
+      viewRowIndices,
+      explicitRowHeightMap,
+      allowFullAutoRowHeight,
+      scaledDefaultRowHeight,
+      scaledFontSize,
+      zoomScale,
+      wrappedColSpecs,
+      hasMultilineRow,
+      unwrappedVisibleColIndices,
+    ],
   );
+
+  const rowHeightProp: number | ((row: number) => number) = needsDynamicRowHeight
+    ? dynamicRowHeight
+    : scaledDefaultRowHeight;
+
+  const autoFitRows = useCallback(
+    (dataRows: number[], forceWrapCols?: Set<number>, skipWrapCols?: Set<number>) => {
+      if (!csvData || dataRows.length === 0) return;
+      const defaultWrap =
+        activeFormat === 'log' || activeFormat === 'text'
+          ? (meta.log?.wordWrap ?? false)
+          : false;
+      let text = metaTextRef.current ?? '';
+      const uniqueRows = Array.from(new Set(dataRows)).slice(0, 50);
+
+      for (const dr of uniqueRows) {
+        const row = rowsRef.current[dr];
+        if (!row) continue;
+        const wrappedSpecs: Array<{ colIdx: number; widthPx: number }> = [];
+        const multilineCols: number[] = [];
+
+        for (let i = 0; i < visibleColIndices.length; i++) {
+          const colIdx = visibleColIndices[i]!;
+          const key = csvData.columnKeys[colIdx]!;
+          const colMeta = meta.columns?.[key];
+          const cellStyle = styleCtx ? resolveCellStyle(styleCtx, dr, colIdx, row) : undefined;
+          const isWrap = skipWrapCols?.has(colIdx)
+            ? false
+            : Boolean(forceWrapCols?.has(colIdx) || cellStyle?.wrap || (colMeta?.wrap ?? defaultWrap));
+          if (isWrap) {
+            const baseW = colMeta?.width ?? autoWidths[colIdx] ?? 140;
+            wrappedSpecs.push({ colIdx, widthPx: Math.max(40, baseW) });
+          } else {
+            multilineCols.push(colIdx);
+          }
+        }
+
+        const fitted = estimateAutoRowHeight(row, wrappedSpecs, multilineCols, {
+          defaultHeight: effectiveDefaultRowHeight,
+          fontSize: effectiveDefaultFontSize,
+          maxHeight: 400,
+        });
+        const clamped = Math.max(20, Math.min(400, Math.round(fitted)));
+        text = patchMetaJsonc(
+          text,
+          ['rows', String(dr), 'height'],
+          clamped <= effectiveDefaultRowHeight ? undefined : clamped,
+        );
+      }
+
+      scheduleMetaSave(text);
+    },
+    [
+      csvData,
+      activeFormat,
+      meta.log?.wordWrap,
+      meta.columns,
+      visibleColIndices,
+      styleCtx,
+      autoWidths,
+      effectiveDefaultRowHeight,
+      effectiveDefaultFontSize,
+      scheduleMetaSave,
+    ],
+  );
+
+  const resetRowHeights = useCallback(
+    (dataRows: number[]) => {
+      if (dataRows.length === 0) return;
+      let text = metaTextRef.current ?? '';
+      for (const dr of Array.from(new Set(dataRows)).slice(0, 50)) {
+        text = patchMetaJsonc(text, ['rows', String(dr), 'height'], undefined);
+      }
+      scheduleMetaSave(text);
+    },
+    [scheduleMetaSave],
+  );
+
+  const onGridMouseMove = useCallback(
+    (args: GridMouseEventArgs) => {
+      if (rowResizeDrag) return;
+      const container = gridContainerRef.current;
+      if (
+        !container ||
+        args.kind !== 'cell' ||
+        args.location[0] !== -1 ||
+        args.location[1] < 0
+      ) {
+        setHoverRowResize((prev) => (prev !== null ? null : prev));
+        return;
+      }
+
+      const rect = container.getBoundingClientRect();
+      const vr = args.location[1];
+      let targetVr = -1;
+      let bottomLocalY = 0;
+      let topLocalY = 0;
+
+      if (args.localEventY >= args.bounds.height - 5) {
+        targetVr = vr;
+        bottomLocalY = args.bounds.y + args.bounds.height - rect.top;
+        topLocalY = args.bounds.y - rect.top;
+      } else if (args.localEventY <= 4 && vr > 0) {
+        targetVr = vr - 1;
+        bottomLocalY = args.bounds.y - rect.top;
+        const prevH =
+          typeof rowHeightProp === 'function' ? rowHeightProp(targetVr) : rowHeightProp;
+        topLocalY = bottomLocalY - prevH;
+      }
+
+      if (targetVr < 0) {
+        setHoverRowResize((prev) => (prev !== null ? null : prev));
+        return;
+      }
+      const dataRow = viewRowIndices[targetVr];
+      if (dataRow === undefined) {
+        setHoverRowResize((prev) => (prev !== null ? null : prev));
+        return;
+      }
+
+      const leftLocalX = Math.max(0, args.bounds.x - rect.left);
+      const width = Math.max(24, args.bounds.width);
+      const roundedBottom = Math.round(bottomLocalY);
+
+      setHoverRowResize((prev) => {
+        if (
+          prev &&
+          prev.viewRow === targetVr &&
+          Math.round(prev.bottomLocalY) === roundedBottom
+        ) {
+          return prev;
+        }
+        return {
+          viewRow: targetVr,
+          dataRow,
+          bottomLocalY,
+          topLocalY,
+          leftLocalX,
+          width,
+        };
+      });
+    },
+    [rowResizeDrag, rowHeightProp, viewRowIndices],
+  );
+
+  useEffect(() => {
+    if (!rowResizeDrag) return;
+    const onMove = (e: MouseEvent) => {
+      const deltaBase = (e.clientY - rowResizeDrag.startClientY) / (zoomScale || 1);
+      const nextBase = Math.max(20, Math.min(400, Math.round(rowResizeDrag.startBaseHeight + deltaBase)));
+      const nextGuideY = rowResizeDrag.topLocalY + nextBase * zoomScale;
+      setRowResizeDrag((prev) =>
+        prev ? { ...prev, currentBaseHeight: nextBase, guideLocalY: nextGuideY } : null,
+      );
+    };
+    const onUp = (e: MouseEvent) => {
+      const deltaBase = (e.clientY - rowResizeDrag.startClientY) / (zoomScale || 1);
+      const finalBase = Math.max(20, Math.min(400, Math.round(rowResizeDrag.startBaseHeight + deltaBase)));
+      patchMeta(['rows', String(rowResizeDrag.dataRow), 'height'], finalBase);
+      setRowResizeDrag(null);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp, { once: true });
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, [rowResizeDrag?.dataRow, rowResizeDrag?.startClientY, rowResizeDrag?.startBaseHeight, rowResizeDrag?.topLocalY, zoomScale, patchMeta]);
 
   const isDark = themeMode === 'dark';
 
@@ -1386,6 +1928,7 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
       visibleRows: csvData ? viewRowIndices.length : 0,
       cols: csvData ? csvData.headers.length : 0,
       markerCount: markers.length,
+      fileBytes,
       format: activeFormat,
       readOnly: isReadOnly,
       encoding: csvData?.dialect.encoding,
@@ -1398,6 +1941,7 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
     csvData,
     viewRowIndices.length,
     markers.length,
+    fileBytes,
     activeFormat,
     isReadOnly,
     dataVersion,
@@ -1789,6 +2333,39 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
               <span>{isReadOnly ? 'Read-Only' : 'Unlocked'}</span>
             </button>
           )}
+          {zoomScale !== 1 && (
+            <button
+              type="button"
+              title="Reset zoom to 100% (Ctrl+0 / Ctrl+Wheel)"
+              onClick={() => setZoomScale(1)}
+              style={{
+                ...btnStyle,
+                padding: '3px 7px',
+                fontSize: 11.5,
+                fontWeight: 600,
+              }}
+            >
+              {Math.round(zoomScale * 100)}%
+            </button>
+          )}
+          <button
+            type="button"
+            aria-label="Cell Inspector"
+            title="Toggle Cell Inspector (view full multiline text / stack trace)"
+            style={{
+              ...btnStyle,
+              padding: '3px 6px',
+              borderColor: showCellInspector ? '#3b82f6' : toolbarBorder,
+              background: showCellInspector
+                ? isDark
+                  ? 'rgba(59, 130, 246, 0.2)'
+                  : 'rgba(59, 130, 246, 0.12)'
+                : btnStyle.background,
+            }}
+            onClick={() => setShowCellInspector((s) => !s)}
+          >
+            <FileText size={14} />
+          </button>
           <button
             type="button"
             aria-label="Settings"
@@ -1891,6 +2468,22 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
               gap: 2,
             }}
           >
+            {onNewFile && (
+              <button
+                type="button"
+                style={menuItemStyle}
+                onClick={() => {
+                  setOpenMenu('none');
+                  handleNewFileAction();
+                }}
+              >
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                  <FilePlus size={14} />
+                  <span>New File</span>
+                </span>
+                <span style={{ fontSize: 10.5, opacity: 0.6 }}>Ctrl+N</span>
+              </button>
+            )}
             {onOpenFile && (
               <button
                 type="button"
@@ -1936,6 +2529,42 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
               </span>
               <span style={{ fontSize: 10.5, opacity: 0.6 }}>Ctrl+S</span>
             </button>
+            {onSaveAs && (
+              <button
+                type="button"
+                style={{
+                  ...menuItemStyle,
+                  opacity: csvData ? 1 : 0.45,
+                }}
+                disabled={!csvData}
+                onClick={() => {
+                  setOpenMenu('none');
+                  void handleSaveAs();
+                }}
+              >
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                  <SaveAll size={14} />
+                  <span>Save As...</span>
+                </span>
+                <span style={{ fontSize: 10.5, opacity: 0.6 }}>Ctrl+Shift+S</span>
+              </button>
+            )}
+            {onCloseFile && (
+              <button
+                type="button"
+                style={menuItemStyle}
+                onClick={() => {
+                  setOpenMenu('none');
+                  handleCloseFileAction();
+                }}
+              >
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                  <X size={14} />
+                  <span>Close File</span>
+                </span>
+                <span style={{ fontSize: 10.5, opacity: 0.6 }}>Ctrl+W</span>
+              </button>
+            )}
             <hr style={{ border: 'none', borderTop: `1px solid ${toolbarBorder}`, margin: '3px 0' }} />
             <button
               type="button"
@@ -2058,6 +2687,50 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
                 <Italic size={13} />
                 <span>Italic</span>
               </button>
+              <button
+                type="button"
+                disabled={!selection.current}
+                style={{
+                  ...btnStyle,
+                  padding: '3px 8px',
+                  borderColor: selectedCellWrap ? '#3b82f6' : toolbarBorder,
+                  background: selectedCellWrap
+                    ? isDark
+                      ? '#1e3a8a'
+                      : '#dbeafe'
+                    : btnStyle.background,
+                  opacity: selection.current ? 1 : 0.45,
+                }}
+                title="Toggle text wrapping for selected cell(s) and auto-fit row height"
+                onClick={() => {
+                  if (!selection.current) return;
+                  const nextWrap = !selectedCellWrap;
+                  applyStyleToSelection((s) => ({ ...s, wrap: nextWrap ? true : undefined }));
+                  const { range, cell } = selection.current;
+                  const startY = range.height > 1 ? range.y : cell[1];
+                  const endY = range.height > 1 ? range.y + range.height - 1 : cell[1];
+                  const startX = range.width > 1 ? range.x : cell[0];
+                  const endX = range.width > 1 ? range.x + range.width - 1 : cell[0];
+                  const targetRows: number[] = [];
+                  for (let vr = startY; vr <= endY && targetRows.length < 50; vr++) {
+                    const dr = viewRowIndices[vr];
+                    if (dr !== undefined) targetRows.push(dr);
+                  }
+                  const targetCols = new Set<number>();
+                  for (let vc = startX; vc <= endX; vc++) {
+                    const ac = visibleColIndices[vc];
+                    if (ac !== undefined) targetCols.add(ac);
+                  }
+                  if (nextWrap) {
+                    autoFitRows(targetRows, targetCols);
+                  } else {
+                    autoFitRows(targetRows, undefined, targetCols);
+                  }
+                }}
+              >
+                <WrapText size={13} />
+                <span>Wrap</span>
+              </button>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -2133,22 +2806,42 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
             </button>
 
             {selectedDataRow !== undefined && (
-              <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginTop: 2 }}>
                 <span>Row #{selectedDataRow + 1} Height</span>
-                <input
-                  type="number"
-                  min={20}
-                  max={400}
-                  value={selectedRowHeight}
-                  onChange={(e) =>
-                    patchMeta(
-                      ['rows', String(selectedDataRow), 'height'],
-                      Math.max(20, Math.min(400, Number(e.target.value) || DEFAULT_ROW_HEIGHT)),
-                    )
-                  }
-                  style={{ width: 64 }}
-                />
-              </label>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <input
+                    type="number"
+                    min={20}
+                    max={400}
+                    value={selectedRowHeight}
+                    onChange={(e) =>
+                      patchMeta(
+                        ['rows', String(selectedDataRow), 'height'],
+                        Math.max(20, Math.min(400, Number(e.target.value) || DEFAULT_ROW_HEIGHT)),
+                      )
+                    }
+                    style={{ width: 58 }}
+                  />
+                  <button
+                    type="button"
+                    title="Auto-fit this row height to wrapped content"
+                    style={{ ...btnStyle, height: 22, padding: '1px 6px', fontSize: 11 }}
+                    onClick={() => autoFitRows([selectedDataRow], new Set(visibleColIndices))}
+                  >
+                    Fit
+                  </button>
+                  {explicitRowHeightMap.has(selectedDataRow) && (
+                    <button
+                      type="button"
+                      title="Reset row height to default"
+                      style={{ ...btnStyle, height: 22, padding: '1px 6px', fontSize: 11 }}
+                      onClick={() => resetRowHeights([selectedDataRow])}
+                    >
+                      Reset
+                    </button>
+                  )}
+                </div>
+              </div>
             )}
           </div>
         )}
@@ -2251,10 +2944,21 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
             onFinishedEditing={onFinishedEditing}
             onColumnResize={onColumnResize}
             onHeaderClicked={onHeaderClicked}
+            onMouseMove={onGridMouseMove}
+            onVisibleRegionChanged={(range) => {
+              if (range.width <= 0 || range.height <= 0) return;
+              if (pendingRestoreSnapshotRef.current) {
+                applyPendingViewRestore();
+                return;
+              }
+              if (isActiveRef.current) {
+                visibleRegionRef.current = { x: range.x, y: range.y };
+              }
+            }}
             gridSelection={selection}
             onGridSelectionChange={setSelection}
-            rowHeight={rowHeight}
-            headerHeight={meta.table?.headerHeight ?? DEFAULT_HEADER_HEIGHT}
+            rowHeight={rowHeightProp}
+            headerHeight={scaledHeaderHeight}
             freezeColumns={meta.table?.freezeColumns ?? 0}
             rowMarkers={appSettings?.showRowNumbers === false ? 'none' : 'number'}
             trapFocus={true}
@@ -2265,7 +2969,172 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
             keybindings={{ search: false }}
           />
         )}
+
+        {/* Excel-like row height resize hit strip over row-number border (drag or double-click to auto-fit) */}
+        {hoverRowResize && !rowResizeDrag && (
+          <div
+            onMouseLeave={() => setHoverRowResize(null)}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (e.detail >= 2) {
+                autoFitRows([hoverRowResize.dataRow], new Set(visibleColIndices));
+                setHoverRowResize(null);
+                return;
+              }
+              const renderedH = hoverRowResize.bottomLocalY - hoverRowResize.topLocalY;
+              const startBase =
+                explicitRowHeightMap.get(hoverRowResize.dataRow) ??
+                Math.max(20, Math.min(400, Math.round(renderedH / (zoomScale || 1))));
+              setRowResizeDrag({
+                dataRow: hoverRowResize.dataRow,
+                topLocalY: hoverRowResize.topLocalY,
+                startClientY: e.clientY,
+                startBaseHeight: startBase,
+                currentBaseHeight: startBase,
+                guideLocalY: hoverRowResize.bottomLocalY,
+              });
+            }}
+            title="Drag to resize row height · Double-click to auto-fit"
+            style={{
+              position: 'absolute',
+              left: hoverRowResize.leftLocalX,
+              top: hoverRowResize.bottomLocalY - 5,
+              width: hoverRowResize.width,
+              height: 10,
+              cursor: 'ns-resize',
+              zIndex: 25,
+              display: 'flex',
+              alignItems: 'center',
+            }}
+          >
+            <div
+              style={{
+                width: '100%',
+                height: 2,
+                background: 'rgba(59, 130, 246, 0.7)',
+              }}
+            />
+          </div>
+        )}
+
+        {rowResizeDrag && (
+          <>
+            <div
+              style={{
+                position: 'absolute',
+                left: 0,
+                right: 0,
+                top: rowResizeDrag.guideLocalY,
+                height: 2,
+                background: '#3b82f6',
+                pointerEvents: 'none',
+                zIndex: 40,
+              }}
+            />
+            <div
+              style={{
+                position: 'absolute',
+                left: 52,
+                top: Math.max(4, rowResizeDrag.guideLocalY - 22),
+                padding: '1px 7px',
+                borderRadius: 4,
+                background: '#2563eb',
+                color: '#ffffff',
+                fontSize: 11,
+                fontWeight: 600,
+                pointerEvents: 'none',
+                zIndex: 41,
+              }}
+            >
+              Row #{rowResizeDrag.dataRow + 1}: {rowResizeDrag.currentBaseHeight}px
+            </div>
+          </>
+        )}
       </div>
+
+      {/* Optional Cell Inspector Drawer (for reading full multiline cells & stack traces) */}
+      {showCellInspector && csvData && (
+        <div
+          style={{
+            height: 132,
+            display: 'flex',
+            flexDirection: 'column',
+            borderTop: `1px solid ${toolbarBorder}`,
+            background: isDark ? '#18181b' : '#f8fafc',
+            color: toolbarFg,
+            flexShrink: 0,
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '4px 10px',
+              borderBottom: `1px solid ${toolbarBorder}`,
+              fontSize: 11.5,
+              background: toolbarBg,
+            }}
+          >
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              <FileText size={12} />
+              <strong>
+                {selectedDataRow !== undefined && selectedColLabel
+                  ? `Row #${selectedDataRow + 1} · ${selectedColLabel}`
+                  : 'Cell Inspector (select a cell)'}
+              </strong>
+              {selectedCellLineCount > 1 && (
+                <span style={{ opacity: 0.7 }}>({selectedCellLineCount} lines)</span>
+              )}
+            </div>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              {selectedCellValue.length > 0 && (
+                <button
+                  type="button"
+                  style={{ ...btnStyle, height: 20, padding: '1px 7px', fontSize: 11 }}
+                  onClick={() => {
+                    void navigator.clipboard?.writeText(selectedCellValue);
+                    setStatusMsg('Copied cell text');
+                  }}
+                >
+                  <Copy size={11} />
+                  <span>Copy</span>
+                </button>
+              )}
+              <button
+                type="button"
+                aria-label="Close cell inspector"
+                style={{ ...btnStyle, height: 20, padding: '1px 5px' }}
+                onClick={() => setShowCellInspector(false)}
+              >
+                <X size={12} />
+              </button>
+            </div>
+          </div>
+          <textarea
+            readOnly
+            value={selectedCellValue}
+            placeholder="Select any cell in the grid to inspect full multiline content or stack traces..."
+            style={{
+              flex: 1,
+              resize: 'none',
+              border: 'none',
+              outline: 'none',
+              padding: '6px 10px',
+              background: isDark ? '#141416' : '#ffffff',
+              color: toolbarFg,
+              fontFamily:
+                activeFormat === 'log' || activeFormat === 'jsonl'
+                  ? "'Consolas', 'Courier New', monospace"
+                  : 'inherit',
+              fontSize: 12,
+              lineHeight: 1.45,
+              whiteSpace: 'pre-wrap',
+            }}
+          />
+        </div>
+      )}
 
       {/* Bottom Status Bar for Desktop & Web (VS Code uses native StatusBarItem) */}
       {hostMode !== 'vscode' && (
@@ -2284,19 +3153,48 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
             flexShrink: 0,
           }}
         >
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, minWidth: 0, position: 'relative' }}>
             <span
+              onMouseEnter={() => {
+                if (filePath) setShowPathTooltip(true);
+              }}
+              onMouseLeave={() => setShowPathTooltip(false)}
               style={{
                 fontWeight: dirtyCsv ? 700 : 500,
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
+                cursor: filePath ? 'default' : undefined,
               }}
-              title={fileName}
+              title={filePath || fileName}
             >
               {fileName || 'MetaText Editor'}
               {dirtyCsv ? ' *' : ''}
             </span>
+            {showPathTooltip && filePath && (
+              <div
+                style={{
+                  position: 'absolute',
+                  bottom: 'calc(100% + 6px)',
+                  left: 0,
+                  zIndex: 80,
+                  maxWidth: 'min(76vw, 720px)',
+                  padding: '4px 8px',
+                  borderRadius: 5,
+                  background: isDark ? '#18181b' : '#ffffff',
+                  color: toolbarFg,
+                  border: `1px solid ${toolbarBorder}`,
+                  boxShadow: '0 6px 18px rgba(0, 0, 0, 0.28)',
+                  fontSize: 11,
+                  fontFamily: "'Consolas', 'Courier New', monospace",
+                  lineHeight: 1.35,
+                  wordBreak: 'break-all',
+                  pointerEvents: 'none',
+                }}
+              >
+                {filePath}
+              </div>
+            )}
             {csvData && (
               <span style={{ opacity: 0.65, whiteSpace: 'nowrap' }}>
                 {activeFormat.toUpperCase()} · {csvData.dialect.encoding.toUpperCase()} · {csvData.dialect.lineEnding.toUpperCase()}
@@ -2310,6 +3208,41 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
           </div>
           {csvData && (
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, opacity: 0.85, whiteSpace: 'nowrap' }}>
+              {selectedCellLineCount > 1 && !showCellInspector && (
+                <button
+                  type="button"
+                  onClick={() => setShowCellInspector(true)}
+                  style={{
+                    border: `1px solid ${toolbarBorder}`,
+                    borderRadius: 4,
+                    background: 'transparent',
+                    color: toolbarFg,
+                    fontSize: 11,
+                    padding: '0 6px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {selectedCellLineCount} lines (Inspect)
+                </button>
+              )}
+              {zoomScale !== 1 && (
+                <button
+                  type="button"
+                  title="Reset zoom to 100% (Ctrl+0)"
+                  onClick={() => setZoomScale(1)}
+                  style={{
+                    border: `1px solid ${toolbarBorder}`,
+                    borderRadius: 4,
+                    background: 'transparent',
+                    color: toolbarFg,
+                    fontSize: 11,
+                    padding: '0 6px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {Math.round(zoomScale * 100)}%
+                </button>
+              )}
               <span>
                 {viewRowIndices.length !== rowsRef.current.length
                   ? `Rows=${viewRowIndices.length.toLocaleString()} / ${rowsRef.current.length.toLocaleString()}, Cols=${csvData.headers.length}`
@@ -2373,15 +3306,23 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
                   patchMeta(['table', 'defaultRowHeight'], next),
                 columns: csvData.columnKeys.map((key, idx) => {
                   const colMeta = meta.columns?.[key];
+                  const defaultWrap =
+                    activeFormat === 'log' || activeFormat === 'text'
+                      ? (meta.log?.wordWrap ?? false)
+                      : false;
                   return {
                     key,
                     label: colMeta?.label ?? getDefaultColumnTitle(idx),
                     visible: colMeta?.visible !== false,
+                    wrap: colMeta?.wrap ?? defaultWrap,
                   };
                 }),
                 onToggleColumnVisible: (key, visible) => {
                   if (!visible && visibleColIndices.length <= 1) return;
                   patchMeta(['columns', key, 'visible'], visible);
+                },
+                onToggleColumnWrap: (key, wrap) => {
+                  patchMeta(['columns', key, 'wrap'], wrap);
                 },
               } satisfies FileLayoutSettingsProps)
             : undefined

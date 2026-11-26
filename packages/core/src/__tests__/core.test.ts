@@ -7,6 +7,8 @@ import {
   computeColumnFacets,
   createStyleResolverContext,
   detectTargetFormat,
+  estimateAutoRowHeight,
+  estimateWrappedLineCount,
   indexToExcelColumn,
   parseCsvBytes,
   parseJsonlBytes,
@@ -76,7 +78,7 @@ describe('@meta-csv/core', () => {
         { "ref": "0:0..2:2", "style": "green" }
       ],
       "cells": {
-        "1:1": { "color": "#f00" }
+        "1:1": { "color": "#f00", "wrap": true }
       }
     }`);
 
@@ -87,6 +89,7 @@ describe('@meta-csv/core', () => {
       backgroundColor: '#0f0',
       italic: true,
       color: '#f00',
+      wrap: true,
     });
   });
 
@@ -487,5 +490,37 @@ describe('@meta-csv/core', () => {
     });
     expect(dockerRules[0]?.when.column).toBe('stream');
     expect(dockerRules[0]?.when.value).toBe('stderr');
+  });
+
+  it('estimates wrapped line counts and auto row height for multiline and wrapped cells', () => {
+    expect(estimateWrappedLineCount('short text', 200, 13)).toBe(1);
+    expect(estimateWrappedLineCount('line1\nline2\nline3', 200, 13)).toBe(3);
+
+    const longJp = '日本語の長文テキストが狭いセルの中で折り返されるケースのテスト';
+    expect(estimateWrappedLineCount(longJp, 120, 13)).toBeGreaterThan(2);
+
+    expect(
+      estimateAutoRowHeight(['a', 'b'], [{ colIdx: 1, widthPx: 180 }], [0], {
+        defaultHeight: 28,
+        fontSize: 13,
+      }),
+    ).toBe(28);
+
+    const expanded = estimateAutoRowHeight(
+      ['err', 'Timeout\n\tat Pool.acquire\nCaused by: SocketTimeoutException'],
+      [],
+      [0, 1],
+      { defaultHeight: 28, fontSize: 13, maxHeight: 240 },
+    );
+    expect(expanded).toBeGreaterThan(50);
+    expect(expanded).toBeLessThanOrEqual(240);
+
+    const capped = estimateAutoRowHeight(
+      [Array.from({ length: 40 }, (_, i) => `line ${i}`).join('\n')],
+      [],
+      [0],
+      { defaultHeight: 28, fontSize: 13, maxHeight: 160 },
+    );
+    expect(capped).toBe(160);
   });
 });

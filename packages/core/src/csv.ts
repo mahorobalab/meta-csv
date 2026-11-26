@@ -271,3 +271,73 @@ function measureVisualUnits(text: string): number {
   }
   return units;
 }
+
+/**
+ * Estimate wrapped line count for a cell value given column width and font size in pixels.
+ */
+export function estimateWrappedLineCount(
+  text: string,
+  colWidthPx: number,
+  fontSizePx: number,
+): number {
+  if (!text) return 1;
+  const avail = Math.max(24, colWidthPx - 16);
+  const hasNewline = text.indexOf('\n') !== -1;
+  if (!hasNewline && text.length * fontSizePx * 0.62 <= avail) {
+    return 1;
+  }
+
+  let totalLines = 0;
+  let lineWidth = 0;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text.charCodeAt(i);
+    if (ch === 13) continue; // ignore \r
+    if (ch === 10) {
+      totalLines += Math.max(1, Math.ceil(lineWidth / avail));
+      lineWidth = 0;
+      continue;
+    }
+    lineWidth += ch > 0xff ? fontSizePx * 1.02 : fontSizePx * 0.58;
+  }
+  totalLines += Math.max(1, Math.ceil(lineWidth / avail));
+  return Math.max(1, totalLines);
+}
+
+/**
+ * Estimate dynamic row height (px) for rows containing wrapped columns or explicit newlines.
+ */
+export function estimateAutoRowHeight(
+  row: string[],
+  wrappedCols: Array<{ colIdx: number; widthPx: number }>,
+  multilineColIndices: number[],
+  options: { defaultHeight: number; fontSize: number; maxHeight?: number },
+): number {
+  const maxHeight = options.maxHeight ?? 240;
+  let maxLines = 1;
+
+  for (let i = 0; i < wrappedCols.length; i++) {
+    const spec = wrappedCols[i]!;
+    const val = row[spec.colIdx] ?? '';
+    if (val.length > 0) {
+      const lines = estimateWrappedLineCount(val, spec.widthPx, options.fontSize);
+      if (lines > maxLines) maxLines = lines;
+    }
+  }
+
+  for (let i = 0; i < multilineColIndices.length; i++) {
+    const colIdx = multilineColIndices[i]!;
+    const val = row[colIdx] ?? '';
+    if (val.indexOf('\n') !== -1) {
+      let explicitLines = 1;
+      for (let p = val.indexOf('\n'); p !== -1; p = val.indexOf('\n', p + 1)) {
+        explicitLines++;
+      }
+      if (explicitLines > maxLines) maxLines = explicitLines;
+    }
+  }
+
+  if (maxLines <= 1) return options.defaultHeight;
+  const lineHeight = Math.round(options.fontSize * 1.45);
+  const computed = maxLines * lineHeight + 10;
+  return Math.max(options.defaultHeight, Math.min(maxHeight, computed));
+}
