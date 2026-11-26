@@ -7,7 +7,7 @@
       "request": "launch",
       "args": [
         "--extensionDevelopmentPath=${workspaceFolder}/apps/vscode",
-        "${workspaceFolder}/../meta-csv-data"
+        "${workspaceFolder}/../metatext-editor-data"
       ],
       "outFiles": ["${workspaceFolder}/apps/vscode/dist/**/*.js"],
       "preLaunchTask": "build-vscode-extension"

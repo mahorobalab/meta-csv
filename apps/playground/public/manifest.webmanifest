@@ -1,6 +1,6 @@
 {
-  "name": "MetaCSV",
-  "short_name": "MetaCSV",
+  "name": "MetaText Editor",
+  "short_name": "MetaText",
   "description": "High-performance CSV editor & viewer with .metatext.jsonc sidecar metadata",
   "start_url": "./",
   "scope": "./",

@@ -656,7 +656,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, fontSize: 12 }}>
           <a
-            href="https://github.com/mahorobalab/meta-csv"
+            href="https://github.com/mahorobalab/metatext-editor"
             target="_blank"
             rel="noopener noreferrer"
             style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#3b82f6', textDecoration: 'none' }}
@@ -665,7 +665,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({
             <ExternalLink size={12} />
           </a>
           <a
-            href="https://mahorobalab.github.io/meta-csv/"
+            href="https://mahorobalab.github.io/metatext-editor/"
             target="_blank"
             rel="noopener noreferrer"
             style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#3b82f6', textDecoration: 'none' }}
@@ -676,7 +676,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({
         </div>
 
         <div style={{ fontSize: 11, opacity: 0.7, lineHeight: 1.5 }}>
-          Licensed under the MIT License · © 2026 MahorobaLab. The MetaCSV name and official icons are assets of MahorobaLab.
+          Licensed under the MIT License · © 2026 MahorobaLab. The MetaText Editor name and official icons are assets of MahorobaLab.
         </div>
       </div>
     </div>
