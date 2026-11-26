@@ -4,3 +4,6 @@ packages:
 
 allowBuilds:
   esbuild: true
+
+# Wait 24h before installing newly published package versions to mitigate supply-chain attacks
+minimumReleaseAge: 1440
