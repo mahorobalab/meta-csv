@@ -38,6 +38,8 @@ struct AppSettings {
     #[serde(default)]
     zebra_striping: Option<bool>,
     #[serde(default)]
+    confirm_hide_column: Option<bool>,
+    #[serde(default)]
     reopen_last_files: Option<bool>,
     #[serde(default)]
     last_opened_files: Option<Vec<String>>,
@@ -61,6 +63,7 @@ impl Default for AppSettings {
             show_row_numbers: None,
             no_header_column_style: None,
             zebra_striping: None,
+            confirm_hide_column: None,
             reopen_last_files: None,
             last_opened_files: None,
             last_active_file: None,
@@ -216,6 +219,7 @@ fn update_app_settings(
     show_row_numbers: Option<bool>,
     no_header_column_style: Option<String>,
     zebra_striping: Option<bool>,
+    confirm_hide_column: Option<bool>,
     reopen_last_files: Option<bool>,
     last_opened_files: Option<Vec<String>>,
     last_active_file: Option<String>,
@@ -259,6 +263,9 @@ fn update_app_settings(
         }
         if let Some(zs) = zebra_striping {
             data.zebra_striping = Some(zs);
+        }
+        if let Some(chc) = confirm_hide_column {
+            data.confirm_hide_column = Some(chc);
         }
         if let Some(rlf) = reopen_last_files {
             data.reopen_last_files = Some(rlf);
@@ -344,6 +351,30 @@ fn percent_decode(input: &str) -> Result<String, String> {
     String::from_utf8(out).map_err(|_| "Invalid UTF-8 path".to_string())
 }
 
+#[tauri::command]
+fn read_clipboard_text() -> Result<String, String> {
+    let mut clipboard = arboard::Clipboard::new().map_err(|e| e.to_string())?;
+    match clipboard.get_text() {
+        Ok(text) => Ok(text),
+        Err(arboard::Error::ContentNotAvailable) => Ok(String::new()),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+#[tauri::command]
+fn write_clipboard_text(text: String) -> Result<(), String> {
+    let mut clipboard = arboard::Clipboard::new().map_err(|e| e.to_string())?;
+    clipboard.set_text(text).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn write_clipboard_html(html: String, alt_text: String) -> Result<(), String> {
+    let mut clipboard = arboard::Clipboard::new().map_err(|e| e.to_string())?;
+    clipboard
+        .set_html(html, Some(alt_text))
+        .map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -396,7 +427,10 @@ pub fn run() {
             load_csv_bytes,
             load_meta_text,
             save_csv_raw,
-            save_meta_text
+            save_meta_text,
+            read_clipboard_text,
+            write_clipboard_text,
+            write_clipboard_html
         ])
         .run(tauri::generate_context!())
         .expect("error while running MetaCSV desktop application");

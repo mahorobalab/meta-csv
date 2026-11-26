@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { Check, Code2, Copy, FileSpreadsheet, Info, Moon, Plus, Settings, X } from 'lucide-react';
@@ -13,6 +13,7 @@ import {
   type EditorStatusInfo,
   type EditorViewSnapshot,
   type MetaCsvEditorHandle,
+  type NativeClipboardBridge,
   type ThemePreference,
 } from '@meta-csv/ui';
 import { createTauriAdapter, createUntitledDesktopAdapter } from './tauriAdapter';
@@ -89,6 +90,16 @@ export const App: React.FC = () => {
 
   const systemTheme = useSystemTheme();
   const resolvedTheme = resolveThemeMode(themePref, systemTheme);
+
+  const nativeClipboard = useMemo<NativeClipboardBridge>(
+    () => ({
+      readText: () => invoke<string>('read_clipboard_text'),
+      writeText: (text: string) => invoke<void>('write_clipboard_text', { text }),
+      writeHtml: (html: string, altText: string) =>
+        invoke<void>('write_clipboard_html', { html, altText }),
+    }),
+    [],
+  );
 
   const applyMemoryBudget = useCallback(
     (list: DesktopTab[], nextActiveId: string | null): DesktopTab[] => {
@@ -361,6 +372,7 @@ export const App: React.FC = () => {
           showRowNumbers: settings.showRowNumbers,
           noHeaderColumnStyle: settings.noHeaderColumnStyle,
           zebraStriping: settings.zebraStriping,
+          confirmHideColumn: settings.confirmHideColumn,
           reopenLastFiles: settings.reopenLastFiles,
         });
       }
@@ -744,6 +756,7 @@ export const App: React.FC = () => {
                     onCloseFile={() => closeTab(tab.id, true)}
                     fileMenuItems={fileMenuItems}
                     settingsExtraSection={settingsExtraSection}
+                    nativeClipboard={nativeClipboard}
                     externalMetaText={tab.metaText}
                     onMetaTextChange={(nextMeta) => {
                       setTabs((prev) =>

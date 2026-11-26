@@ -10,10 +10,16 @@ import {
   AlignCenter,
   AlignLeft,
   AlignRight,
+  ArrowLeft,
+  ArrowRight,
   Bold,
   ChevronDown,
   ChevronUp,
+  ClipboardPaste,
+  Columns2,
   Copy,
+  Eye,
+  EyeOff,
   FilePlus,
   FileText,
   FolderOpen,
@@ -23,6 +29,7 @@ import {
   Menu,
   Minus,
   Palette,
+  Pencil,
   Plus,
   Redo2,
   Save,
@@ -30,6 +37,7 @@ import {
   Search,
   Settings,
   Sparkles,
+  Trash2,
   Undo2,
   Unlock,
   WrapText,
@@ -112,6 +120,13 @@ import {
 } from './ConditionalRulesModal';
 import { useInputHistory } from './useInputHistory';
 import { ZebraRowsIcon } from './icons/ZebraRowsIcon';
+import {
+  readClipboardForColumnPaste,
+  writeColumnsToClipboard,
+  type CopiedColumnMeta,
+  type CopiedColumnPayload,
+  type NativeClipboardBridge,
+} from './columnClipboard';
 
 export interface EditorViewSnapshot {
   scrollCol: number;
@@ -175,6 +190,8 @@ export interface MetaCsvEditorProps {
   /** Optional external JSONC text override (for live playground editing) */
   externalMetaText?: string | null;
   onMetaTextChange?: (text: string) => void;
+  /** Optional native clipboard bridge (Desktop Tauri uses OS clipboard without browser permission prompts) */
+  nativeClipboard?: NativeClipboardBridge;
 }
 
 const AUTO_ROW_HEIGHT_ROW_LIMIT = 20_000;
@@ -205,6 +222,7 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
       onStatusChange,
       externalMetaText,
       onMetaTextChange,
+      nativeClipboard,
     },
     ref,
   ) {
@@ -220,6 +238,41 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
   const [reloadTick, setReloadTick] = useState(0);
   const [openMenu, setOpenMenu] = useState<'none' | 'file' | 'edit' | 'unlock'>('none');
   const [customNumFmt, setCustomNumFmt] = useState<string>('');
+  const [headerContextMenu, setHeaderContextMenu] = useState<{
+    visCols: number[];
+    actualCols: number[];
+    colKeys: string[];
+    x: number;
+    y: number;
+    headerBounds: { x: number; y: number; width: number; height: number };
+  } | null>(null);
+  const [editingHeaderCol, setEditingHeaderCol] = useState<{
+    actualCol: number;
+    colKey: string;
+    value: string;
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  } | null>(null);
+  const [pendingHideCol, setPendingHideCol] = useState<{
+    colKeys: string[];
+    label: string;
+    dontShowAgain: boolean;
+  } | null>(null);
+  const [pendingDeleteCol, setPendingDeleteCol] = useState<{
+    actualCols: number[];
+    colKeys: string[];
+    label: string;
+  } | null>(null);
+  const [localConfirmHideCol, setLocalConfirmHideCol] = useState<boolean | null>(null);
+  const shouldConfirmHideColumn =
+    localConfirmHideCol ?? (appSettings?.confirmHideColumn !== false);
+  useEffect(() => {
+    setLocalConfirmHideCol(null);
+  }, [appSettings?.confirmHideColumn]);
+  const copiedColumnRef = useRef<CopiedColumnPayload | null>(null);
+  const headerMenuRef = useRef<HTMLDivElement | null>(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [showAboutModal, setShowAboutModal] = useState(false);
@@ -274,6 +327,24 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
     document.addEventListener('mousedown', onDocDown);
     return () => document.removeEventListener('mousedown', onDocDown);
   }, [openMenu]);
+
+  useEffect(() => {
+    if (!headerContextMenu) return;
+    const onDocDown = (e: MouseEvent) => {
+      if (headerMenuRef.current && !headerMenuRef.current.contains(e.target as Node)) {
+        setHeaderContextMenu(null);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setHeaderContextMenu(null);
+    };
+    document.addEventListener('mousedown', onDocDown);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDocDown);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [headerContextMenu]);
 
   useEffect(() => {
     onDirtyChange?.(dirtyCsv);
@@ -539,6 +610,27 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
     }
     return list;
   }, [csvData, meta.columns]);
+
+  // Track visible column borders where one or more hidden columns sit in between
+  const { hiddenBeforeVisCols, hiddenAfterVisCols } = useMemo(() => {
+    const before = new Set<number>();
+    const after = new Set<number>();
+    if (!csvData || visibleColIndices.length === 0) {
+      return { hiddenBeforeVisCols: before, hiddenAfterVisCols: after };
+    }
+    if (visibleColIndices[0]! > 0) {
+      before.add(0);
+    }
+    for (let i = 1; i < visibleColIndices.length; i++) {
+      if (visibleColIndices[i]! - visibleColIndices[i - 1]! > 1) {
+        before.add(i);
+      }
+    }
+    if (visibleColIndices[visibleColIndices.length - 1]! < csvData.columnKeys.length - 1) {
+      after.add(visibleColIndices.length - 1);
+    }
+    return { hiddenBeforeVisCols: before, hiddenAfterVisCols: after };
+  }, [csvData, visibleColIndices]);
 
   // Debounce filter query input (220ms) for smooth typing even on 1M rows
   useEffect(() => {
@@ -1083,7 +1175,7 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
     ],
   );
 
-  // Draw crisp 4px marker stripe on column 0 + subtle grid lines on selected rows/columns
+  // Draw crisp 4px marker stripe on column 0 + subtle grid lines on selected rows/columns + thick hidden-column dividers
   const drawCell: DrawCellCallback = useCallback(
     (args, drawContent) => {
       drawContent();
@@ -1098,6 +1190,19 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
         ctx.fillRect(rect.x + rect.width - 1, rect.y, 1, rect.height);
         ctx.restore();
       }
+      // Thick vertical divider indicating hidden column(s) between visible columns
+      if (hiddenBeforeVisCols.has(args.col)) {
+        ctx.save();
+        ctx.fillStyle = themeMode === 'dark' ? '#94a3b8' : '#64748b';
+        ctx.fillRect(rect.x, rect.y, 3, rect.height);
+        ctx.restore();
+      }
+      if (hiddenAfterVisCols.has(args.col)) {
+        ctx.save();
+        ctx.fillStyle = themeMode === 'dark' ? '#94a3b8' : '#64748b';
+        ctx.fillRect(rect.x + rect.width - 3, rect.y, 3, rect.height);
+        ctx.restore();
+      }
       if (args.col !== 0) return;
       const dataRow = viewRowIndices[args.row];
       if (dataRow === undefined) return;
@@ -1109,7 +1214,15 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
       ctx.fillRect(rect.x, rect.y + 1, 4, Math.max(0, rect.height - 2));
       ctx.restore();
     },
-    [viewRowIndices, markerMap, selection.rows, selection.columns, themeMode],
+    [
+      viewRowIndices,
+      markerMap,
+      selection.rows,
+      selection.columns,
+      themeMode,
+      hiddenBeforeVisCols,
+      hiddenAfterVisCols,
+    ],
   );
 
   // Cell edit handler
@@ -1243,6 +1356,666 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
       patchMeta(['view', 'sort'], nextSort);
     },
     [columns, meta.view?.sort, patchMeta],
+  );
+
+  const isContiguousCols = useCallback((cols: number[]): boolean => {
+    if (cols.length === 0) return false;
+    for (let i = 1; i < cols.length; i++) {
+      if (cols[i]! !== cols[i - 1]! + 1) return false;
+    }
+    return true;
+  }, []);
+
+  // Header right-click -> preserve contiguous multi-column selection if clicked inside it; otherwise select clicked column
+  const onHeaderContextMenu = useCallback(
+    (colIndex: number, event: { preventDefault: () => void; bounds: { x: number; y: number; width: number; height: number } }) => {
+      event.preventDefault();
+      if (!csvData) return;
+
+      const selectedVis = selection.columns.toArray();
+      const keepMulti =
+        selectedVis.length > 1 &&
+        isContiguousCols(selectedVis) &&
+        selectedVis.includes(colIndex);
+
+      const targetVisCols = keepMulti ? selectedVis : [colIndex];
+      const targetActualCols: number[] = [];
+      const targetColKeys: string[] = [];
+      for (const vc of targetVisCols) {
+        const ac = visibleColIndices[vc];
+        if (ac === undefined) continue;
+        targetActualCols.push(ac);
+        targetColKeys.push(csvData.columnKeys[ac] ?? String(ac));
+      }
+      if (targetActualCols.length === 0) return;
+
+      setOpenMenu('none');
+      setEditingHeaderCol(null);
+      if (!keepMulti) {
+        setSelection({
+          columns: CompactSelection.fromSingleSelection(colIndex),
+          rows: CompactSelection.empty(),
+        });
+      }
+
+      const menuW = 262;
+      const menuH = 395;
+      const vw = typeof window !== 'undefined' ? window.innerWidth : 1280;
+      const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
+      const x = Math.max(8, Math.min(event.bounds.x, vw - menuW - 8));
+      const y = Math.max(8, Math.min(event.bounds.y + event.bounds.height + 2, vh - menuH - 8));
+      setHeaderContextMenu({
+        visCols: targetVisCols,
+        actualCols: targetActualCols,
+        colKeys: targetColKeys,
+        x,
+        y,
+        headerBounds: event.bounds,
+      });
+    },
+    [csvData, selection.columns, isContiguousCols, visibleColIndices],
+  );
+
+  const makeUniqueColKey = useCallback(
+    (base: string, existingKeys: string[]): string => {
+      const set = new Set(existingKeys);
+      if (!set.has(base)) return base;
+      let n = 2;
+      while (set.has(`${base}_${n}`)) n++;
+      return `${base}_${n}`;
+    },
+    [],
+  );
+
+  const commitHeaderTitleEdit = useCallback(() => {
+    if (!editingHeaderCol || !csvData) {
+      setEditingHeaderCol(null);
+      return;
+    }
+    const { actualCol, colKey, value } = editingHeaderCol;
+    const trimmed = value.trim();
+    setEditingHeaderCol(null);
+
+    if (csvData.dialect.hasHeader && !isReadOnly && activeFormat === 'csv') {
+      if (!trimmed || trimmed === csvData.headers[actualCol]) return;
+      const nextHeaders = [...csvData.headers];
+      const nextKeys = [...csvData.columnKeys];
+      const otherKeys = nextKeys.filter((_, i) => i !== actualCol);
+      const uniqueKey = makeUniqueColKey(trimmed, otherKeys);
+      nextHeaders[actualCol] = trimmed;
+      nextKeys[actualCol] = uniqueKey;
+
+      // Migrate column metadata from oldKey to uniqueKey if present
+      if (colKey !== uniqueKey && meta.columns?.[colKey]) {
+        let text = metaTextRef.current ?? '';
+        text = patchMetaJsonc(text, ['columns', uniqueKey], meta.columns[colKey]);
+        text = patchMetaJsonc(text, ['columns', colKey], undefined);
+        scheduleMetaSave(text);
+      }
+
+      setCsvData({ ...csvData, headers: nextHeaders, columnKeys: nextKeys });
+      setDirtyCsv(true);
+      setDataVersion((v) => v + 1);
+      onDocumentEdit?.('Rename column');
+      setStatusMsg(`Renamed column to "${trimmed}"`);
+    } else {
+      // Read-Only / No-Header / JSONL / LOG -> persist display alias to .metatext.jsonc
+      patchMeta(['columns', colKey, 'label'], trimmed.length > 0 ? trimmed : undefined);
+      setStatusMsg(trimmed ? `Updated column label to "${trimmed}"` : 'Reset column label');
+    }
+  }, [
+    editingHeaderCol,
+    csvData,
+    isReadOnly,
+    activeFormat,
+    makeUniqueColKey,
+    meta.columns,
+    scheduleMetaSave,
+    onDocumentEdit,
+    patchMeta,
+  ]);
+
+  const handleCopyColumns = useCallback(
+    async (actualCols: number[], colKeys: string[]) => {
+      if (!csvData || actualCols.length === 0) return;
+      const colMetas: CopiedColumnMeta[] = actualCols.map((ac, i) => {
+        const key = colKeys[i]!;
+        const title = meta.columns?.[key]?.label ?? getDefaultColumnTitle(ac);
+        const colCfg = meta.columns?.[key];
+        const resolvedColStyle =
+          typeof colCfg?.style === 'string' ? meta.styles?.[colCfg.style] : colCfg?.style;
+        return {
+          title,
+          style: resolvedColStyle,
+          align: colCfg?.align,
+          wrap: colCfg?.wrap,
+          numberFormat: colCfg?.numberFormat,
+        };
+      });
+
+      const matrix: string[][] = new Array(viewRowIndices.length);
+      for (let r = 0; r < viewRowIndices.length; r++) {
+        const dr = viewRowIndices[r]!;
+        const row = rowsRef.current[dr];
+        matrix[r] = actualCols.map((ac) => row?.[ac] ?? '');
+      }
+
+      const payload = await writeColumnsToClipboard(
+        { columns: colMetas, matrix },
+        nativeClipboard,
+      );
+      copiedColumnRef.current = payload;
+      const label =
+        colMetas.length === 1 ? `"${colMetas[0]!.title}"` : `${colMetas.length} columns`;
+      setStatusMsg(`Copied ${label} (${matrix.length.toLocaleString()} rows)`);
+    },
+    [csvData, meta.columns, meta.styles, getDefaultColumnTitle, viewRowIndices, nativeClipboard],
+  );
+
+  const handlePasteColumns = useCallback(
+    async (startActualCol: number, withStyle: boolean) => {
+      if (!csvData || isReadOnly) return;
+      const parsed = await readClipboardForColumnPaste(
+        withStyle,
+        copiedColumnRef.current,
+        nativeClipboard,
+      );
+      if (!parsed || parsed.matrix.length === 0) {
+        setStatusMsg('Clipboard is empty');
+        return;
+      }
+
+      const startColKey = csvData.columnKeys[startActualCol] ?? String(startActualCol);
+      const colHeaderName = meta.columns?.[startColKey]?.label ?? csvData.headers[startActualCol];
+      const hasExternalHeaderRow =
+        parsed.source !== 'internal' &&
+        csvData.dialect.hasHeader &&
+        parsed.matrix.length === viewRowIndices.length + 1 &&
+        Boolean(colHeaderName) &&
+        (parsed.matrix[0]?.[0] === colHeaderName ||
+          parsed.matrix[0]?.[0] === csvData.headers[startActualCol]);
+      const dataMatrix = hasExternalHeaderRow ? parsed.matrix.slice(1) : parsed.matrix;
+
+      const pasteColCount = Math.max(1, ...dataMatrix.map((r) => r.length));
+      const nextHeaders = [...csvData.headers];
+      const nextKeys = [...csvData.columnKeys];
+      const nextWidths = [...autoWidths];
+      let headersChanged = false;
+
+      // Expand columns if multi-column paste extends past right edge
+      while (startActualCol + pasteColCount > nextKeys.length) {
+        const idx = nextKeys.length;
+        const name = csvData.dialect.hasHeader
+          ? makeUniqueColKey(`column_${idx + 1}`, nextKeys)
+          : String(idx);
+        nextHeaders.push(csvData.dialect.hasHeader ? name : '');
+        nextKeys.push(name);
+        nextWidths.push(140);
+        headersChanged = true;
+        for (let r = 0; r < rowsRef.current.length; r++) {
+          rowsRef.current[r]!.push('');
+        }
+      }
+
+      // If pasting into blank/placeholder columns (e.g. "column_11" or empty) with a copied column title,
+      // auto-assign a unique header name (e.g. "amount_2") so it matches the copied column cleanly.
+      if (csvData.dialect.hasHeader && parsed.columns) {
+        for (let c = 0; c < pasteColCount; c++) {
+          const targetIdx = startActualCol + c;
+          const srcTitle = parsed.columns[c]?.title?.trim();
+          const curHeader = (nextHeaders[targetIdx] ?? '').trim();
+          if (srcTitle && (curHeader === '' || /^column_\d+$/i.test(curHeader))) {
+            const otherKeys = nextKeys.filter((_, idx) => idx !== targetIdx);
+            const uniqueTitle = makeUniqueColKey(srcTitle, otherKeys);
+            nextHeaders[targetIdx] = uniqueTitle;
+            nextKeys[targetIdx] = uniqueTitle;
+            headersChanged = true;
+          }
+        }
+      }
+
+      // Expand rows if pasted data has more rows than currently visible
+      const rowsNeeded = dataMatrix.length;
+      const existingVisible = viewRowIndices.length;
+      const appendedDataRows: number[] = [];
+      if (rowsNeeded > existingVisible) {
+        const extra = rowsNeeded - existingVisible;
+        for (let i = 0; i < extra; i++) {
+          const newRow = Array.from({ length: nextKeys.length }, () => '');
+          rowsRef.current.push(newRow);
+          appendedDataRows.push(rowsRef.current.length - 1);
+        }
+      }
+
+      for (let r = 0; r < rowsNeeded; r++) {
+        const dataRowIdx =
+          r < existingVisible
+            ? viewRowIndices[r]!
+            : appendedDataRows[r - existingVisible]!;
+        const targetRow = rowsRef.current[dataRowIdx];
+        if (!targetRow) continue;
+        const srcRow = dataMatrix[r]!;
+        for (let c = 0; c < srcRow.length; c++) {
+          targetRow[startActualCol + c] = srcRow[c] ?? '';
+        }
+      }
+
+      if (headersChanged) {
+        setCsvData({ ...csvData, headers: nextHeaders, columnKeys: nextKeys });
+        setAutoWidths(nextWidths);
+      }
+
+      if (withStyle && parsed.columns && parsed.columns.length > 0) {
+        let text = metaTextRef.current ?? '';
+        let patchedAny = false;
+        for (let c = 0; c < pasteColCount; c++) {
+          const colMetaSrc = parsed.columns[c];
+          if (!colMetaSrc) continue;
+          const targetKey = nextKeys[startActualCol + c] ?? String(startActualCol + c);
+          if (colMetaSrc.style && Object.keys(colMetaSrc.style).length > 0) {
+            text = patchMetaJsonc(text, ['columns', targetKey, 'style'], colMetaSrc.style);
+            patchedAny = true;
+          }
+          if (colMetaSrc.align) {
+            text = patchMetaJsonc(text, ['columns', targetKey, 'align'], colMetaSrc.align);
+            patchedAny = true;
+          }
+          if (colMetaSrc.wrap) {
+            text = patchMetaJsonc(text, ['columns', targetKey, 'wrap'], true);
+            patchedAny = true;
+          }
+          if (colMetaSrc.numberFormat) {
+            text = patchMetaJsonc(
+              text,
+              ['columns', targetKey, 'numberFormat'],
+              colMetaSrc.numberFormat,
+            );
+            patchedAny = true;
+          }
+        }
+        if (patchedAny) {
+          scheduleMetaSave(text);
+        }
+      }
+
+      setDirtyCsv(true);
+      setDataVersion((v) => v + 1);
+      onDocumentEdit?.(withStyle ? 'Paste column(s) with style' : 'Paste values');
+      setStatusMsg(
+        `Pasted ${rowsNeeded.toLocaleString()} row${rowsNeeded === 1 ? '' : 's'}${
+          pasteColCount > 1 ? ` × ${pasteColCount} cols` : ''
+        }${withStyle ? ' (with style)' : ' (values only)'}`,
+      );
+    },
+    [
+      csvData,
+      isReadOnly,
+      autoWidths,
+      viewRowIndices,
+      makeUniqueColKey,
+      scheduleMetaSave,
+      onDocumentEdit,
+      meta.columns,
+      nativeClipboard,
+    ],
+  );
+
+  const executeDeleteColumns = useCallback(
+    (actualCols: number[], colKeys: string[], label: string) => {
+      if (!csvData || isReadOnly || actualCols.length === 0) return;
+      if (actualCols.length >= csvData.columnKeys.length) {
+        setStatusMsg('Cannot delete all remaining columns');
+        return;
+      }
+      const removeSet = new Set(actualCols);
+      const nextHeaders = csvData.headers.filter((_, i) => !removeSet.has(i));
+      const nextKeys = csvData.dialect.hasHeader
+        ? csvData.columnKeys.filter((_, i) => !removeSet.has(i))
+        : Array.from(
+            { length: csvData.columnKeys.length - removeSet.size },
+            (_, i) => String(i),
+          );
+      const nextWidths = autoWidths.filter((_, i) => !removeSet.has(i));
+      const sortedDesc = [...actualCols].sort((a, b) => b - a);
+      for (let r = 0; r < rowsRef.current.length; r++) {
+        const row = rowsRef.current[r]!;
+        for (const colIdx of sortedDesc) {
+          row.splice(colIdx, 1);
+        }
+      }
+
+      if (csvData.dialect.hasHeader) {
+        let text = metaTextRef.current ?? '';
+        let changed = false;
+        for (const k of colKeys) {
+          if (meta.columns?.[k]) {
+            text = patchMetaJsonc(text, ['columns', k], undefined);
+            changed = true;
+          }
+        }
+        if (changed) scheduleMetaSave(text);
+      }
+
+      setCsvData({ ...csvData, headers: nextHeaders, columnKeys: nextKeys });
+      setAutoWidths(nextWidths);
+      setSelection({
+        columns: CompactSelection.empty(),
+        rows: CompactSelection.empty(),
+      });
+      setDirtyCsv(true);
+      setDataVersion((v) => v + 1);
+      onDocumentEdit?.(actualCols.length > 1 ? 'Delete columns' : 'Delete column');
+      setStatusMsg(`Deleted ${label}`);
+    },
+    [csvData, isReadOnly, autoWidths, meta.columns, scheduleMetaSave, onDocumentEdit],
+  );
+
+  const handleDeleteColumns = useCallback(
+    (actualCols: number[], colKeys: string[]) => {
+      if (!csvData || isReadOnly || actualCols.length === 0) return;
+      if (actualCols.length >= csvData.columnKeys.length) {
+        setStatusMsg('Cannot delete all remaining columns');
+        return;
+      }
+      const label =
+        actualCols.length === 1
+          ? `列「${meta.columns?.[colKeys[0]!]?.label ?? getDefaultColumnTitle(actualCols[0]!)}」`
+          : `選択中の ${actualCols.length} 列`;
+      setPendingDeleteCol({ actualCols, colKeys, label });
+    },
+    [csvData, isReadOnly, meta.columns, getDefaultColumnTitle],
+  );
+
+  const executeHideColumns = useCallback(
+    (colKeys: string[], label: string) => {
+      if (visibleColIndices.length - colKeys.length < 1) {
+        setStatusMsg('At least one column must remain visible');
+        return;
+      }
+      let text = metaTextRef.current ?? '';
+      for (const k of colKeys) {
+        text = patchMetaJsonc(text, ['columns', k, 'visible'], false);
+      }
+      scheduleMetaSave(text);
+      setSelection({
+        columns: CompactSelection.empty(),
+        rows: CompactSelection.empty(),
+      });
+      setStatusMsg(`Hidden ${label}`);
+    },
+    [visibleColIndices.length, scheduleMetaSave],
+  );
+
+  const handleHideColumns = useCallback(
+    (actualCols: number[], colKeys: string[]) => {
+      if (visibleColIndices.length - colKeys.length < 1) {
+        setStatusMsg('At least one column must remain visible');
+        return;
+      }
+      const label =
+        actualCols.length === 1
+          ? `列「${meta.columns?.[colKeys[0]!]?.label ?? getDefaultColumnTitle(actualCols[0]!)}」`
+          : `選択中の ${actualCols.length} 列`;
+      if (shouldConfirmHideColumn) {
+        setPendingHideCol({ colKeys, label, dontShowAgain: false });
+        return;
+      }
+      executeHideColumns(colKeys, label);
+    },
+    [
+      visibleColIndices.length,
+      meta.columns,
+      getDefaultColumnTitle,
+      shouldConfirmHideColumn,
+      executeHideColumns,
+    ],
+  );
+
+  const getAdjacentHiddenColumnKeys = useCallback(
+    (visCols: number[]): string[] => {
+      if (!csvData || visibleColIndices.length === 0 || visCols.length === 0) return [];
+      const firstVis = visCols[0]!;
+      const lastVis = visCols[visCols.length - 1]!;
+      const keys: string[] = [];
+      const firstActual = visibleColIndices[firstVis]!;
+      const lastActual = visibleColIndices[lastVis]!;
+      const prevActual = firstVis > 0 ? visibleColIndices[firstVis - 1]! : -1;
+      for (let i = prevActual + 1; i < firstActual; i++) {
+        const k = csvData.columnKeys[i];
+        if (k && meta.columns?.[k]?.visible === false) keys.push(k);
+      }
+      const nextActual =
+        lastVis < visibleColIndices.length - 1
+          ? visibleColIndices[lastVis + 1]!
+          : csvData.columnKeys.length;
+      for (let i = lastActual + 1; i < nextActual; i++) {
+        const k = csvData.columnKeys[i];
+        if (k && meta.columns?.[k]?.visible === false) keys.push(k);
+      }
+      return keys;
+    },
+    [csvData, visibleColIndices, meta.columns],
+  );
+
+  const handleUnhideColumns = useCallback(
+    (colKeys: string[]) => {
+      if (colKeys.length === 0) return;
+      let text = metaTextRef.current ?? '';
+      for (const k of colKeys) {
+        text = patchMetaJsonc(text, ['columns', k, 'visible'], undefined);
+      }
+      scheduleMetaSave(text);
+      setStatusMsg(`Unhidden ${colKeys.length} column${colKeys.length === 1 ? '' : 's'}`);
+    },
+    [scheduleMetaSave],
+  );
+
+  const handleDuplicateColumns = useCallback(
+    (actualCols: number[], colKeys: string[], side: 'left' | 'right') => {
+      if (!csvData || isReadOnly || actualCols.length === 0) return;
+      const firstCol = actualCols[0]!;
+      const lastCol = actualCols[actualCols.length - 1]!;
+      const insertIdx = side === 'left' ? firstCol : lastCol + 1;
+
+      const workingKeys = [...csvData.columnKeys];
+      const dupHeaders: string[] = [];
+      const dupKeys: string[] = [];
+      const dupWidths: number[] = [];
+      const metaCopies: Array<{ newKey: string; cfg: NonNullable<typeof meta.columns>[string] }> = [];
+
+      for (let i = 0; i < actualCols.length; i++) {
+        const ac = actualCols[i]!;
+        const oldKey = colKeys[i]!;
+        const baseHeader = csvData.headers[ac] ?? `column_${ac + 1}`;
+        const newHeader = csvData.dialect.hasHeader
+          ? makeUniqueColKey(`${baseHeader}_copy`, workingKeys)
+          : '';
+        if (csvData.dialect.hasHeader) {
+          workingKeys.push(newHeader);
+        }
+        dupHeaders.push(newHeader);
+        dupKeys.push(newHeader);
+        dupWidths.push(autoWidths[ac] ?? 140);
+        if (csvData.dialect.hasHeader && meta.columns?.[oldKey]) {
+          metaCopies.push({ newKey: newHeader, cfg: { ...meta.columns[oldKey]! } });
+        }
+      }
+
+      const nextHeaders = [...csvData.headers];
+      nextHeaders.splice(insertIdx, 0, ...dupHeaders);
+
+      const nextKeys = csvData.dialect.hasHeader
+        ? (() => {
+            const arr = [...csvData.columnKeys];
+            arr.splice(insertIdx, 0, ...dupKeys);
+            return arr;
+          })()
+        : Array.from({ length: csvData.columnKeys.length + actualCols.length }, (_, i) => String(i));
+
+      const nextWidths = [...autoWidths];
+      nextWidths.splice(insertIdx, 0, ...dupWidths);
+
+      for (let r = 0; r < rowsRef.current.length; r++) {
+        const row = rowsRef.current[r]!;
+        const copiedVals = actualCols.map((ac) => row[ac] ?? '');
+        row.splice(insertIdx, 0, ...copiedVals);
+      }
+
+      if (metaCopies.length > 0) {
+        let text = metaTextRef.current ?? '';
+        for (const item of metaCopies) {
+          text = patchMetaJsonc(text, ['columns', item.newKey], item.cfg);
+        }
+        scheduleMetaSave(text);
+      }
+
+      setCsvData({ ...csvData, headers: nextHeaders, columnKeys: nextKeys });
+      setAutoWidths(nextWidths);
+      setDirtyCsv(true);
+      setDataVersion((v) => v + 1);
+      onDocumentEdit?.(`Duplicate ${actualCols.length} column(s) ${side}`);
+      setStatusMsg(
+        `Duplicated ${actualCols.length} column${actualCols.length === 1 ? '' : 's'} to the ${side}`,
+      );
+    },
+    [csvData, isReadOnly, autoWidths, makeUniqueColKey, meta.columns, scheduleMetaSave, onDocumentEdit],
+  );
+
+  const handleInsertBlankColumns = useCallback(
+    (actualCols: number[], side: 'left' | 'right') => {
+      if (!csvData || isReadOnly || actualCols.length === 0) return;
+      const count = actualCols.length;
+      const firstCol = actualCols[0]!;
+      const lastCol = actualCols[actualCols.length - 1]!;
+      const insertIdx = side === 'left' ? firstCol : lastCol + 1;
+
+      const workingKeys = [...csvData.columnKeys];
+      const blankHeaders: string[] = [];
+      const blankKeys: string[] = [];
+      const blankWidths: number[] = [];
+      for (let i = 0; i < count; i++) {
+        const newHeader = csvData.dialect.hasHeader
+          ? makeUniqueColKey(`column_${workingKeys.length + 1}`, workingKeys)
+          : '';
+        if (csvData.dialect.hasHeader) workingKeys.push(newHeader);
+        blankHeaders.push(newHeader);
+        blankKeys.push(newHeader);
+        blankWidths.push(140);
+      }
+
+      const nextHeaders = [...csvData.headers];
+      nextHeaders.splice(insertIdx, 0, ...blankHeaders);
+
+      const nextKeys = csvData.dialect.hasHeader
+        ? (() => {
+            const arr = [...csvData.columnKeys];
+            arr.splice(insertIdx, 0, ...blankKeys);
+            return arr;
+          })()
+        : Array.from({ length: csvData.columnKeys.length + count }, (_, i) => String(i));
+
+      const nextWidths = [...autoWidths];
+      nextWidths.splice(insertIdx, 0, ...blankWidths);
+
+      const emptyCells = Array.from({ length: count }, () => '');
+      for (let r = 0; r < rowsRef.current.length; r++) {
+        rowsRef.current[r]!.splice(insertIdx, 0, ...emptyCells);
+      }
+
+      setCsvData({ ...csvData, headers: nextHeaders, columnKeys: nextKeys });
+      setAutoWidths(nextWidths);
+      setDirtyCsv(true);
+      setDataVersion((v) => v + 1);
+      onDocumentEdit?.(`Insert ${count} blank column(s) ${side}`);
+      setStatusMsg(
+        `Inserted ${count} blank column${count === 1 ? '' : 's'} to the ${side}`,
+      );
+    },
+    [csvData, isReadOnly, autoWidths, makeUniqueColKey, onDocumentEdit],
+  );
+
+  const handleShiftColumns = useCallback(
+    (visCols: number[], actualCols: number[], direction: -1 | 1) => {
+      if (!csvData || isReadOnly || actualCols.length === 0) return;
+      const startCol = actualCols[0]!;
+      const endCol = actualCols[actualCols.length - 1]!;
+      const totalCols = csvData.columnKeys.length;
+      if (direction === -1 && startCol <= 0) return;
+      if (direction === 1 && endCol >= totalCols - 1) return;
+
+      const rotateArr = <T,>(arr: T[]): T[] => {
+        const next = [...arr];
+        if (direction === -1) {
+          const [moved] = next.splice(startCol - 1, 1);
+          next.splice(endCol, 0, moved!);
+        } else {
+          const [moved] = next.splice(endCol + 1, 1);
+          next.splice(startCol, 0, moved!);
+        }
+        return next;
+      };
+
+      const nextHeaders = rotateArr(csvData.headers);
+      const nextKeys = csvData.dialect.hasHeader
+        ? rotateArr(csvData.columnKeys)
+        : [...csvData.columnKeys];
+      const nextWidths = rotateArr(
+        Array.from({ length: totalCols }, (_, i) => autoWidths[i] ?? 140),
+      );
+
+      for (let r = 0; r < rowsRef.current.length; r++) {
+        const row = rowsRef.current[r]!;
+        if (direction === -1) {
+          const moved = row.splice(startCol - 1, 1)[0] ?? '';
+          row.splice(endCol, 0, moved);
+        } else {
+          const moved = row.splice(endCol + 1, 1)[0] ?? '';
+          row.splice(startCol, 0, moved);
+        }
+      }
+
+      // When hasHeader=false, columnKeys are numeric indices so rotate meta.columns entries to follow data
+      if (!csvData.dialect.hasHeader && meta.columns) {
+        const oldConfigs = Array.from({ length: totalCols }, (_, i) => meta.columns?.[String(i)]);
+        const rotatedConfigs = rotateArr(oldConfigs);
+        let text = metaTextRef.current ?? '';
+        let changed = false;
+        for (let i = 0; i < totalCols; i++) {
+          if (oldConfigs[i] !== rotatedConfigs[i]) {
+            text = patchMetaJsonc(text, ['columns', String(i)], rotatedConfigs[i]);
+            changed = true;
+          }
+        }
+        if (changed) scheduleMetaSave(text);
+      }
+
+      setCsvData({ ...csvData, headers: nextHeaders, columnKeys: nextKeys });
+      setAutoWidths(nextWidths);
+
+      // Keep the shifted column block selected so user can shift repeatedly
+      const firstVis = visCols[0]!;
+      const lastVis = visCols[visCols.length - 1]!;
+      const nextStartVis = Math.max(0, firstVis + direction);
+      const nextEndVis = Math.min(visibleColIndices.length - 1, lastVis + direction);
+      setSelection({
+        columns: CompactSelection.fromSingleSelection([nextStartVis, nextEndVis + 1]),
+        rows: CompactSelection.empty(),
+      });
+
+      setDirtyCsv(true);
+      setDataVersion((v) => v + 1);
+      onDocumentEdit?.(direction < 0 ? 'Shift column(s) left' : 'Shift column(s) right');
+      setStatusMsg(direction < 0 ? 'Moved column(s) left' : 'Moved column(s) right');
+    },
+    [
+      csvData,
+      isReadOnly,
+      autoWidths,
+      meta.columns,
+      scheduleMetaSave,
+      visibleColIndices.length,
+      onDocumentEdit,
+    ],
   );
 
   const serializeCurrentCsv = useCallback((): Uint8Array | null => {
@@ -1546,6 +2319,61 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
     jumpNextMarker,
     jumpPrevMarker,
     zoomScale,
+  ]);
+
+  // Column selection clipboard shortcuts (Ctrl+C, Ctrl+V, Ctrl+Shift+V) — capture phase to preempt grid default when full column(s) selected
+  useEffect(() => {
+    if (!isActive || !csvData || selection.columns.length === 0) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const inTextInput =
+        target?.tagName === 'INPUT' ||
+        target?.tagName === 'TEXTAREA' ||
+        target?.isContentEditable === true;
+      if (inTextInput) return;
+      const mod = e.ctrlKey || e.metaKey;
+      if (!mod || e.altKey) return;
+      const key = e.key.toLowerCase();
+      if (key !== 'c' && key !== 'v') return;
+
+      const selVisCols = selection.columns.toArray();
+      if (selVisCols.length === 0) return;
+      const targetVisCols = isContiguousCols(selVisCols) ? selVisCols : [selVisCols[0]!];
+      const targetActualCols: number[] = [];
+      const targetColKeys: string[] = [];
+      for (const vc of targetVisCols) {
+        const ac = visibleColIndices[vc];
+        if (ac === undefined) continue;
+        targetActualCols.push(ac);
+        targetColKeys.push(csvData.columnKeys[ac] ?? String(ac));
+      }
+      if (targetActualCols.length === 0) return;
+
+      if (key === 'c' && !e.shiftKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        void handleCopyColumns(targetActualCols, targetColKeys);
+      } else if (key === 'v' && !e.shiftKey && !isReadOnly) {
+        e.preventDefault();
+        e.stopPropagation();
+        void handlePasteColumns(targetActualCols[0]!, true);
+      } else if (key === 'v' && e.shiftKey && !isReadOnly) {
+        e.preventDefault();
+        e.stopPropagation();
+        void handlePasteColumns(targetActualCols[0]!, false);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
+  }, [
+    isActive,
+    csvData,
+    selection.columns,
+    isContiguousCols,
+    visibleColIndices,
+    isReadOnly,
+    handleCopyColumns,
+    handlePasteColumns,
   ]);
 
   // Ctrl/Cmd + Mouse Wheel zoom on the grid container (non-passive so browser zoom is prevented)
@@ -3269,6 +4097,7 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
                 onFinishedEditing={onFinishedEditing}
                 onColumnResize={onColumnResize}
                 onHeaderClicked={onHeaderClicked}
+                onHeaderContextMenu={onHeaderContextMenu}
                 onMouseMove={onGridMouseMove}
                 onVisibleRegionChanged={(range) => {
                   if (range.width <= 0 || range.height <= 0) return;
@@ -3372,6 +4201,348 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
                   />
                 </button>
               )}
+
+              {/* Inline column header title editor */}
+              {editingHeaderCol && (
+                <input
+                  type="text"
+                  autoFocus
+                  value={editingHeaderCol.value}
+                  onFocus={(e) => e.currentTarget.select()}
+                  onChange={(e) =>
+                    setEditingHeaderCol((prev) =>
+                      prev ? { ...prev, value: e.target.value } : null,
+                    )
+                  }
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      commitHeaderTitleEdit();
+                    } else if (e.key === 'Escape') {
+                      e.preventDefault();
+                      setEditingHeaderCol(null);
+                    }
+                  }}
+                  onBlur={() => commitHeaderTitleEdit()}
+                  style={{
+                    position: 'absolute',
+                    left: editingHeaderCol.left,
+                    top: editingHeaderCol.top,
+                    width: Math.max(80, editingHeaderCol.width),
+                    height: editingHeaderCol.height,
+                    zIndex: 45,
+                    padding: '0 8px',
+                    fontSize: scaledFontSize,
+                    fontWeight: 600,
+                    fontFamily: 'inherit',
+                    border: '2px solid #3b82f6',
+                    borderRadius: 2,
+                    background: isDark ? '#18181b' : '#ffffff',
+                    color: toolbarFg,
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              )}
+
+              {/* Column Header Right-Click Context Menu */}
+              {headerContextMenu && (() => {
+                const { visCols, actualCols, colKeys, x, y, headerBounds } = headerContextMenu;
+                const isMulti = actualCols.length > 1;
+                const firstActual = actualCols[0]!;
+                const lastActual = actualCols[actualCols.length - 1]!;
+                const firstKey = colKeys[0]!;
+                const adjacentHidden = getAdjacentHiddenColumnKeys(visCols);
+                const canShiftLeft = !isReadOnly && firstActual > 0;
+                const canShiftRight =
+                  !isReadOnly && lastActual < (csvData?.columnKeys.length ?? 1) - 1;
+                const canDelete =
+                  !isReadOnly && actualCols.length < (csvData?.columnKeys.length ?? 0);
+                const canHide = visibleColIndices.length - colKeys.length >= 1;
+                const ctxItemStyle = (disabled = false): React.CSSProperties => ({
+                  ...menuItemStyle,
+                  padding: '5px 8px',
+                  opacity: disabled ? 0.42 : 1,
+                  cursor: disabled ? 'default' : 'pointer',
+                });
+                const sep = (
+                  <hr
+                    style={{
+                      border: 'none',
+                      borderTop: `1px solid ${toolbarBorder}`,
+                      margin: '3px 0',
+                    }}
+                  />
+                );
+
+                return (
+                  <div
+                    ref={headerMenuRef}
+                    role="menu"
+                    style={{
+                      position: 'fixed',
+                      left: x,
+                      top: y,
+                      zIndex: 80,
+                      width: 262,
+                      padding: 5,
+                      borderRadius: 6,
+                      background: isDark ? '#1f1f23' : '#ffffff',
+                      border: `1px solid ${toolbarBorder}`,
+                      boxShadow: '0 10px 28px rgba(0, 0, 0, 0.34)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 1,
+                      color: toolbarFg,
+                    }}
+                  >
+                    <button
+                      type="button"
+                      disabled={isMulti}
+                      style={ctxItemStyle(isMulti)}
+                      onClick={() => {
+                        if (isMulti) return;
+                        const containerRect = gridContainerRef.current?.getBoundingClientRect();
+                        const currentTitle =
+                          meta.columns?.[firstKey]?.label ?? getDefaultColumnTitle(firstActual);
+                        setHeaderContextMenu(null);
+                        setEditingHeaderCol({
+                          actualCol: firstActual,
+                          colKey: firstKey,
+                          value: currentTitle,
+                          left: containerRect
+                            ? Math.max(0, headerBounds.x - containerRect.left)
+                            : 0,
+                          top: containerRect
+                            ? Math.max(0, headerBounds.y - containerRect.top)
+                            : 0,
+                          width: headerBounds.width,
+                          height: headerBounds.height,
+                        });
+                      }}
+                    >
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                        <Pencil size={13} />
+                        <span>タイトル編集</span>
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      style={ctxItemStyle(false)}
+                      onClick={() => {
+                        setHeaderContextMenu(null);
+                        setSelection({
+                          columns: CompactSelection.fromSingleSelection([
+                            visCols[0]!,
+                            visCols[visCols.length - 1]! + 1,
+                          ]),
+                          rows: CompactSelection.empty(),
+                        });
+                        setOpenMenu('edit');
+                      }}
+                    >
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                        <Palette size={13} />
+                        <span>スタイル</span>
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      style={ctxItemStyle(false)}
+                      onClick={() => {
+                        setHeaderContextMenu(null);
+                        void handleCopyColumns(actualCols, colKeys);
+                      }}
+                    >
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                        <Copy size={13} />
+                        <span>コピー</span>
+                      </span>
+                      <span style={{ fontSize: 10.5, opacity: 0.6 }}>Ctrl+C</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={isReadOnly}
+                      style={ctxItemStyle(isReadOnly)}
+                      onClick={() => {
+                        setHeaderContextMenu(null);
+                        void handlePasteColumns(firstActual, true);
+                      }}
+                    >
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                        <ClipboardPaste size={13} />
+                        <span>貼り付け (スタイルあり)</span>
+                      </span>
+                      <span style={{ fontSize: 10.5, opacity: 0.6 }}>Ctrl+V</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={isReadOnly}
+                      style={ctxItemStyle(isReadOnly)}
+                      onClick={() => {
+                        setHeaderContextMenu(null);
+                        void handlePasteColumns(firstActual, false);
+                      }}
+                    >
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                        <ClipboardPaste size={13} />
+                        <span>値のみ貼り付け</span>
+                      </span>
+                      <span style={{ fontSize: 10.5, opacity: 0.6 }}>Ctrl+Shift+V</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={!canDelete}
+                      style={ctxItemStyle(!canDelete)}
+                      onClick={() => {
+                        setHeaderContextMenu(null);
+                        handleDeleteColumns(actualCols, colKeys);
+                      }}
+                    >
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                        <Trash2 size={13} />
+                        <span>{isMulti ? `削除 (${actualCols.length}列)` : '削除'}</span>
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={!canHide}
+                      style={ctxItemStyle(!canHide)}
+                      onClick={() => {
+                        setHeaderContextMenu(null);
+                        handleHideColumns(actualCols, colKeys);
+                      }}
+                    >
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                        <EyeOff size={13} />
+                        <span>{isMulti ? `列の非表示 (${actualCols.length}列)` : '列の非表示'}</span>
+                      </span>
+                    </button>
+
+                    {adjacentHidden.length > 0 && (
+                      <button
+                        type="button"
+                        style={ctxItemStyle(false)}
+                        onClick={() => {
+                          setHeaderContextMenu(null);
+                          handleUnhideColumns(adjacentHidden);
+                        }}
+                      >
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                          <Eye size={13} />
+                          <span>非表示列を再表示 ({adjacentHidden.length})</span>
+                        </span>
+                      </button>
+                    )}
+
+                    {sep}
+
+                    <button
+                      type="button"
+                      disabled={isReadOnly}
+                      style={ctxItemStyle(isReadOnly)}
+                      onClick={() => {
+                        setHeaderContextMenu(null);
+                        handleDuplicateColumns(actualCols, colKeys, 'left');
+                      }}
+                    >
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                        <Columns2 size={13} />
+                        <span>{isMulti ? `${actualCols.length}列を左に複製` : '列を左に複製'}</span>
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={isReadOnly}
+                      style={ctxItemStyle(isReadOnly)}
+                      onClick={() => {
+                        setHeaderContextMenu(null);
+                        handleDuplicateColumns(actualCols, colKeys, 'right');
+                      }}
+                    >
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                        <Columns2 size={13} />
+                        <span>{isMulti ? `${actualCols.length}列を右に複製` : '列を右に複製'}</span>
+                      </span>
+                    </button>
+
+                    {sep}
+
+                    <button
+                      type="button"
+                      disabled={isReadOnly}
+                      style={ctxItemStyle(isReadOnly)}
+                      onClick={() => {
+                        setHeaderContextMenu(null);
+                        handleInsertBlankColumns(actualCols, 'left');
+                      }}
+                    >
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                        <Plus size={13} />
+                        <span>
+                          {isMulti ? `左に空白列挿入 (${actualCols.length}列)` : '左に空白列挿入'}
+                        </span>
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={isReadOnly}
+                      style={ctxItemStyle(isReadOnly)}
+                      onClick={() => {
+                        setHeaderContextMenu(null);
+                        handleInsertBlankColumns(actualCols, 'right');
+                      }}
+                    >
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                        <Plus size={13} />
+                        <span>
+                          {isMulti ? `右に空白列挿入 (${actualCols.length}列)` : '右に空白列挿入'}
+                        </span>
+                      </span>
+                    </button>
+
+                    {sep}
+
+                    <button
+                      type="button"
+                      disabled={!canShiftLeft}
+                      style={ctxItemStyle(!canShiftLeft)}
+                      onClick={() => {
+                        setHeaderContextMenu(null);
+                        handleShiftColumns(visCols, actualCols, -1);
+                      }}
+                    >
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                        <ArrowLeft size={13} />
+                        <span>列を左にずらす</span>
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={!canShiftRight}
+                      style={ctxItemStyle(!canShiftRight)}
+                      onClick={() => {
+                        setHeaderContextMenu(null);
+                        handleShiftColumns(visCols, actualCols, 1);
+                      }}
+                    >
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                        <ArrowRight size={13} />
+                        <span>列を右にずらす</span>
+                      </span>
+                    </button>
+                  </div>
+                );
+              })()}
             </>
           );
         })()}
@@ -3752,6 +4923,187 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
         themeMode={themeMode}
         hostMode={hostMode}
       />
+
+      {/* Column Delete Confirmation Dialog */}
+      {pendingDeleteCol && (
+        <div
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setPendingDeleteCol(null);
+          }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 110,
+            background: 'rgba(0, 0, 0, 0.45)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="列の削除"
+            style={{
+              width: '100%',
+              maxWidth: 380,
+              borderRadius: 10,
+              background: isDark ? '#1f1f23' : '#ffffff',
+              color: toolbarFg,
+              border: `1px solid ${toolbarBorder}`,
+              boxShadow: '0 16px 48px rgba(0, 0, 0, 0.4)',
+              padding: 18,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 12,
+              fontSize: 13,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700 }}>
+              <Trash2 size={15} style={{ color: '#ef4444' }} />
+              <span>列の削除</span>
+            </div>
+            <div style={{ fontSize: 12.5, lineHeight: 1.6, opacity: 0.9 }}>
+              <strong>{pendingDeleteCol.label}</strong>を削除しますか？
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+              <button
+                type="button"
+                autoFocus
+                style={{ ...btnStyle, padding: '4px 12px', height: 28 }}
+                onClick={() => setPendingDeleteCol(null)}
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                style={{
+                  ...btnStyle,
+                  padding: '4px 12px',
+                  height: 28,
+                  background: '#dc2626',
+                  borderColor: '#ef4444',
+                  color: '#ffffff',
+                  fontWeight: 600,
+                }}
+                onClick={() => {
+                  const target = pendingDeleteCol;
+                  setPendingDeleteCol(null);
+                  executeDeleteColumns(target.actualCols, target.colKeys, target.label);
+                }}
+              >
+                削除する
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Column Hide Guidance Dialog (with "Don't show again" synced to Settings -> Columns) */}
+      {pendingHideCol && (
+        <div
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setPendingHideCol(null);
+          }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 110,
+            background: 'rgba(0, 0, 0, 0.45)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="列の非表示"
+            style={{
+              width: '100%',
+              maxWidth: 400,
+              borderRadius: 10,
+              background: isDark ? '#1f1f23' : '#ffffff',
+              color: toolbarFg,
+              border: `1px solid ${toolbarBorder}`,
+              boxShadow: '0 16px 48px rgba(0, 0, 0, 0.4)',
+              padding: 18,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 12,
+              fontSize: 13,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700 }}>
+              <EyeOff size={15} />
+              <span>列の非表示</span>
+            </div>
+            <div style={{ fontSize: 12.5, lineHeight: 1.6, opacity: 0.9 }}>
+              <strong>{pendingHideCol.label}</strong>を非表示にします。
+              <br />
+              再表示は設定画面（Settings → File → Columns）から行ってください。
+            </div>
+            <label
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                fontSize: 12,
+                cursor: 'pointer',
+                userSelect: 'none',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={pendingHideCol.dontShowAgain}
+                onChange={(e) =>
+                  setPendingHideCol((prev) =>
+                    prev ? { ...prev, dontShowAgain: e.target.checked } : null,
+                  )
+                }
+              />
+              <span>次回から表示しない</span>
+            </label>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+              <button
+                type="button"
+                style={{ ...btnStyle, padding: '4px 12px', height: 28 }}
+                onClick={() => setPendingHideCol(null)}
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                style={{
+                  ...btnStyle,
+                  padding: '4px 12px',
+                  height: 28,
+                  background: '#2563eb',
+                  borderColor: '#3b82f6',
+                  color: '#ffffff',
+                  fontWeight: 600,
+                }}
+                onClick={() => {
+                  const target = pendingHideCol;
+                  setPendingHideCol(null);
+                  if (target.dontShowAgain) {
+                    if (onAppSettingsChange) {
+                      onAppSettingsChange({ confirmHideColumn: false });
+                    } else {
+                      setLocalConfirmHideCol(false);
+                    }
+                  }
+                  executeHideColumns(target.colKeys, target.label);
+                }}
+              >
+                非表示にする
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
   },

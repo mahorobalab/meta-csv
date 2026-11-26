@@ -19,6 +19,7 @@ export interface EditorAppSettings {
   showRowNumbers?: boolean;
   noHeaderColumnStyle?: 'excel' | 'numbered';
   zebraStriping?: boolean;
+  confirmHideColumn?: boolean;
   reopenLastFiles?: boolean;
 }
 
@@ -581,7 +582,30 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </label>
 
             <hr style={{ border: 'none', borderTop: `1px solid ${border}`, margin: '2px 0' }} />
-            <div style={{ fontWeight: 600, fontSize: 12 }}>Columns (Show / Wrap)</div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+              <div style={{ fontWeight: 600, fontSize: 12 }}>Columns (Show / Wrap)</div>
+              <label
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  fontSize: 11.5,
+                  fontWeight: 400,
+                  cursor: 'pointer',
+                  opacity: 0.85,
+                }}
+                title="列を非表示にするときに確認ダイアログを表示する"
+              >
+                <input
+                  type="checkbox"
+                  checked={appSettings.confirmHideColumn !== false}
+                  onChange={(e) =>
+                    onAppSettingsChange?.({ confirmHideColumn: e.target.checked })
+                  }
+                />
+                <span>確認表示</span>
+              </label>
+            </div>
             <div
               style={{
                 display: 'grid',

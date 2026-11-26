@@ -5,6 +5,7 @@ export {
   type MetaCsvEditorHandle,
   type MetaCsvEditorProps,
 } from './MetaCsvEditor';
+export type { NativeClipboardBridge } from './columnClipboard';
 export {
   SettingsModal,
   AboutModal,
