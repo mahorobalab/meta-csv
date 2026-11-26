@@ -305,11 +305,54 @@ export const App: React.FC = () => {
             setNewSeq((s) => s + 1);
           }}
           onOpenFile={() => fileInputRef.current?.click()}
-          onSaveAs={(bytes) => {
-            const name = window.prompt('Save As file name:', 'export.csv')?.trim();
-            if (!name) return false;
+          onSaveAs={async (bytes) => {
+            const suggestedName =
+              document.title.split(' — ')[0]?.replace(/ \*$/, '').trim() || 'export.csv';
             const copy = new Uint8Array(bytes.byteLength);
             copy.set(bytes);
+
+            type SavePickerFn = (options?: {
+              suggestedName?: string;
+              types?: Array<{ description?: string; accept: Record<string, string[]> }>;
+            }) => Promise<{
+              createWritable: () => Promise<{
+                write: (data: Blob | Uint8Array) => Promise<void>;
+                close: () => Promise<void>;
+              }>;
+            }>;
+
+            const picker = (window as unknown as { showSaveFilePicker?: SavePickerFn })
+              .showSaveFilePicker;
+            if (typeof picker === 'function') {
+              try {
+                const handle = await picker({
+                  suggestedName,
+                  types: [
+                    {
+                      description: 'CSV / TSV / JSONL / Log',
+                      accept: {
+                        'text/csv': ['.csv'],
+                        'text/tab-separated-values': ['.tsv'],
+                        'application/x-ndjson': ['.jsonl', '.ndjson'],
+                        'text/plain': ['.log', '.txt'],
+                      },
+                    },
+                  ],
+                });
+                const writable = await handle.createWritable();
+                await writable.write(new Blob([copy], { type: 'text/plain;charset=utf-8' }));
+                await writable.close();
+                return true;
+              } catch (err) {
+                if ((err as { name?: string })?.name === 'AbortError') {
+                  return false;
+                }
+                // Fall back to anchor download if picker fails unexpectedly
+              }
+            }
+
+            const name = window.prompt('Save As file name:', suggestedName)?.trim();
+            if (!name) return false;
             const blob = new Blob([copy], { type: 'text/plain;charset=utf-8' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
