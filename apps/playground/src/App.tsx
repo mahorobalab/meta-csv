@@ -1,8 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Check, Code2, ExternalLink, FileSpreadsheet } from 'lucide-react';
 import {
   MetaCsvEditor,
   resolveThemeMode,
   useSystemTheme,
+  type EditorAppSettings,
+  type EditorStatusInfo,
   type ThemePreference,
 } from '@meta-csv/ui';
 import {
@@ -18,7 +21,7 @@ type PresetKey = 'spec' | 'large100k' | 'custom';
 
 const STORAGE_KEY = 'metacsv:playground-settings:v1';
 
-interface PlaygroundSettings {
+interface PlaygroundSettings extends EditorAppSettings {
   theme: ThemePreference;
   showMetaPanel: boolean;
 }
@@ -34,7 +37,15 @@ function loadPlaygroundSettings(): PlaygroundSettings {
         : 'system';
     const showMetaPanel =
       typeof parsed.showMetaPanel === 'boolean' ? parsed.showMetaPanel : true;
-    return { theme, showMetaPanel };
+    return {
+      theme,
+      showMetaPanel,
+      defaultFontSize: parsed.defaultFontSize,
+      defaultRowHeight: parsed.defaultRowHeight,
+      defaultMarkerColor: parsed.defaultMarkerColor,
+      showRowNumbers: parsed.showRowNumbers,
+      noHeaderColumnStyle: parsed.noHeaderColumnStyle,
+    };
   } catch {
     return { theme: 'system', showMetaPanel: true };
   }
@@ -45,20 +56,32 @@ export const App: React.FC = () => {
   const [preset, setPreset] = useState<PresetKey>('spec');
   const [themePref, setThemePref] = useState<ThemePreference>(initial.theme);
   const [showMetaPanel, setShowMetaPanel] = useState<boolean>(initial.showMetaPanel);
+  const [appSettings, setAppSettings] = useState<EditorAppSettings>({
+    defaultFontSize: initial.defaultFontSize,
+    defaultRowHeight: initial.defaultRowHeight,
+    defaultMarkerColor: initial.defaultMarkerColor,
+    showRowNumbers: initial.showRowNumbers,
+    noHeaderColumnStyle: initial.noHeaderColumnStyle,
+  });
   const [metaText, setMetaText] = useState<string>(SPEC_SETTING_META);
   const [customFile, setCustomFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const systemTheme = useSystemTheme();
   const resolvedTheme = resolveThemeMode(themePref, systemTheme);
 
   useEffect(() => {
     try {
-      const payload: PlaygroundSettings = { theme: themePref, showMetaPanel };
+      const payload: PlaygroundSettings = {
+        theme: themePref,
+        showMetaPanel,
+        ...appSettings,
+      };
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
     } catch {
       // Ignore storage errors
     }
-  }, [themePref, showMetaPanel]);
+  }, [themePref, showMetaPanel, appSettings]);
 
   const adapter = useMemo(() => {
     if (preset === 'spec') {
@@ -95,171 +118,185 @@ export const App: React.FC = () => {
   };
 
   const isDark = resolvedTheme === 'dark';
-  const barBg = isDark ? '#18181b' : '#e2e8f0';
   const barFg = isDark ? '#f8fafc' : '#0f172a';
   const border = isDark ? '#333338' : '#cbd5e1';
 
-  const tabBtn = (active: boolean): React.CSSProperties => ({
-    padding: '4px 10px',
-    fontSize: 12,
+  const menuRowStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    width: '100%',
+    padding: '6px 8px',
     borderRadius: 4,
-    border: `1px solid ${active ? '#3b82f6' : border}`,
-    background: active ? '#2563eb' : isDark ? '#27272a' : '#ffffff',
-    color: active ? '#ffffff' : barFg,
+    border: 'none',
+    background: 'transparent',
+    color: barFg,
+    fontSize: 12,
     cursor: 'pointer',
-  });
+    textAlign: 'left',
+  };
+
+  const fileMenuItems = (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <div style={{ padding: '4px 8px 2px', fontSize: 10.5, opacity: 0.6, fontWeight: 600 }}>
+        Sample Datasets
+      </div>
+      <button
+        type="button"
+        style={menuRowStyle}
+        onClick={() => {
+          setMetaText(SPEC_SETTING_META);
+          setPreset('spec');
+        }}
+      >
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+          <FileSpreadsheet size={13} />
+          <span>spec_setting.csv</span>
+        </span>
+        {preset === 'spec' && <Check size={13} />}
+      </button>
+      <button
+        type="button"
+        style={menuRowStyle}
+        onClick={() => {
+          setMetaText(LARGE_CSV_META);
+          setPreset('large100k');
+        }}
+      >
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+          <FileSpreadsheet size={13} />
+          <span>100,000 Rows Benchmark</span>
+        </span>
+        {preset === 'large100k' && <Check size={13} />}
+      </button>
+      <button
+        type="button"
+        style={menuRowStyle}
+        onClick={() => setShowMetaPanel((s) => !s)}
+      >
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+          <Code2 size={13} />
+          <span>{showMetaPanel ? 'Hide .meta.jsonc Panel' : 'Show .meta.jsonc Panel'}</span>
+        </span>
+        {showMetaPanel && <Check size={13} />}
+      </button>
+      <a
+        href="../"
+        style={{
+          ...menuRowStyle,
+          textDecoration: 'none',
+        }}
+      >
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+          <ExternalLink size={13} />
+          <span>Back to MetaCSV Home</span>
+        </span>
+      </a>
+    </div>
+  );
+
+  const settingsExtraSection = (
+    <label
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        gap: 12,
+        cursor: 'pointer',
+      }}
+    >
+      <span>Show live .meta.jsonc panel</span>
+      <input
+        type="checkbox"
+        checked={showMetaPanel}
+        onChange={(e) => setShowMetaPanel(e.target.checked)}
+      />
+    </label>
+  );
 
   return (
     <div
       style={{
         display: 'flex',
-        flexDirection: 'column',
         width: '100vw',
         height: '100vh',
         background: isDark ? '#1e1e1e' : '#ffffff',
         color: barFg,
       }}
     >
-      {/* Top Web / Playground Header */}
-      <header
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          padding: '6px 12px',
-          background: barBg,
-          borderBottom: `1px solid ${border}`,
-          fontSize: 13,
-        }}
-      >
-        <a
-          href="../"
-          title="Back to MetaCSV Home"
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".csv,.tsv,.txt"
+        onChange={handleOpenLocalCsv}
+        style={{ display: 'none' }}
+      />
+
+      <div style={{ flex: 1, minWidth: 0, height: '100%' }}>
+        <MetaCsvEditor
+          adapter={adapter}
+          hostMode="web"
+          themeMode={resolvedTheme}
+          themePreference={themePref}
+          systemTheme={systemTheme}
+          onThemePreferenceChange={setThemePref}
+          appSettings={appSettings}
+          onAppSettingsChange={(patch) =>
+            setAppSettings((prev) => ({ ...prev, ...patch }))
+          }
+          onOpenFile={() => fileInputRef.current?.click()}
+          fileMenuItems={fileMenuItems}
+          settingsExtraSection={settingsExtraSection}
+          onStatusChange={(info: EditorStatusInfo) => {
+            document.title = info.fileName
+              ? `${info.fileName}${info.dirty ? ' *' : ''} — MetaCSV`
+              : 'MetaCSV Web';
+          }}
+          externalMetaText={metaText}
+          onMetaTextChange={setMetaText}
+        />
+      </div>
+
+      {showMetaPanel && (
+        <aside
           style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            fontWeight: 700,
-            marginRight: 6,
-            color: barFg,
-            textDecoration: 'none',
+            width: 360,
+            borderLeft: `1px solid ${border}`,
+            display: 'flex',
+            flexDirection: 'column',
+            background: isDark ? '#1a1a1d' : '#f8fafc',
           }}
         >
-          <span>MetaCSV</span>
-        </a>
-
-        <button
-          style={tabBtn(preset === 'spec')}
-          onClick={() => {
-            setMetaText(SPEC_SETTING_META);
-            setPreset('spec');
-          }}
-        >
-          spec_setting.csv
-        </button>
-        <button
-          style={tabBtn(preset === 'large100k')}
-          onClick={() => {
-            setMetaText(LARGE_CSV_META);
-            setPreset('large100k');
-          }}
-        >
-          100,000 Rows Benchmark
-        </button>
-        <label style={{ ...tabBtn(preset === 'custom'), display: 'inline-block' }}>
-          Open Local CSV...
-          <input
-            type="file"
-            accept=".csv,.tsv,.txt"
-            onChange={handleOpenLocalCsv}
-            style={{ display: 'none' }}
-          />
-        </label>
-
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <label
+          <div
             style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
+              padding: '6px 10px',
               fontSize: 12,
+              fontWeight: 600,
+              borderBottom: `1px solid ${border}`,
             }}
           >
-            <span style={{ opacity: 0.8 }}>Theme:</span>
-            <select
-              aria-label="Theme mode"
-              value={themePref}
-              onChange={(e) => setThemePref(e.target.value as ThemePreference)}
-              style={{
-                ...tabBtn(false),
-                padding: '3px 8px',
-              }}
-            >
-              <option value="system">System ({systemTheme})</option>
-              <option value="light">Light</option>
-              <option value="dark">Dark</option>
-            </select>
-          </label>
-          <button
-            style={tabBtn(showMetaPanel)}
-            onClick={() => setShowMetaPanel((s) => !s)}
-          >
-            {showMetaPanel ? 'Hide .meta.jsonc' : 'Show .meta.jsonc'}
-          </button>
-        </div>
-      </header>
-
-      {/* Main Split View */}
-      <main style={{ flex: 1, minHeight: 0, display: 'flex' }}>
-        <div style={{ flex: 1, minWidth: 0, height: '100%' }}>
-          <MetaCsvEditor
-            adapter={adapter}
-            themeMode={resolvedTheme}
-            externalMetaText={metaText}
-            onMetaTextChange={setMetaText}
-          />
-        </div>
-
-        {showMetaPanel && (
-          <aside
+            Live .meta.jsonc (drag columns / click header / add markers)
+          </div>
+          <textarea
+            value={metaText}
+            onChange={(e) => setMetaText(e.target.value)}
+            spellCheck={false}
             style={{
-              width: 380,
-              borderLeft: `1px solid ${border}`,
-              display: 'flex',
-              flexDirection: 'column',
-              background: isDark ? '#1a1a1d' : '#f8fafc',
+              flex: 1,
+              resize: 'none',
+              border: 'none',
+              outline: 'none',
+              padding: 10,
+              fontFamily: "'Consolas', 'Courier New', monospace",
+              fontSize: 12,
+              lineHeight: 1.5,
+              background: isDark ? '#141416' : '#ffffff',
+              color: isDark ? '#d4d4d8' : '#1e293b',
             }}
-          >
-            <div
-              style={{
-                padding: '6px 10px',
-                fontSize: 12,
-                fontWeight: 600,
-                borderBottom: `1px solid ${border}`,
-              }}
-            >
-              Live .meta.jsonc (drag columns / click header to watch updates)
-            </div>
-            <textarea
-              value={metaText}
-              onChange={(e) => setMetaText(e.target.value)}
-              spellCheck={false}
-              style={{
-                flex: 1,
-                resize: 'none',
-                border: 'none',
-                outline: 'none',
-                padding: 10,
-                fontFamily: "'Consolas', 'Courier New', monospace",
-                fontSize: 12,
-                lineHeight: 1.5,
-                background: isDark ? '#141416' : '#ffffff',
-                color: isDark ? '#d4d4d8' : '#1e293b',
-              }}
-            />
-          </aside>
-        )}
-      </main>
+          />
+        </aside>
+      )}
     </div>
   );
 };

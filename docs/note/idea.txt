@@ -13,9 +13,17 @@ Tauriで実装
 ソート順の記憶
 検索
 
-CSV エディタ、ビューアでメタデータと連動する
+・CSV エディタ、ビューアでメタデータと連動する
+
+・ほぼ同じ仕組みで、MetaLogが作れそう
+  → MetaLogは、読み取り専用
+  → フィルター、検索、マーカーは実装
+  → 保存したい場合は、ロック解除してから
+
+・~.csv.meta.jsonc じゃなくて、~.*.metatext.jsonc に拡張
+log やcsv 含めたJSON Schema定義する。
+
+・履歴管理は、gix
 
 
-# Meta Log Viewer
-
-
+.metatext.jsonc に関しては、別リポジトリでドキュメントだけのリポジトリ作る？

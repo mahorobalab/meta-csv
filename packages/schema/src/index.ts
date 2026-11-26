@@ -31,11 +31,21 @@ export interface FilterPreset {
   collapseColumn?: string;
 }
 
+export type MarkerColor = 'amber' | 'rose' | 'emerald' | 'sky' | 'violet';
+
+export interface RowMarker {
+  /** 0-based raw data row index (stable across sort & filter) */
+  row: number;
+  color?: MarkerColor;
+  note?: string;
+}
+
 export interface ViewConfig {
   sort?: SortSpec[];
   activeFilter?: string;
   filterContextRows?: number;
   filterPresets?: FilterPreset[];
+  markers?: RowMarker[];
 }
 
 export interface CellStyle {

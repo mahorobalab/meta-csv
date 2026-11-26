@@ -1,15 +1,20 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
+import { Info, Settings } from 'lucide-react';
 import {
+  AboutModal,
   MetaCsvEditor,
+  SettingsModal,
   resolveThemeMode,
   useSystemTheme,
+  type EditorAppSettings,
+  type EditorStatusInfo,
   type ThemePreference,
 } from '@meta-csv/ui';
 import { createTauriAdapter } from './tauriAdapter';
 
-interface DesktopAppSettings {
+interface DesktopAppSettings extends EditorAppSettings {
   theme: ThemePreference;
   lastDirectory?: string | null;
 }
@@ -23,6 +28,9 @@ export const App: React.FC = () => {
   const [filePath, setFilePath] = useState<string | null>(null);
   const [themePref, setThemePref] = useState<ThemePreference>('system');
   const [lastDirectory, setLastDirectory] = useState<string | undefined>(undefined);
+  const [appSettings, setAppSettings] = useState<EditorAppSettings>({});
+  const [showEmptySettings, setShowEmptySettings] = useState(false);
+  const [showEmptyAbout, setShowEmptyAbout] = useState(false);
   const systemTheme = useSystemTheme();
   const resolvedTheme = resolveThemeMode(themePref, systemTheme);
 
@@ -39,6 +47,13 @@ export const App: React.FC = () => {
         if (settings.lastDirectory) {
           setLastDirectory(settings.lastDirectory);
         }
+        setAppSettings({
+          defaultFontSize: settings.defaultFontSize,
+          defaultRowHeight: settings.defaultRowHeight,
+          defaultMarkerColor: settings.defaultMarkerColor,
+          showRowNumbers: settings.showRowNumbers,
+          noHeaderColumnStyle: settings.noHeaderColumnStyle,
+        });
       })
       .catch(() => {
         // Ignore when running outside Tauri
@@ -56,6 +71,13 @@ export const App: React.FC = () => {
   const handleThemeChange = (next: ThemePreference) => {
     setThemePref(next);
     invoke('update_app_settings', { theme: next }).catch(() => {
+      // Ignore when running outside Tauri
+    });
+  };
+
+  const handleAppSettingsChange = (patch: Partial<EditorAppSettings>) => {
+    setAppSettings((prev) => ({ ...prev, ...patch }));
+    invoke('update_app_settings', patch).catch(() => {
       // Ignore when running outside Tauri
     });
   };
@@ -87,19 +109,55 @@ export const App: React.FC = () => {
   };
 
   const isDark = resolvedTheme === 'dark';
-  const barBg = isDark ? '#18181b' : '#e2e8f0';
   const barFg = isDark ? '#f8fafc' : '#0f172a';
   const border = isDark ? '#333338' : '#cbd5e1';
 
   const btnStyle: React.CSSProperties = {
-    padding: '4px 10px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 6,
+    padding: '5px 10px',
     fontSize: 12,
-    borderRadius: 4,
+    borderRadius: 5,
     border: `1px solid ${border}`,
     background: isDark ? '#27272a' : '#ffffff',
     color: barFg,
     cursor: 'pointer',
   };
+
+  if (adapter) {
+    return (
+      <div
+        style={{
+          width: '100vw',
+          height: '100vh',
+          overflow: 'hidden',
+          background: isDark ? '#1e1e1e' : '#ffffff',
+          color: barFg,
+        }}
+      >
+        <MetaCsvEditor
+          adapter={adapter}
+          hostMode="desktop"
+          themeMode={resolvedTheme}
+          themePreference={themePref}
+          systemTheme={systemTheme}
+          onThemePreferenceChange={handleThemeChange}
+          appSettings={appSettings}
+          onAppSettingsChange={handleAppSettingsChange}
+          onOpenFile={() => void handleOpenFile()}
+          onStatusChange={(info: EditorStatusInfo) => {
+            const title = info.fileName
+              ? `MetaCSV - ${info.fileName}${info.dirty ? ' *' : ''}`
+              : 'MetaCSV';
+            invoke('set_window_title', { title }).catch(() => {
+              // Ignore when running outside Tauri
+            });
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div
@@ -112,97 +170,81 @@ export const App: React.FC = () => {
         color: barFg,
       }}
     >
-      <header
+      <div
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: 8,
-          padding: '6px 12px',
-          background: barBg,
-          borderBottom: `1px solid ${border}`,
-          fontSize: 13,
+          justifyContent: 'flex-end',
+          gap: 6,
+          padding: '8px 12px',
         }}
       >
-        <strong>MetaCSV</strong>
-        <button style={btnStyle} onClick={() => void handleOpenFile()}>
-          Open CSV...
+        <button
+          type="button"
+          style={{ ...btnStyle, padding: '5px 8px' }}
+          title="Settings"
+          onClick={() => setShowEmptySettings(true)}
+        >
+          <Settings size={14} />
         </button>
-        {filePath && (
-          <span
-            style={{
-              fontSize: 12,
-              opacity: 0.75,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
-            title={filePath}
-          >
-            {filePath}
-          </span>
-        )}
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <label
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              fontSize: 12,
-            }}
-          >
-            <span style={{ opacity: 0.8 }}>Theme:</span>
-            <select
-              aria-label="Theme mode"
-              value={themePref}
-              onChange={(e) => handleThemeChange(e.target.value as ThemePreference)}
-              style={{
-                ...btnStyle,
-                padding: '3px 8px',
-              }}
-            >
-              <option value="system">System ({systemTheme})</option>
-              <option value="light">Light</option>
-              <option value="dark">Dark</option>
-            </select>
-          </label>
-        </div>
-      </header>
+        <button
+          type="button"
+          style={{ ...btnStyle, padding: '5px 8px' }}
+          title="About MetaCSV"
+          onClick={() => setShowEmptyAbout(true)}
+        >
+          <Info size={14} />
+        </button>
+      </div>
 
-      <main style={{ flex: 1, minHeight: 0 }}>
-        {adapter ? (
-          <MetaCsvEditor adapter={adapter} themeMode={resolvedTheme} />
-        ) : (
-          <div
-            style={{
-              height: '100%',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 12,
-              opacity: 0.85,
-            }}
-          >
-            <div style={{ fontSize: 18, fontWeight: 600 }}>MetaCSV Desktop</div>
-            <div style={{ fontSize: 13, opacity: 0.75 }}>
-              CSV を開くと、隣の .meta.jsonc を自動で読み書きします
-            </div>
-            <button
-              style={{
-                ...btnStyle,
-                padding: '8px 18px',
-                fontSize: 14,
-                background: '#2563eb',
-                borderColor: '#3b82f6',
-                color: '#ffffff',
-              }}
-              onClick={() => void handleOpenFile()}
-            >
-              CSV ファイルを開く
-            </button>
-          </div>
-        )}
-      </main>
+      <div
+        style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 12,
+          opacity: 0.9,
+        }}
+      >
+        <div style={{ fontSize: 20, fontWeight: 700 }}>MetaCSV Desktop</div>
+        <div style={{ fontSize: 13, opacity: 0.75 }}>
+          CSV を開くと、隣の .meta.jsonc を自動で読み書きします
+        </div>
+        <button
+          type="button"
+          style={{
+            ...btnStyle,
+            padding: '8px 20px',
+            fontSize: 14,
+            fontWeight: 600,
+            background: '#2563eb',
+            borderColor: '#3b82f6',
+            color: '#ffffff',
+          }}
+          onClick={() => void handleOpenFile()}
+        >
+          CSV ファイルを開く
+        </button>
+      </div>
+
+      <SettingsModal
+        open={showEmptySettings}
+        onClose={() => setShowEmptySettings(false)}
+        themeMode={resolvedTheme}
+        themePreference={themePref}
+        systemTheme={systemTheme}
+        onThemePreferenceChange={handleThemeChange}
+        appSettings={appSettings}
+        onAppSettingsChange={handleAppSettingsChange}
+      />
+      <AboutModal
+        open={showEmptyAbout}
+        onClose={() => setShowEmptyAbout(false)}
+        themeMode={resolvedTheme}
+        hostMode="desktop"
+      />
     </div>
   );
 };

@@ -2,6 +2,20 @@ import * as vscode from 'vscode';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 
+interface VsCodeAppSettings {
+  defaultFontSize: number;
+  defaultRowHeight: number;
+  defaultMarkerColor: 'amber' | 'rose' | 'emerald' | 'sky' | 'violet';
+  showRowNumbers: boolean;
+  noHeaderColumnStyle: 'excel' | 'numbered';
+}
+
+interface EditorStatusPayload {
+  totalRows?: number;
+  visibleRows?: number;
+  cols?: number;
+}
+
 class MetaCsvDocument implements vscode.CustomDocument {
   constructor(public readonly uri: vscode.Uri) {}
 
@@ -10,13 +24,122 @@ class MetaCsvDocument implements vscode.CustomDocument {
   }
 }
 
-class MetaCsvEditorProvider implements vscode.CustomReadonlyEditorProvider<MetaCsvDocument> {
+class MetaCsvEditorProvider implements vscode.CustomEditorProvider<MetaCsvDocument> {
   public static readonly viewType = 'metaCsv.editor';
 
-  constructor(private readonly context: vscode.ExtensionContext) {}
+  private readonly _onDidChangeCustomDocument = new vscode.EventEmitter<
+    vscode.CustomDocumentEditEvent<MetaCsvDocument>
+  >();
+  public readonly onDidChangeCustomDocument = this._onDidChangeCustomDocument.event;
+
+  private readonly panelsByDoc = new Map<string, vscode.WebviewPanel>();
+  private readonly statusByDoc = new Map<string, string>();
+  private readonly pendingCsvRequests = new Map<
+    number,
+    { resolve: (bytes: Buffer) => void; reject: (err: Error) => void }
+  >();
+  private nextRequestId = 1;
+
+  constructor(
+    private readonly context: vscode.ExtensionContext,
+    private readonly statusBarItem: vscode.StatusBarItem,
+  ) {}
+
+  private refreshStatusBarForActivePanel(): void {
+    for (const [docKey, panel] of this.panelsByDoc.entries()) {
+      if (panel.active) {
+        const text = this.statusByDoc.get(docKey);
+        if (text) {
+          this.statusBarItem.text = text;
+          this.statusBarItem.show();
+        } else {
+          this.statusBarItem.hide();
+        }
+        return;
+      }
+    }
+    this.statusBarItem.hide();
+  }
 
   async openCustomDocument(uri: vscode.Uri): Promise<MetaCsvDocument> {
     return new MetaCsvDocument(uri);
+  }
+
+  private async requestCsvBytesFromWebview(document: MetaCsvDocument): Promise<Buffer> {
+    const panel = this.panelsByDoc.get(document.uri.toString());
+    if (!panel) {
+      throw new Error('Editor panel is not active.');
+    }
+    const requestId = this.nextRequestId++;
+    return new Promise<Buffer>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        if (this.pendingCsvRequests.has(requestId)) {
+          this.pendingCsvRequests.delete(requestId);
+          reject(new Error('Timed out waiting for serialized CSV data from webview.'));
+        }
+      }, 10_000);
+      this.pendingCsvRequests.set(requestId, {
+        resolve: (buf) => {
+          clearTimeout(timer);
+          resolve(buf);
+        },
+        reject: (err) => {
+          clearTimeout(timer);
+          reject(err);
+        },
+      });
+      void panel.webview.postMessage({ type: 'hostCommand', command: 'requestCsvData', requestId });
+    });
+  }
+
+  async saveCustomDocument(document: MetaCsvDocument, _cancellation: vscode.CancellationToken): Promise<void> {
+    const buf = await this.requestCsvBytesFromWebview(document);
+    await fs.writeFile(document.uri.fsPath, buf);
+    const panel = this.panelsByDoc.get(document.uri.toString());
+    if (panel) {
+      await panel.webview.postMessage({ type: 'hostCommand', command: 'hostSaved' });
+    }
+  }
+
+  async saveCustomDocumentAs(
+    document: MetaCsvDocument,
+    destination: vscode.Uri,
+    _cancellation: vscode.CancellationToken,
+  ): Promise<void> {
+    const buf = await this.requestCsvBytesFromWebview(document);
+    await fs.writeFile(destination.fsPath, buf);
+    const srcMeta = `${document.uri.fsPath}.meta.jsonc`;
+    const dstMeta = `${destination.fsPath}.meta.jsonc`;
+    try {
+      const metaText = await fs.readFile(srcMeta, 'utf-8');
+      await fs.writeFile(dstMeta, metaText, 'utf-8');
+    } catch {
+      // Optional sidecar
+    }
+    const panel = this.panelsByDoc.get(document.uri.toString());
+    if (panel) {
+      await panel.webview.postMessage({ type: 'hostCommand', command: 'hostSaved' });
+    }
+  }
+
+  async revertCustomDocument(document: MetaCsvDocument, _cancellation: vscode.CancellationToken): Promise<void> {
+    const panel = this.panelsByDoc.get(document.uri.toString());
+    if (panel) {
+      await panel.webview.postMessage({ type: 'hostCommand', command: 'reload' });
+    }
+  }
+
+  async backupCustomDocument(
+    _document: MetaCsvDocument,
+    context: vscode.CustomDocumentBackupContext,
+    _cancellation: vscode.CancellationToken,
+  ): Promise<vscode.CustomDocumentBackup> {
+    return {
+      id: context.destination.toString(),
+      delete: () => {
+        // Nothing persisted
+      },
+    };
   }
 
   async resolveCustomEditor(
@@ -25,6 +148,8 @@ class MetaCsvEditorProvider implements vscode.CustomReadonlyEditorProvider<MetaC
   ): Promise<void> {
     const webview = webviewPanel.webview;
     const webviewRoot = vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'webview');
+    const docKey = document.uri.toString();
+    this.panelsByDoc.set(docKey, webviewPanel);
 
     webview.options = {
       enableScripts: true,
@@ -53,6 +178,7 @@ class MetaCsvEditorProvider implements vscode.CustomReadonlyEditorProvider<MetaC
             csvBase64: csvBuffer.toString('base64'),
             metaText,
             themeMode: getThemeMode(),
+            appSettings: readAppSettings(),
           },
         });
       } catch (err) {
@@ -70,6 +196,76 @@ class MetaCsvEditorProvider implements vscode.CustomReadonlyEditorProvider<MetaC
         case 'ready':
           await sendFilePayload();
           break;
+
+        case 'openSettings':
+          await vscode.commands.executeCommand('workbench.action.openSettings', 'metaCsv.');
+          break;
+
+        case 'updateConfig': {
+          const patch = message.patch as Record<string, unknown> | undefined;
+          if (patch && typeof patch === 'object') {
+            const cfg = vscode.workspace.getConfiguration('metaCsv');
+            const allowedKeys = [
+              'defaultFontSize',
+              'defaultRowHeight',
+              'defaultMarkerColor',
+              'showRowNumbers',
+              'noHeaderColumnStyle',
+            ];
+            for (const key of allowedKeys) {
+              if (patch[key] !== undefined) {
+                await cfg.update(key, patch[key], vscode.ConfigurationTarget.Global);
+              }
+            }
+          }
+          break;
+        }
+
+        case 'statusChanged': {
+          const st = (message.status ?? {}) as EditorStatusPayload;
+          const totalRows = Number(st.totalRows ?? 0);
+          const visibleRows = Number(st.visibleRows ?? totalRows);
+          const cols = Number(st.cols ?? 0);
+          if (cols > 0) {
+            const text =
+              visibleRows !== totalRows
+                ? `MetaCSV: Rows=${visibleRows.toLocaleString()}/${totalRows.toLocaleString()}, Cols=${cols}`
+                : `MetaCSV: Rows=${totalRows.toLocaleString()}, Cols=${cols}`;
+            this.statusByDoc.set(docKey, text);
+            if (webviewPanel.active) {
+              this.statusBarItem.text = text;
+              this.statusBarItem.show();
+            }
+          }
+          break;
+        }
+
+        case 'documentEdited':
+          this._onDidChangeCustomDocument.fire({
+            document,
+            label: String(message.label ?? 'Edit CSV'),
+            undo: async () => {
+              await webview.postMessage({ type: 'hostCommand', command: 'undo' });
+            },
+            redo: async () => {
+              await webview.postMessage({ type: 'hostCommand', command: 'redo' });
+            },
+          });
+          break;
+
+        case 'csvDataResponse': {
+          const reqId = Number(message.requestId);
+          const pending = this.pendingCsvRequests.get(reqId);
+          if (pending) {
+            this.pendingCsvRequests.delete(reqId);
+            if (typeof message.csvBase64 === 'string') {
+              pending.resolve(Buffer.from(message.csvBase64, 'base64'));
+            } else {
+              pending.reject(new Error('CSV data unavailable from webview.'));
+            }
+          }
+          break;
+        }
 
         case 'saveCsv': {
           try {
@@ -104,6 +300,10 @@ class MetaCsvEditorProvider implements vscode.CustomReadonlyEditorProvider<MetaC
       }
     });
 
+    const viewStateDisposable = webviewPanel.onDidChangeViewState(() => {
+      this.refreshStatusBarForActivePanel();
+    });
+
     const themeDisposable = vscode.window.onDidChangeActiveColorTheme(() => {
       void webview.postMessage({
         type: 'themeChanged',
@@ -111,9 +311,23 @@ class MetaCsvEditorProvider implements vscode.CustomReadonlyEditorProvider<MetaC
       });
     });
 
+    const configDisposable = vscode.workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration('metaCsv')) {
+        void webview.postMessage({
+          type: 'configChanged',
+          appSettings: readAppSettings(),
+        });
+      }
+    });
+
     webviewPanel.onDidDispose(() => {
+      this.panelsByDoc.delete(docKey);
+      this.statusByDoc.delete(docKey);
       msgDisposable.dispose();
+      viewStateDisposable.dispose();
       themeDisposable.dispose();
+      configDisposable.dispose();
+      this.refreshStatusBarForActivePanel();
     });
   }
 
@@ -137,9 +351,32 @@ class MetaCsvEditorProvider implements vscode.CustomReadonlyEditorProvider<MetaC
   <body style="margin:0;padding:0;overflow:hidden;width:100vw;height:100vh;">
     <div id="root" style="width:100%;height:100%;"></div>
     <script type="module" nonce="${nonce}" src="${scriptUri}"></script>
+    <div id="portal" style="position:fixed;left:0;top:0;z-index:9999;"></div>
   </body>
 </html>`;
   }
+}
+
+function readAppSettings(): VsCodeAppSettings {
+  const cfg = vscode.workspace.getConfiguration('metaCsv');
+  const rawColor = cfg.get<string>('defaultMarkerColor', 'amber');
+  const defaultMarkerColor =
+    rawColor === 'amber' ||
+    rawColor === 'rose' ||
+    rawColor === 'emerald' ||
+    rawColor === 'sky' ||
+    rawColor === 'violet'
+      ? rawColor
+      : 'amber';
+  const rawColStyle = cfg.get<string>('noHeaderColumnStyle', 'excel');
+  const noHeaderColumnStyle = rawColStyle === 'numbered' ? 'numbered' : 'excel';
+  return {
+    defaultFontSize: cfg.get<number>('defaultFontSize', 13),
+    defaultRowHeight: cfg.get<number>('defaultRowHeight', 28),
+    defaultMarkerColor,
+    showRowNumbers: cfg.get<boolean>('showRowNumbers', true),
+    noHeaderColumnStyle,
+  };
 }
 
 function getThemeMode(): 'light' | 'dark' {
@@ -159,7 +396,11 @@ function getNonce(): string {
 }
 
 export function activate(context: vscode.ExtensionContext): void {
-  const provider = new MetaCsvEditorProvider(context);
+  const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+  statusBarItem.tooltip = 'MetaCSV active table dimensions';
+  context.subscriptions.push(statusBarItem);
+
+  const provider = new MetaCsvEditorProvider(context, statusBarItem);
   context.subscriptions.push(
     vscode.window.registerCustomEditorProvider(MetaCsvEditorProvider.viewType, provider, {
       webviewOptions: {

@@ -25,6 +25,16 @@ struct AppSettings {
     window: Option<WindowState>,
     #[serde(default)]
     last_directory: Option<String>,
+    #[serde(default)]
+    default_font_size: Option<u32>,
+    #[serde(default)]
+    default_row_height: Option<u32>,
+    #[serde(default)]
+    default_marker_color: Option<String>,
+    #[serde(default)]
+    show_row_numbers: Option<bool>,
+    #[serde(default)]
+    no_header_column_style: Option<String>,
 }
 
 fn default_theme() -> String {
@@ -37,6 +47,11 @@ impl Default for AppSettings {
             theme: default_theme(),
             window: None,
             last_directory: None,
+            default_font_size: None,
+            default_row_height: None,
+            default_marker_color: None,
+            show_row_numbers: None,
+            no_header_column_style: None,
         }
     }
 }
@@ -174,6 +189,11 @@ fn update_app_settings(
     state: tauri::State<'_, SettingsStore>,
     theme: Option<String>,
     last_directory: Option<String>,
+    default_font_size: Option<u32>,
+    default_row_height: Option<u32>,
+    default_marker_color: Option<String>,
+    show_row_numbers: Option<bool>,
+    no_header_column_style: Option<String>,
 ) -> Result<AppSettings, String> {
     let updated = {
         let mut data = state
@@ -193,10 +213,36 @@ fn update_app_settings(
         if let Some(dir) = last_directory {
             data.last_directory = if dir.is_empty() { None } else { Some(dir) };
         }
+        if let Some(fsz) = default_font_size {
+            data.default_font_size = Some(fsz.clamp(9, 32));
+        }
+        if let Some(rh) = default_row_height {
+            data.default_row_height = Some(rh.clamp(20, 200));
+        }
+        if let Some(mc) = default_marker_color {
+            if matches!(mc.as_str(), "amber" | "rose" | "emerald" | "sky" | "violet") {
+                data.default_marker_color = Some(mc);
+            }
+        }
+        if let Some(srn) = show_row_numbers {
+            data.show_row_numbers = Some(srn);
+        }
+        if let Some(ncs) = no_header_column_style {
+            if matches!(ncs.as_str(), "excel" | "numbered") {
+                data.no_header_column_style = Some(ncs);
+            }
+        }
         data.clone()
     };
     state.persist();
     Ok(updated)
+}
+
+#[tauri::command]
+fn set_window_title(app: tauri::AppHandle, title: String) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.set_title(&title);
+    }
 }
 
 #[tauri::command]
@@ -308,6 +354,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_app_settings,
             update_app_settings,
+            set_window_title,
             get_initial_file,
             load_csv_bytes,
             load_meta_text,

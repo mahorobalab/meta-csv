@@ -1,4 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import {
+  BarChart2,
+  BookmarkPlus,
+  ChevronDown,
+  Filter,
+  Layers,
+  X,
+} from 'lucide-react';
 import type { FilterPreset } from '@meta-csv/schema';
 import { computeColumnFacets } from '@meta-csv/core';
 import { useInputHistory } from './useInputHistory';
@@ -27,6 +35,7 @@ export interface FilterBarProps {
   onSavePreset: (preset: FilterPreset) => void;
   onDeletePreset: (name: string) => void;
   onApplyPreset: (preset: FilterPreset) => void;
+  extraControls?: React.ReactNode;
   themeMode: 'light' | 'dark';
 }
 
@@ -48,6 +57,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   onSavePreset,
   onDeletePreset,
   onApplyPreset,
+  extraControls,
   themeMode,
 }) => {
   const [showFacets, setShowFacets] = useState(false);
@@ -122,7 +132,18 @@ export const FilterBar: React.FC<FilterBarProps> = ({
         position: 'relative',
       }}
     >
-      <span style={{ fontWeight: 600, opacity: 0.85 }}>Filter:</span>
+      <span
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 4,
+          fontWeight: 600,
+          opacity: 0.85,
+        }}
+      >
+        <Filter size={13} />
+        <span>Filter:</span>
+      </span>
 
       <div
         style={{
@@ -131,7 +152,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           alignItems: 'center',
           flex: '1 1 260px',
           minWidth: 180,
-          maxWidth: 520,
+          maxWidth: 540,
         }}
       >
         <input
@@ -182,12 +203,11 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               color: fg,
               opacity: 0.6,
               cursor: 'pointer',
-              fontSize: 14,
-              lineHeight: 1,
-              padding: '2px 4px',
+              display: 'inline-flex',
+              padding: 2,
             }}
           >
-            ×
+            <X size={13} />
           </button>
         )}
         <button
@@ -206,12 +226,11 @@ export const FilterBar: React.FC<FilterBarProps> = ({
             color: fg,
             opacity: history.items.length > 0 ? 0.75 : 0.35,
             cursor: 'pointer',
-            fontSize: 11,
-            lineHeight: 1,
-            padding: '3px 4px',
+            display: 'inline-flex',
+            padding: 3,
           }}
         >
-          ▾
+          <ChevronDown size={12} />
         </button>
 
         {showHistory && (filteredHistory.length > 0 || query.trim().length === 0) && (
@@ -336,8 +355,9 @@ export const FilterBar: React.FC<FilterBarProps> = ({
         style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
         title="Collapse consecutive duplicate values in a column (non-destructive)"
       >
-        <span style={{ opacity: 0.8 }}>Collapse:</span>
+        <Layers size={13} style={{ opacity: 0.8 }} />
         <select
+          aria-label="Collapse consecutive duplicates"
           value={collapseColKey}
           onChange={(e) => onCollapseColKeyChange(e.target.value)}
           style={{
@@ -350,7 +370,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
             maxWidth: 130,
           }}
         >
-          <option value="">Off</option>
+          <option value="">Collapse: Off</option>
           {columns.map((c) => (
             <option key={c.key} value={c.key}>
               {c.label}
@@ -361,8 +381,12 @@ export const FilterBar: React.FC<FilterBarProps> = ({
 
       {/* Facet Ranking Popover Toggle */}
       <button
+        type="button"
         style={{
           ...btnStyle,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 4,
           borderColor: showFacets ? '#3b82f6' : border,
         }}
         onClick={() => {
@@ -370,13 +394,18 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           setShowPresets(false);
         }}
       >
-        Facets ▾
+        <BarChart2 size={13} />
+        <span>Facets</span>
       </button>
 
       {/* Presets Popover Toggle */}
       <button
+        type="button"
         style={{
           ...btnStyle,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 4,
           borderColor: showPresets ? '#3b82f6' : border,
         }}
         onClick={() => {
@@ -384,8 +413,16 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           setShowFacets(false);
         }}
       >
-        Presets ({presets.length}) ▾
+        <BookmarkPlus size={13} />
+        <span>Presets ({presets.length})</span>
       </button>
+
+      {extraControls && (
+        <>
+          <span style={{ opacity: 0.35 }}>|</span>
+          {extraControls}
+        </>
+      )}
 
       {/* Result stats / error */}
       <div style={{ marginLeft: 'auto', fontSize: 11, opacity: 0.8 }}>

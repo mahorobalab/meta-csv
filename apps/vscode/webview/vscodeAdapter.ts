@@ -1,4 +1,5 @@
 import type { CsvFilePayload, FileSystemAdapter } from '@meta-csv/core';
+import type { EditorAppSettings, EditorStatusInfo } from '@meta-csv/ui';
 
 interface VsCodeApi {
   postMessage(message: unknown): void;
@@ -25,9 +26,21 @@ function bytesToBase64(bytes: Uint8Array): string {
   return btoa(parts.join(''));
 }
 
+export interface HostCommand {
+  command: 'undo' | 'redo' | 'reload' | 'hostSaved' | 'requestCsvData';
+  requestId?: number;
+}
+
 export interface VsCodeAdapterBundle {
   adapter: FileSystemAdapter;
   onThemeMode: (cb: (mode: 'light' | 'dark') => void) => () => void;
+  onAppSettings: (cb: (settings: EditorAppSettings) => void) => () => void;
+  onHostCommand: (cb: (cmd: HostCommand) => void) => () => void;
+  respondCsvData: (requestId: number, bytes: Uint8Array | null) => void;
+  notifyEdit: (label: string) => void;
+  notifyStatus: (status: EditorStatusInfo) => void;
+  updateSettings: (patch: Partial<EditorAppSettings>) => void;
+  openSettings: () => void;
 }
 
 export function createVsCodeAdapter(): VsCodeAdapterBundle {
@@ -43,6 +56,8 @@ export function createVsCodeAdapter(): VsCodeAdapterBundle {
     reject: (err: Error) => void;
   } | null = null;
   const themeListeners = new Set<(mode: 'light' | 'dark') => void>();
+  const settingsListeners = new Set<(settings: EditorAppSettings) => void>();
+  const commandListeners = new Set<(cmd: HostCommand) => void>();
 
   window.addEventListener('message', (event: MessageEvent) => {
     const msg = event.data;
@@ -53,6 +68,9 @@ export function createVsCodeAdapter(): VsCodeAdapterBundle {
       pendingLoad = null;
       if (msg.payload?.themeMode) {
         themeListeners.forEach((cb) => cb(msg.payload.themeMode));
+      }
+      if (msg.payload?.appSettings) {
+        settingsListeners.forEach((cb) => cb(msg.payload.appSettings));
       }
       resolve({
         fileName: msg.payload.fileName,
@@ -77,6 +95,12 @@ export function createVsCodeAdapter(): VsCodeAdapterBundle {
       }
     } else if (msg.type === 'themeChanged') {
       themeListeners.forEach((cb) => cb(msg.themeMode));
+    } else if (msg.type === 'configChanged' && msg.appSettings) {
+      settingsListeners.forEach((cb) => cb(msg.appSettings));
+    } else if (msg.type === 'hostCommand') {
+      commandListeners.forEach((cb) =>
+        cb({ command: msg.command, requestId: msg.requestId }),
+      );
     }
   });
 
@@ -118,6 +142,33 @@ export function createVsCodeAdapter(): VsCodeAdapterBundle {
     onThemeMode(cb) {
       themeListeners.add(cb);
       return () => themeListeners.delete(cb);
+    },
+    onAppSettings(cb) {
+      settingsListeners.add(cb);
+      return () => settingsListeners.delete(cb);
+    },
+    onHostCommand(cb) {
+      commandListeners.add(cb);
+      return () => commandListeners.delete(cb);
+    },
+    respondCsvData(requestId, bytes) {
+      vscode.postMessage({
+        type: 'csvDataResponse',
+        requestId,
+        csvBase64: bytes ? bytesToBase64(bytes) : undefined,
+      });
+    },
+    notifyEdit(label) {
+      vscode.postMessage({ type: 'documentEdited', label });
+    },
+    notifyStatus(status) {
+      vscode.postMessage({ type: 'statusChanged', status });
+    },
+    updateSettings(patch) {
+      vscode.postMessage({ type: 'updateConfig', patch });
+    },
+    openSettings() {
+      vscode.postMessage({ type: 'openSettings' });
     },
   };
 }

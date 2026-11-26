@@ -1,3 +1,30 @@
+・多言語化
+
+・マーカー機能 次々打って、ジャンプできる
+・最後のファイルを自動で開く
+
+・ README.mdに追記
+    • Installation / Download セクション:
+	• 公式の実行版（Windows / macOS 用インストーラー・ストア版）は Microsoft Store / BOOTH で配布（販売）している旨を記載（将来リンクを貼る場所を用意）。
+	• GitHub Releases でのバイナリ配布は行わない旨を明記。
+
+・MetaLogの検討
+
+-- 保留 --
+
+-- 対応しない --
+
+・GitHub Release
+  → ビルド済は、MS Store、BOOTHで販売する
+
+-- 済 --
+
+・テーマ、ウィンドウ位置記憶
+・JSON Schema 定義必要？
+
+----------------------------------------
+Gemin talk
+
 1.VS Code / Antigravity 拡張の .vsix パッケージ化
 F5 起動ではなく、普段使っている IDE にそのままインストールして spec_setting.csv 等で実戦ドッグフーディング開始できます。
 
@@ -26,22 +53,3 @@ Push だけで Windows / Mac（ユニバーサル）の Tauri ビルドやテス
     Chrome / Edge なら File System Access API でローカルファイルの直接読み書きにも対応可能（Safari / Firefox はダウンロード保存にフォールバック）
 
     なので、「普段使い＆自動 .meta.jsonc 連携は Tauri / VS Code 拡張、インストール不要のお試し・配布用は PWA（Web 版）」という 3 段構えが、ほぼ追加コストなしでそのまま実現できます！
-
-
-・GitHub Release
-
-・多言語化
-
-・JSON Schema 定義必要？
-・マーカー機能 次々打って、ジャンプできる
-・最後のファイルを自動で開く
-
-・ README.mdに追記
-    • Installation / Download セクション:
-	• 公式の実行版（Windows / macOS 用インストーラー・ストア版）は Microsoft Store / BOOTH で配布（販売）している旨を記載（将来リンクを貼る場所を用意）。
-	• GitHub Releases でのバイナリ配布は行わない旨を明記。
-
-
--- 済 --
-
-・テーマ、ウィンドウ位置記憶

@@ -148,6 +148,22 @@ export const LARGE_CSV_META = `{
 }
 `;
 
+function triggerBrowserDownload(fileName: string, bytes: Uint8Array): void {
+  if (typeof document === 'undefined' || typeof URL === 'undefined') return;
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  const blob = new Blob([copy], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 export function createMemoryAdapter(initial: CsvFilePayload): FileSystemAdapter {
   let csvBytes = initial.csvBytes;
   let metaText = initial.metaText;
@@ -160,6 +176,7 @@ export function createMemoryAdapter(initial: CsvFilePayload): FileSystemAdapter 
     },
     async saveCsv(bytes: Uint8Array) {
       csvBytes = bytes.slice();
+      triggerBrowserDownload(fileName, csvBytes);
     },
     async saveMeta(text: string) {
       metaText = text;
@@ -183,6 +200,7 @@ export function createFileAdapter(
     },
     async saveCsv(bytes: Uint8Array) {
       savedBytes = bytes.slice();
+      triggerBrowserDownload(file.name, savedBytes);
     },
     async saveMeta(text: string) {
       metaText = text;

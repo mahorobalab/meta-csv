@@ -1,9 +1,35 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import {
+  Bold,
+  ChevronDown,
+  ChevronUp,
+  FolderOpen,
+  Info,
+  Italic,
+  Menu,
+  Minus,
+  Palette,
+  Plus,
+  Redo2,
+  Save,
+  Search,
+  Settings,
+  Undo2,
+  X,
+} from 'lucide-react';
 import {
   CompactSelection,
   DataEditor,
   GridCellKind,
   type DataEditorRef,
+  type DrawCellCallback,
   type EditableGridCell,
   type GridCell,
   type GridColumn,
@@ -18,8 +44,10 @@ import {
   DEFAULT_ROW_HEIGHT,
   type CellStyle,
   type FilterPreset,
+  type MarkerColor,
   type MetaCsvDocument,
   type RangeStyleRule,
+  type RowMarker,
   type SortSpec,
 } from '@meta-csv/schema';
 import {
@@ -28,6 +56,7 @@ import {
   buildSortedRowIndices,
   createStyleResolverContext,
   doesCellMatchFilterTerms,
+  indexToExcelColumn,
   parseMetaJsonc,
   patchMetaJsonc,
   resolveCellStyle,
@@ -39,14 +68,55 @@ import {
   type ParsedFilterTerm,
   type SearchMatch,
 } from '@meta-csv/core';
-import { buildGridTheme } from './theme';
+import { buildGridTheme, type ThemePreference } from './theme';
 import { parseCsvInWorker } from './parseInWorker';
 import { FilterBar, type FilterColumnOption } from './FilterBar';
+import { MARKER_COLORS, MARKER_PALETTE, MarkerControls } from './MarkerControls';
+import {
+  AboutModal,
+  SettingsModal,
+  type EditorAppSettings,
+  type EditorHostMode,
+  type FileLayoutSettingsProps,
+} from './SettingsAboutDialogs';
 import { useInputHistory } from './useInputHistory';
+
+export interface MetaCsvEditorHandle {
+  saveCsv: () => Promise<void>;
+  serializeCurrentCsv: () => Uint8Array | null;
+  undo: () => void;
+  redo: () => void;
+  reload: () => void;
+  markClean: () => void;
+}
+
+export interface EditorStatusInfo {
+  fileName: string;
+  dirty: boolean;
+  totalRows: number;
+  visibleRows: number;
+  cols: number;
+  markerCount: number;
+  encoding?: string;
+  lineEnding?: string;
+}
 
 export interface MetaCsvEditorProps {
   adapter: FileSystemAdapter;
+  hostMode?: EditorHostMode;
   themeMode?: 'light' | 'dark';
+  themePreference?: ThemePreference;
+  systemTheme?: 'light' | 'dark';
+  onThemePreferenceChange?: (pref: ThemePreference) => void;
+  appSettings?: EditorAppSettings;
+  onAppSettingsChange?: (patch: Partial<EditorAppSettings>) => void;
+  onOpenSettings?: () => void;
+  onOpenFile?: () => void;
+  fileMenuItems?: React.ReactNode;
+  settingsExtraSection?: React.ReactNode;
+  onDocumentEdit?: (label: string) => void;
+  onDirtyChange?: (dirty: boolean) => void;
+  onStatusChange?: (info: EditorStatusInfo) => void;
   /** Optional external JSONC text override (for live playground editing) */
   externalMetaText?: string | null;
   onMetaTextChange?: (text: string) => void;
@@ -60,23 +130,72 @@ const SWATCH_COLORS = [
   { label: 'Rose', value: 'rgba(244, 63, 94, 0.20)' },
 ];
 
-export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
-  adapter,
-  themeMode = 'dark',
-  externalMetaText,
-  onMetaTextChange,
-}) => {
+export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditorProps>(
+  function MetaCsvEditor(
+    {
+      adapter,
+      hostMode = 'web',
+      themeMode = 'dark',
+      themePreference,
+      systemTheme,
+      onThemePreferenceChange,
+      appSettings,
+      onAppSettingsChange,
+      onOpenSettings,
+      onOpenFile,
+      fileMenuItems,
+      settingsExtraSection,
+      onDocumentEdit,
+      onDirtyChange,
+      onStatusChange,
+      externalMetaText,
+      onMetaTextChange,
+    },
+    ref,
+  ) {
   const [fileName, setFileName] = useState<string>('');
   const [csvData, setCsvData] = useState<ParsedCsvData | null>(null);
   const [meta, setMeta] = useState<MetaCsvDocument>({ version: '0.1' });
   const [autoWidths, setAutoWidths] = useState<number[]>([]);
   const [dirtyCsv, setDirtyCsv] = useState(false);
-  const [statusMsg, setStatusMsg] = useState<string>('Loading...');
+  const [statusMsg, setStatusMsg] = useState<string>('');
   const [dataVersion, setDataVersion] = useState(0);
   const [reloadTick, setReloadTick] = useState(0);
-  const [showViewMenu, setShowViewMenu] = useState(false);
+  const [openMenu, setOpenMenu] = useState<'none' | 'file' | 'edit'>('none');
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showAboutModal, setShowAboutModal] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState<ParseProgress | null>(null);
   const [showProgressOverlay, setShowProgressOverlay] = useState(false);
+  const toolbarRef = useRef<HTMLDivElement | null>(null);
+
+  // Ensure Glide Data Grid overlay editor portal exists in any host DOM
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    if (!document.getElementById('portal')) {
+      const portal = document.createElement('div');
+      portal.id = 'portal';
+      portal.style.position = 'fixed';
+      portal.style.left = '0';
+      portal.style.top = '0';
+      portal.style.zIndex = '9999';
+      document.body.appendChild(portal);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (openMenu === 'none') return;
+    const onDocDown = (e: MouseEvent) => {
+      if (toolbarRef.current && !toolbarRef.current.contains(e.target as Node)) {
+        setOpenMenu('none');
+      }
+    };
+    document.addEventListener('mousedown', onDocDown);
+    return () => document.removeEventListener('mousedown', onDocDown);
+  }, [openMenu]);
+
+  useEffect(() => {
+    onDirtyChange?.(dirtyCsv);
+  }, [dirtyCsv, onDirtyChange]);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -106,6 +225,16 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
   const [debouncedFilterQuery, setDebouncedFilterQuery] = useState('');
   const [filterContextRows, setFilterContextRows] = useState(0);
   const [collapseColKey, setCollapseColKey] = useState('');
+  const [activeMarkerColor, setActiveMarkerColor] = useState<MarkerColor>(
+    appSettings?.defaultMarkerColor ?? 'amber',
+  );
+  const [onlyMarked, setOnlyMarked] = useState(false);
+
+  useEffect(() => {
+    if (appSettings?.defaultMarkerColor) {
+      setActiveMarkerColor(appSettings.defaultMarkerColor);
+    }
+  }, [appSettings?.defaultMarkerColor]);
 
   // Selection state
   const [selection, setSelection] = useState<GridSelection>({
@@ -114,6 +243,7 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
   });
 
   const gridRef = useRef<DataEditorRef | null>(null);
+  const gridContainerRef = useRef<HTMLDivElement | null>(null);
   const rowsRef = useRef<string[][]>([]);
   const historyRef = useRef(new UndoRedoHistory());
   const metaSaveTimerRef = useRef<number | null>(null);
@@ -131,6 +261,7 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
       prevAdapterRef.current = adapter;
       rowsRef.current = [];
       setCsvData(null);
+      setOnlyMarked(false);
     }
 
     setStatusMsg('Loading CSV...');
@@ -172,8 +303,9 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
         setCsvData(parsed);
         setAutoWidths(widths);
         setDataVersion((v) => v + 1);
-        setStatusMsg(
-          `${parsed.rows.length.toLocaleString()} rows × ${parsed.headers.length} cols (${elapsedMs} ms)`,
+        setStatusMsg('');
+        console.info(
+          `[MetaCSV] Loaded ${payload.fileName}: ${parsed.rows.length.toLocaleString()} rows × ${parsed.headers.length} cols in ${elapsedMs} ms`,
         );
       })
       .catch((err) => {
@@ -272,15 +404,28 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
     return () => window.clearTimeout(t);
   }, [filterQuery]);
 
+  const getDefaultColumnTitle = useCallback(
+    (idx: number): string => {
+      if (!csvData) return `column ${idx + 1}`;
+      if (csvData.dialect.hasHeader) {
+        return csvData.headers[idx] ?? `column ${idx + 1}`;
+      }
+      return appSettings?.noHeaderColumnStyle === 'numbered'
+        ? `column ${idx + 1}`
+        : indexToExcelColumn(idx);
+    },
+    [csvData, appSettings?.noHeaderColumnStyle],
+  );
+
   // Column name + alias lookup for FilterBar (supports both raw column keys and .meta.jsonc labels)
   const filterColumnOptions: FilterColumnOption[] = useMemo(() => {
     if (!csvData) return [];
     return csvData.columnKeys.map((key, idx) => ({
       index: idx,
       key,
-      label: meta.columns?.[key]?.label ?? csvData.headers[idx] ?? `column ${idx + 1}`,
+      label: meta.columns?.[key]?.label ?? getDefaultColumnTitle(idx),
     }));
-  }, [csvData, meta.columns]);
+  }, [csvData, meta.columns, getDefaultColumnTitle]);
 
   const filterColumnLookup = useMemo(() => {
     const map = new Map<string, number>();
@@ -342,7 +487,217 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
     filterColumnLookup,
   ]);
 
-  const viewRowIndices = filterState.indices;
+  // Step 3: Row Markers (Bookmark & Jump)
+  const markers: RowMarker[] = useMemo(() => {
+    const raw = meta.view?.markers;
+    if (!raw || raw.length === 0) return [];
+    return [...raw].sort((a, b) => a.row - b.row);
+  }, [meta.view?.markers]);
+
+  const markerMap = useMemo(() => {
+    const map = new Map<number, RowMarker>();
+    for (const m of markers) {
+      map.set(m.row, m);
+    }
+    return map;
+  }, [markers]);
+
+  useEffect(() => {
+    if (onlyMarked && markerMap.size === 0) {
+      setOnlyMarked(false);
+    }
+  }, [onlyMarked, markerMap.size]);
+
+  const viewRowIndices = useMemo(() => {
+    if (!onlyMarked || markerMap.size === 0) return filterState.indices;
+    const src = filterState.indices;
+    const kept: number[] = [];
+    for (let i = 0; i < src.length; i++) {
+      const dr = src[i]!;
+      if (markerMap.has(dr)) kept.push(dr);
+    }
+    return Int32Array.from(kept);
+  }, [filterState.indices, onlyMarked, markerMap]);
+
+  const { markedViewRows, visibleMarkerRowSet } = useMemo(() => {
+    if (markerMap.size === 0) {
+      return { markedViewRows: [] as number[], visibleMarkerRowSet: new Set<number>() };
+    }
+    const list: number[] = [];
+    const visibleSet = new Set<number>();
+    for (let vr = 0; vr < viewRowIndices.length; vr++) {
+      const dr = viewRowIndices[vr]!;
+      if (markerMap.has(dr)) {
+        list.push(vr);
+        visibleSet.add(dr);
+      }
+    }
+    return { markedViewRows: list, visibleMarkerRowSet: visibleSet };
+  }, [viewRowIndices, markerMap]);
+
+  const selectedDataRow = selection.current
+    ? viewRowIndices[selection.current.cell[1]]
+    : undefined;
+  const selectedMarker =
+    selectedDataRow !== undefined ? markerMap.get(selectedDataRow) : undefined;
+
+  const persistMarkers = useCallback(
+    (next: RowMarker[]) => {
+      const sorted = [...next].sort((a, b) => a.row - b.row);
+      patchMeta(['view', 'markers'], sorted.length > 0 ? sorted : undefined);
+    },
+    [patchMeta],
+  );
+
+  const toggleMarkerOnSelection = useCallback(() => {
+    if (!selection.current) return;
+    const { range, cell } = selection.current;
+    const rowSet = new Set<number>();
+    const maxRows = 500;
+    const startY = range.height > 1 ? range.y : cell[1];
+    const endY = range.height > 1 ? range.y + range.height - 1 : cell[1];
+    for (let vr = startY; vr <= endY && rowSet.size < maxRows; vr++) {
+      const dr = viewRowIndices[vr];
+      if (dr !== undefined) rowSet.add(dr);
+    }
+    if (rowSet.size === 0) return;
+
+    const allAlreadyMarked = Array.from(rowSet).every((dr) => markerMap.has(dr));
+    if (allAlreadyMarked) {
+      persistMarkers(markers.filter((m) => !rowSet.has(m.row)));
+    } else {
+      const next = [...markers];
+      for (const dr of rowSet) {
+        if (!markerMap.has(dr)) {
+          next.push({ row: dr, color: activeMarkerColor });
+        }
+      }
+      persistMarkers(next);
+    }
+  }, [selection, viewRowIndices, markerMap, markers, activeMarkerColor, persistMarkers]);
+
+  const handleMarkerColorChange = useCallback(
+    (color: MarkerColor) => {
+      setActiveMarkerColor(color);
+      if (selectedDataRow !== undefined && markerMap.has(selectedDataRow)) {
+        persistMarkers(
+          markers.map((m) => (m.row === selectedDataRow ? { ...m, color } : m)),
+        );
+      }
+    },
+    [selectedDataRow, markerMap, markers, persistMarkers],
+  );
+
+  const handleUpdateMarkerNote = useCallback(
+    (dataRow: number, note: string) => {
+      const trimmed = note.trim();
+      persistMarkers(
+        markers.map((m) => {
+          if (m.row !== dataRow) return m;
+          if (!trimmed) {
+            const { note: _removed, ...rest } = m;
+            return rest;
+          }
+          return { ...m, note: trimmed };
+        }),
+      );
+    },
+    [markers, persistMarkers],
+  );
+
+  const handleCycleMarkerColor = useCallback(
+    (dataRow: number) => {
+      persistMarkers(
+        markers.map((m) => {
+          if (m.row !== dataRow) return m;
+          const cur = m.color ?? 'amber';
+          const nextColor =
+            MARKER_COLORS[(MARKER_COLORS.indexOf(cur) + 1) % MARKER_COLORS.length]!;
+          return { ...m, color: nextColor };
+        }),
+      );
+    },
+    [markers, persistMarkers],
+  );
+
+  const handleRemoveMarker = useCallback(
+    (dataRow: number) => {
+      persistMarkers(markers.filter((m) => m.row !== dataRow));
+    },
+    [markers, persistMarkers],
+  );
+
+  const handleClearAllMarkers = useCallback(() => {
+    persistMarkers([]);
+    setOnlyMarked(false);
+  }, [persistMarkers]);
+
+  const jumpToViewRow = useCallback((targetViewRow: number) => {
+    const col = 0;
+    gridRef.current?.scrollTo(col, targetViewRow, 'vertical', 0, 0, {
+      vAlign: 'center',
+    });
+    setSelection({
+      columns: CompactSelection.empty(),
+      rows: CompactSelection.empty(),
+      current: {
+        cell: [col, targetViewRow],
+        range: { x: col, y: targetViewRow, width: 1, height: 1 },
+        rangeStack: [],
+      },
+    });
+  }, []);
+
+  const jumpNextMarker = useCallback(() => {
+    if (markedViewRows.length === 0) return;
+    const currentViewRow = selection.current?.cell[1] ?? -1;
+    let lo = 0;
+    let hi = markedViewRows.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >>> 1;
+      if (markedViewRows[mid]! <= currentViewRow) lo = mid + 1;
+      else hi = mid;
+    }
+    const target = markedViewRows[lo < markedViewRows.length ? lo : 0]!;
+    jumpToViewRow(target);
+  }, [markedViewRows, selection, jumpToViewRow]);
+
+  const jumpPrevMarker = useCallback(() => {
+    if (markedViewRows.length === 0) return;
+    const currentViewRow = selection.current?.cell[1] ?? Number.MAX_SAFE_INTEGER;
+    let lo = 0;
+    let hi = markedViewRows.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >>> 1;
+      if (markedViewRows[mid]! < currentViewRow) lo = mid + 1;
+      else hi = mid;
+    }
+    const idx = lo - 1 >= 0 ? lo - 1 : markedViewRows.length - 1;
+    jumpToViewRow(markedViewRows[idx]!);
+  }, [markedViewRows, selection, jumpToViewRow]);
+
+  const jumpToDataRow = useCallback(
+    (dataRow: number) => {
+      const vr = viewRowIndices.indexOf(dataRow);
+      if (vr !== -1) {
+        jumpToViewRow(vr);
+      } else {
+        setStatusMsg(`Row #${dataRow + 1} is hidden by current filter`);
+      }
+    },
+    [viewRowIndices, jumpToViewRow],
+  );
+
+  const getRowPreview = useCallback((dataRow: number): string => {
+    const row = rowsRef.current[dataRow];
+    if (!row) return '';
+    const parts: string[] = [];
+    for (let c = 0; c < row.length && parts.length < 3; c++) {
+      const v = row[c]?.trim();
+      if (v) parts.push(v);
+    }
+    return parts.join(' · ');
+  }, []);
 
   // Style resolver context
   const styleCtx = useMemo(() => {
@@ -390,8 +745,7 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
     return visibleColIndices.map((actualColIdx) => {
       const key = csvData.columnKeys[actualColIdx]!;
       const colMeta = meta.columns?.[key];
-      const baseTitle =
-        colMeta?.label ?? csvData.headers[actualColIdx] ?? `column ${actualColIdx + 1}`;
+      const baseTitle = colMeta?.label ?? getDefaultColumnTitle(actualColIdx);
       const sortIndicator =
         activeSort?.column === key
           ? activeSort.direction === 'asc'
@@ -404,11 +758,16 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
         width: colMeta?.width ?? autoWidths[actualColIdx] ?? 140,
       };
     });
-  }, [csvData, visibleColIndices, meta.columns, meta.view?.sort, autoWidths]);
+  }, [csvData, visibleColIndices, meta.columns, meta.view?.sort, autoWidths, getDefaultColumnTitle]);
+
+  const effectiveDefaultFontSize =
+    meta.table?.fontSize ?? appSettings?.defaultFontSize ?? DEFAULT_FONT_SIZE;
+  const effectiveDefaultRowHeight =
+    meta.table?.defaultRowHeight ?? appSettings?.defaultRowHeight ?? DEFAULT_ROW_HEIGHT;
 
   const gridTheme = useMemo(
-    () => buildGridTheme(themeMode, meta.table),
-    [themeMode, meta.table],
+    () => buildGridTheme(themeMode, { ...meta.table, fontSize: effectiveDefaultFontSize }),
+    [themeMode, meta.table, effectiveDefaultFontSize],
   );
 
   // Cell content provider (runs only for visible viewport cells)
@@ -438,6 +797,7 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
       // Highlight context-only rows subtly when grep -C context mode is active
       const isContextOnlyRow =
         filterState.matchedRowSet !== null && !filterState.matchedRowSet.has(dataRow);
+      const marker = markerMap.get(dataRow);
       const isFilterHit =
         !isContextOnlyRow &&
         filterState.positiveTerms.length > 0 &&
@@ -449,7 +809,14 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
       const displayVal = collapsedDupes ? `${val} (+${collapsedDupes} dupes)` : val;
 
       let themeOverride: Partial<Theme> | undefined;
-      if (resolvedStyle || isSearchHit || isFilterHit || colMeta?.readonly || isContextOnlyRow) {
+      if (
+        resolvedStyle ||
+        marker ||
+        isSearchHit ||
+        isFilterHit ||
+        colMeta?.readonly ||
+        isContextOnlyRow
+      ) {
         const fontSize = resolvedStyle?.fontSize ?? meta.table?.fontSize ?? DEFAULT_FONT_SIZE;
         const fontPrefix = [
           resolvedStyle?.italic ? 'italic' : '',
@@ -457,6 +824,11 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
         ]
           .filter(Boolean)
           .join(' ');
+        const markerBg = marker
+          ? themeMode === 'dark'
+            ? MARKER_PALETTE[marker.color ?? 'amber'].rowBgDark
+            : MARKER_PALETTE[marker.color ?? 'amber'].rowBgLight
+          : undefined;
 
         themeOverride = {
           ...(resolvedStyle?.backgroundColor ? { bgCell: resolvedStyle.backgroundColor } : {}),
@@ -474,6 +846,7 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
                 bgCell: themeMode === 'dark' ? '#18181b' : '#f8fafc',
               }
             : {}),
+          ...(markerBg && !resolvedStyle?.backgroundColor ? { bgCell: markerBg } : {}),
           ...(isFilterHit
             ? {
                 bgCell: 'rgba(14, 165, 233, 0.20)',
@@ -505,6 +878,7 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
       csvData,
       meta,
       styleCtx,
+      markerMap,
       matchSet,
       activeMatch,
       themeMode,
@@ -512,7 +886,27 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
       filterState.collapsedCounts,
       filterState.positiveTerms,
       collapseColKey,
+      dataVersion,
     ],
+  );
+
+  // Draw crisp 4px marker stripe on column 0 for bookmarked rows
+  const drawCell: DrawCellCallback = useCallback(
+    (args, drawContent) => {
+      drawContent();
+      if (args.col !== 0) return;
+      const dataRow = viewRowIndices[args.row];
+      if (dataRow === undefined) return;
+      const marker = markerMap.get(dataRow);
+      if (!marker) return;
+      const pal = MARKER_PALETTE[marker.color ?? 'amber'];
+      const { ctx, rect } = args;
+      ctx.save();
+      ctx.fillStyle = pal.bar;
+      ctx.fillRect(rect.x, rect.y + 1, 4, Math.max(0, rect.height - 2));
+      ctx.restore();
+    },
+    [viewRowIndices, markerMap],
   );
 
   // Cell edit handler
@@ -534,10 +928,77 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
         type: 'editCells',
         changes: [{ dataRow, col: actualCol, before, after }],
       });
+      gridRef.current?.updateCells([{ cell: [visibleCol, viewRow] }]);
       setDirtyCsv(true);
       setDataVersion((v) => v + 1);
+      onDocumentEdit?.('Edit cell');
     },
-    [visibleColIndices, viewRowIndices],
+    [visibleColIndices, viewRowIndices, onDocumentEdit],
+  );
+
+  // Move to and open the adjacent cell editor when finishing a cell edit via Tab / Shift+Tab
+  const onFinishedEditing = useCallback(
+    (_newValue: GridCell | undefined, movement: Item) => {
+      const [movX] = movement;
+      if (movX === 0 || !csvData || columns.length === 0) return;
+
+      const prevCell = selection.current?.cell;
+      let targetCol = prevCell ? prevCell[0] + movX : 0;
+      let targetRow = prevCell ? prevCell[1] : 0;
+      let wrapped = false;
+
+      if (prevCell) {
+        if (movX > 0 && prevCell[0] === columns.length - 1 && prevCell[1] + 1 < viewRowIndices.length) {
+          targetCol = 0;
+          targetRow = prevCell[1] + 1;
+          wrapped = true;
+        } else if (movX < 0 && prevCell[0] === 0 && prevCell[1] > 0) {
+          targetCol = columns.length - 1;
+          targetRow = prevCell[1] - 1;
+          wrapped = true;
+        }
+      }
+
+      targetCol = Math.max(0, Math.min(columns.length - 1, targetCol));
+      targetRow = Math.max(0, Math.min(viewRowIndices.length - 1, targetRow));
+
+      if (wrapped) {
+        setSelection({
+          columns: CompactSelection.empty(),
+          rows: CompactSelection.empty(),
+          current: {
+            cell: [targetCol, targetRow],
+            range: { x: targetCol, y: targetRow, width: 1, height: 1 },
+            rangeStack: [],
+          },
+        });
+        gridRef.current?.scrollTo(targetCol, targetRow, 'both');
+      }
+
+      const actualCol = visibleColIndices[targetCol];
+      const colKey = actualCol !== undefined ? csvData.columnKeys[actualCol] : undefined;
+      if (colKey && meta.columns?.[colKey]?.readonly) return;
+
+      window.requestAnimationFrame(() => {
+        window.setTimeout(() => {
+          gridRef.current?.focus();
+          const canvas = gridContainerRef.current?.querySelector<HTMLCanvasElement>(
+            'canvas[data-testid="data-grid-canvas"]',
+          );
+          if (!canvas) return;
+          canvas.dispatchEvent(
+            new KeyboardEvent('keydown', {
+              key: 'Enter',
+              code: 'Enter',
+              keyCode: 13,
+              bubbles: true,
+              cancelable: true,
+            }),
+          );
+        }, 0);
+      });
+    },
+    [csvData, columns.length, selection, viewRowIndices.length, visibleColIndices, meta.columns],
   );
 
   // Column resize -> persist to .meta.jsonc
@@ -569,31 +1030,73 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
     [columns, meta.view?.sort, patchMeta],
   );
 
+  const serializeCurrentCsv = useCallback((): Uint8Array | null => {
+    if (!csvData) return null;
+    return serializeCsv(csvData.headers, rowsRef.current, csvData.dialect);
+  }, [csvData]);
+
   const handleSaveCsv = useCallback(async () => {
-    if (!csvData) return;
-    const bytes = serializeCsv(csvData.headers, rowsRef.current, csvData.dialect);
+    const bytes = serializeCurrentCsv();
+    if (!bytes) return;
     await adapter.saveCsv(bytes);
     setDirtyCsv(false);
     setStatusMsg(
       `Saved ${fileName} (${rowsRef.current.length.toLocaleString()} rows)`,
     );
-  }, [adapter, csvData, fileName]);
+  }, [adapter, serializeCurrentCsv, fileName]);
 
-  const handleUndo = useCallback(() => {
+  const applyUndoLocal = useCallback(() => {
     const cmd = historyRef.current.undo(rowsRef.current);
     if (cmd) {
       setDirtyCsv(true);
       setDataVersion((v) => v + 1);
+      return true;
     }
+    return false;
   }, []);
 
-  const handleRedo = useCallback(() => {
+  const applyRedoLocal = useCallback(() => {
     const cmd = historyRef.current.redo(rowsRef.current);
     if (cmd) {
       setDirtyCsv(true);
       setDataVersion((v) => v + 1);
+      return true;
     }
+    return false;
   }, []);
+
+  const handleUndo = useCallback(() => {
+    if (applyUndoLocal()) {
+      onDocumentEdit?.('Undo');
+    }
+  }, [applyUndoLocal, onDocumentEdit]);
+
+  const handleRedo = useCallback(() => {
+    if (applyRedoLocal()) {
+      onDocumentEdit?.('Redo');
+    }
+  }, [applyRedoLocal, onDocumentEdit]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      saveCsv: handleSaveCsv,
+      serializeCurrentCsv,
+      undo: () => {
+        applyUndoLocal();
+      },
+      redo: () => {
+        applyRedoLocal();
+      },
+      reload: () => {
+        setReloadTick((t) => t + 1);
+      },
+      markClean: () => {
+        setDirtyCsv(false);
+      },
+    }),
+    [handleSaveCsv, serializeCurrentCsv, applyUndoLocal, applyRedoLocal],
+  );
 
   const handleAddRow = useCallback(() => {
     if (!csvData) return;
@@ -606,9 +1109,15 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
     }
     rowsRef.current.splice(insertIdx, 0, newRow);
     historyRef.current.push({ type: 'insertRow', index: insertIdx, row: [...newRow] });
+    if (markers.length > 0 && markers.some((m) => m.row >= insertIdx)) {
+      persistMarkers(
+        markers.map((m) => (m.row >= insertIdx ? { ...m, row: m.row + 1 } : m)),
+      );
+    }
     setDirtyCsv(true);
     setDataVersion((v) => v + 1);
-  }, [csvData, selection, viewRowIndices]);
+    onDocumentEdit?.('Insert row');
+  }, [csvData, selection, viewRowIndices, markers, persistMarkers, onDocumentEdit]);
 
   const handleDeleteRow = useCallback(() => {
     if (!csvData || !selection.current) return;
@@ -617,15 +1126,42 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
     const removed = rowsRef.current.splice(dataRow, 1)[0];
     if (!removed) return;
     historyRef.current.push({ type: 'deleteRow', index: dataRow, row: [...removed] });
+    if (markers.length > 0 && markers.some((m) => m.row >= dataRow)) {
+      persistMarkers(
+        markers
+          .filter((m) => m.row !== dataRow)
+          .map((m) => (m.row > dataRow ? { ...m, row: m.row - 1 } : m)),
+      );
+    }
     setDirtyCsv(true);
     setDataVersion((v) => v + 1);
-  }, [csvData, selection, viewRowIndices]);
+    onDocumentEdit?.('Delete row');
+  }, [csvData, selection, viewRowIndices, markers, persistMarkers, onDocumentEdit]);
 
-  // Keyboard shortcuts (Ctrl/Cmd + S, Z, Y)
+  // Keyboard shortcuts (F2 / Shift+F2 / Ctrl+M for Markers; Ctrl+S/Z/Y handled when not in VS Code)
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const inTextInput =
+        target?.tagName === 'INPUT' ||
+        target?.tagName === 'TEXTAREA' ||
+        target?.isContentEditable === true;
       const mod = e.ctrlKey || e.metaKey;
-      if (!mod) return;
+
+      if (!inTextInput && ((mod && e.key.toLowerCase() === 'm') || (mod && e.key === 'F2'))) {
+        e.preventDefault();
+        toggleMarkerOnSelection();
+        return;
+      }
+
+      if (!inTextInput && e.key === 'F2' && !mod && !e.altKey) {
+        e.preventDefault();
+        if (e.shiftKey) jumpPrevMarker();
+        else jumpNextMarker();
+        return;
+      }
+
+      if (!mod || hostMode === 'vscode') return;
       const key = e.key.toLowerCase();
       if (key === 's') {
         e.preventDefault();
@@ -640,7 +1176,15 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [handleSaveCsv, handleUndo, handleRedo]);
+  }, [
+    hostMode,
+    handleSaveCsv,
+    handleUndo,
+    handleRedo,
+    toggleMarkerOnSelection,
+    jumpNextMarker,
+    jumpPrevMarker,
+  ]);
 
   // Apply style to selected single cell (cells) OR multi-cell drag selection (ranges)
   const applyStyleToSelection = useCallback(
@@ -723,32 +1267,54 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
     [selection, csvData, visibleColIndices, viewRowIndices, meta, patchMeta],
   );
 
-  const selectedDataRow = selection.current
-    ? viewRowIndices[selection.current.cell[1]]
-    : undefined;
   const selectedRowHeight =
     selectedDataRow !== undefined
-      ? (meta.rows?.[String(selectedDataRow)]?.height ??
-          meta.table?.defaultRowHeight ??
-          DEFAULT_ROW_HEIGHT)
-      : (meta.table?.defaultRowHeight ?? DEFAULT_ROW_HEIGHT);
+      ? (meta.rows?.[String(selectedDataRow)]?.height ?? effectiveDefaultRowHeight)
+      : effectiveDefaultRowHeight;
 
   const rowHeight = useCallback(
     (viewRow: number) => {
       const dataRow = viewRowIndices[viewRow];
-      const fallback = meta.table?.defaultRowHeight ?? DEFAULT_ROW_HEIGHT;
-      if (dataRow === undefined) return fallback;
-      return meta.rows?.[String(dataRow)]?.height ?? fallback;
+      if (dataRow === undefined) return effectiveDefaultRowHeight;
+      return meta.rows?.[String(dataRow)]?.height ?? effectiveDefaultRowHeight;
     },
-    [viewRowIndices, meta.rows, meta.table?.defaultRowHeight],
+    [viewRowIndices, meta.rows, effectiveDefaultRowHeight],
   );
 
   const isDark = themeMode === 'dark';
+
+  // Report live row/col/dirty status to host (VS Code StatusBarItem, Desktop window title, Web title)
+  useEffect(() => {
+    if (!onStatusChange) return;
+    onStatusChange({
+      fileName,
+      dirty: dirtyCsv,
+      totalRows: csvData ? rowsRef.current.length : 0,
+      visibleRows: csvData ? viewRowIndices.length : 0,
+      cols: csvData ? csvData.headers.length : 0,
+      markerCount: markers.length,
+      encoding: csvData?.dialect.encoding,
+      lineEnding: csvData?.dialect.lineEnding,
+    });
+  }, [
+    onStatusChange,
+    fileName,
+    dirtyCsv,
+    csvData,
+    viewRowIndices.length,
+    markers.length,
+    dataVersion,
+  ]);
   const toolbarBg = isDark ? '#252526' : '#f8fafc';
   const toolbarBorder = isDark ? '#3c3c3c' : '#e2e8f0';
   const toolbarFg = isDark ? '#e2e8f0' : '#0f172a';
   const btnStyle: React.CSSProperties = {
-    padding: '4px 9px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    padding: '3px 7px',
+    height: 26,
     fontSize: 12,
     borderRadius: 4,
     border: `1px solid ${toolbarBorder}`,
@@ -757,15 +1323,32 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
     cursor: 'pointer',
   };
 
+  const menuItemStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    width: '100%',
+    padding: '6px 8px',
+    borderRadius: 4,
+    border: 'none',
+    background: 'transparent',
+    color: toolbarFg,
+    fontSize: 12,
+    cursor: 'pointer',
+    textAlign: 'left',
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%' }}>
-      {/* Toolbar */}
+      {/* Row 1: Navigation, Search, Marker, Popovers, Settings & About */}
       <div
+        ref={toolbarRef}
         style={{
           display: 'flex',
           alignItems: 'center',
           gap: 6,
-          padding: '6px 10px',
+          padding: '5px 10px',
           background: toolbarBg,
           borderBottom: `1px solid ${toolbarBorder}`,
           color: toolbarFg,
@@ -774,81 +1357,64 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
           position: 'relative',
         }}
       >
-        <strong style={{ marginRight: 4 }}>
-          {fileName || 'MetaCSV'}
-          {dirtyCsv ? ' ●' : ''}
-        </strong>
+        {/* Host Hamburger Menu & Quick Open (hidden in VS Code where native menus handle Open/Save/Undo/Redo) */}
+        {hostMode !== 'vscode' && (
+          <>
+            <button
+              type="button"
+              aria-label="Menu"
+              title="File & Edit Menu"
+              style={{
+                ...btnStyle,
+                padding: '3px 6px',
+                borderColor: openMenu === 'file' ? '#3b82f6' : toolbarBorder,
+              }}
+              onClick={() => setOpenMenu((m) => (m === 'file' ? 'none' : 'file'))}
+            >
+              <Menu size={15} />
+            </button>
+            {onOpenFile && (
+              <button
+                type="button"
+                aria-label="Open CSV"
+                title="Open CSV..."
+                style={{ ...btnStyle, padding: '3px 6px' }}
+                onClick={onOpenFile}
+              >
+                <FolderOpen size={14} />
+              </button>
+            )}
+          </>
+        )}
 
-        <button style={btnStyle} onClick={() => void handleSaveCsv()} disabled={!dirtyCsv}>
-          Save CSV
-        </button>
-        <button style={btnStyle} onClick={handleUndo} disabled={!historyRef.current.canUndo()}>
-          Undo
-        </button>
-        <button style={btnStyle} onClick={handleRedo} disabled={!historyRef.current.canRedo()}>
-          Redo
-        </button>
-        <button style={btnStyle} onClick={handleAddRow} title="Insert empty row below selection">
-          + Row
-        </button>
+        {/* Style & Row Popover Toggle (+Row / -Row / Bold / Italic / Cell Colors) */}
         <button
-          style={btnStyle}
-          onClick={handleDeleteRow}
-          disabled={!selection.current}
-          title="Delete selected row"
-        >
-          - Row
-        </button>
-
-        <span style={{ opacity: 0.4 }}>|</span>
-
-        {/* Style controls for active cell or dragged range */}
-        <button
-          style={{ ...btnStyle, fontWeight: 700 }}
-          title="Toggle Bold on selection"
-          onClick={() => applyStyleToSelection((s) => ({ ...s, bold: !s.bold }))}
-        >
-          B
-        </button>
-        <button
-          style={{ ...btnStyle, fontStyle: 'italic' }}
-          title="Toggle Italic on selection"
-          onClick={() => applyStyleToSelection((s) => ({ ...s, italic: !s.italic }))}
-        >
-          I
-        </button>
-        {SWATCH_COLORS.map((sw) => (
-          <button
-            key={sw.label}
-            title={`Background: ${sw.label}`}
-            style={{
-              ...btnStyle,
-              padding: '2px 6px',
-              background: sw.value ?? (isDark ? '#1e1e1e' : '#ffffff'),
-            }}
-            onClick={() =>
-              applyStyleToSelection((s) => ({ ...s, backgroundColor: sw.value }))
-            }
-          >
-            {sw.label === 'Clear' ? '×' : ' '}
-          </button>
-        ))}
-
-        <span style={{ opacity: 0.4 }}>|</span>
-
-        {/* View / Layout menu */}
-        <button
+          type="button"
+          title="Cell styles & row actions"
+          aria-label="Cell styles & row actions"
           style={{
             ...btnStyle,
-            borderColor: showViewMenu ? '#3b82f6' : toolbarBorder,
+            borderColor: openMenu === 'edit' ? '#3b82f6' : toolbarBorder,
           }}
-          onClick={() => setShowViewMenu((s) => !s)}
+          onClick={() => setOpenMenu((m) => (m === 'edit' ? 'none' : 'edit'))}
         >
-          View / Columns ▾
+          <Palette size={13} />
+          <span>Style</span>
         </button>
+
+        <span style={{ opacity: 0.35 }}>|</span>
 
         {/* Search box with inline clear & history dropdown */}
         <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+          <Search
+            size={13}
+            style={{
+              position: 'absolute',
+              left: 7,
+              opacity: 0.55,
+              pointerEvents: 'none',
+            }}
+          />
           <input
             type="text"
             value={searchQuery}
@@ -873,13 +1439,15 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
             }}
             placeholder="Search..."
             style={{
-              padding: '4px 40px 4px 8px',
+              padding: '3px 38px 3px 24px',
+              height: 26,
               fontSize: 12,
               borderRadius: 4,
               border: `1px solid ${toolbarBorder}`,
               background: isDark ? '#1e1e1e' : '#ffffff',
               color: toolbarFg,
-              width: 170,
+              width: 165,
+              boxSizing: 'border-box',
             }}
           />
           {searchQuery.length > 0 && (
@@ -889,18 +1457,17 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
               onClick={() => setSearchQuery('')}
               style={{
                 position: 'absolute',
-                right: 20,
+                right: 19,
                 border: 'none',
                 background: 'transparent',
                 color: toolbarFg,
                 opacity: 0.6,
                 cursor: 'pointer',
-                fontSize: 13,
-                lineHeight: 1,
-                padding: '2px 4px',
+                display: 'inline-flex',
+                padding: 2,
               }}
             >
-              ×
+              <X size={12} />
             </button>
           )}
           <button
@@ -915,12 +1482,11 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
               color: toolbarFg,
               opacity: searchHistory.items.length > 0 ? 0.75 : 0.35,
               cursor: 'pointer',
-              fontSize: 11,
-              lineHeight: 1,
-              padding: '3px 4px',
+              display: 'inline-flex',
+              padding: 3,
             }}
           >
-            ▾
+            <ChevronDown size={11} />
           </button>
 
           {showSearchHistory && (filteredSearchHistory.length > 0 || searchQuery.trim().length === 0) && (
@@ -951,7 +1517,7 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
                 {searchHistory.items.length > 0 && (
                   <button
                     type="button"
-                    style={{ ...btnStyle, padding: '1px 6px', fontSize: 11 }}
+                    style={{ ...btnStyle, height: 20, padding: '1px 6px', fontSize: 11 }}
                     onClick={() => searchHistory.clear()}
                   >
                     Clear History
@@ -1000,11 +1566,11 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
                         color: toolbarFg,
                         opacity: 0.55,
                         cursor: 'pointer',
-                        fontSize: 12,
-                        padding: '0 3px',
+                        display: 'inline-flex',
+                        padding: 2,
                       }}
                     >
-                      ×
+                      <X size={12} />
                     </button>
                   </div>
                 ))
@@ -1014,113 +1580,279 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
         </div>
         {searchQuery.trim() && (
           <>
-            <span>
+            <span style={{ fontSize: 11, opacity: 0.85 }}>
               {matches.length > 0 ? `${activeMatchIdx + 1}/${matches.length}` : '0'}
             </span>
             <button
-              style={btnStyle}
+              type="button"
+              style={{ ...btnStyle, padding: '3px 4px' }}
               disabled={matches.length === 0}
               onClick={() =>
                 setActiveMatchIdx((i) => (i - 1 + matches.length) % matches.length)
               }
+              title="Previous match"
             >
-              ↑
+              <ChevronUp size={13} />
             </button>
             <button
-              style={btnStyle}
+              type="button"
+              style={{ ...btnStyle, padding: '3px 4px' }}
               disabled={matches.length === 0}
               onClick={() => setActiveMatchIdx((i) => (i + 1) % matches.length)}
+              title="Next match"
             >
-              ↓
+              <ChevronDown size={13} />
             </button>
           </>
         )}
 
-        <div style={{ marginLeft: 'auto', opacity: 0.75 }}>{statusMsg}</div>
+        <span style={{ opacity: 0.35 }}>|</span>
 
-        {/* View / Columns Popover */}
-        {showViewMenu && csvData && (
+        {/* Row Markers (Bookmark & Jump) unified on Row 1 */}
+        {csvData && (
+          <MarkerControls
+            markers={markers}
+            visibleMarkerCount={markedViewRows.length}
+            visibleMarkerRowSet={visibleMarkerRowSet}
+            selectedDataRow={selectedDataRow}
+            selectedMarker={selectedMarker}
+            activeColor={activeMarkerColor}
+            onActiveColorChange={handleMarkerColorChange}
+            onlyMarked={onlyMarked}
+            onOnlyMarkedChange={setOnlyMarked}
+            onToggleSelectedMarker={toggleMarkerOnSelection}
+            onJumpPrev={jumpPrevMarker}
+            onJumpNext={jumpNextMarker}
+            onJumpToRow={jumpToDataRow}
+            onUpdateMarkerNote={handleUpdateMarkerNote}
+            onCycleMarkerColor={handleCycleMarkerColor}
+            onRemoveMarker={handleRemoveMarker}
+            onClearAll={handleClearAllMarkers}
+            getRowPreview={getRowPreview}
+            themeMode={themeMode}
+          />
+        )}
+
+        {/* Right section: Settings + About */}
+        <div
+          style={{
+            marginLeft: 'auto',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            flexShrink: 0,
+          }}
+        >
+          <button
+            type="button"
+            aria-label="Settings"
+            title="Settings (File layout & App)"
+            style={{ ...btnStyle, padding: '3px 6px' }}
+            onClick={() => {
+              setOpenMenu('none');
+              setShowSettingsModal(true);
+            }}
+          >
+            <Settings size={14} />
+          </button>
+          <button
+            type="button"
+            aria-label="About MetaCSV"
+            title="About MetaCSV"
+            style={{ ...btnStyle, padding: '3px 6px' }}
+            onClick={() => {
+              setOpenMenu('none');
+              setShowAboutModal(true);
+            }}
+          >
+            <Info size={14} />
+          </button>
+        </div>
+
+        {/* Hamburger File / Edit Menu Popover (Desktop & Web) */}
+        {openMenu === 'file' && hostMode !== 'vscode' && (
           <div
             style={{
               position: 'absolute',
-              top: '100%',
+              top: 'calc(100% + 2px)',
               left: 10,
-              zIndex: 40,
-              width: 310,
-              maxHeight: 420,
-              overflowY: 'auto',
+              zIndex: 60,
+              width: 240,
+              padding: 6,
+              borderRadius: 6,
+              background: isDark ? '#1f1f23' : '#ffffff',
+              border: `1px solid ${toolbarBorder}`,
+              boxShadow: '0 8px 24px rgba(0,0,0,0.32)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 2,
+            }}
+          >
+            {onOpenFile && (
+              <button
+                type="button"
+                style={menuItemStyle}
+                onClick={() => {
+                  setOpenMenu('none');
+                  onOpenFile();
+                }}
+              >
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                  <FolderOpen size={14} />
+                  <span>Open CSV...</span>
+                </span>
+              </button>
+            )}
+            <button
+              type="button"
+              style={{
+                ...menuItemStyle,
+                opacity: !dirtyCsv && hostMode === 'desktop' ? 0.45 : 1,
+              }}
+              disabled={!dirtyCsv && hostMode === 'desktop'}
+              onClick={() => {
+                setOpenMenu('none');
+                void handleSaveCsv();
+              }}
+            >
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                <Save size={14} />
+                <span>{hostMode === 'web' ? 'Save / Download CSV' : 'Save CSV'}</span>
+              </span>
+              <span style={{ fontSize: 10.5, opacity: 0.6 }}>Ctrl+S</span>
+            </button>
+            <hr style={{ border: 'none', borderTop: `1px solid ${toolbarBorder}`, margin: '3px 0' }} />
+            <button
+              type="button"
+              style={{
+                ...menuItemStyle,
+                opacity: historyRef.current.canUndo() ? 1 : 0.45,
+              }}
+              disabled={!historyRef.current.canUndo()}
+              onClick={() => {
+                setOpenMenu('none');
+                handleUndo();
+              }}
+            >
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                <Undo2 size={14} />
+                <span>Undo</span>
+              </span>
+              <span style={{ fontSize: 10.5, opacity: 0.6 }}>Ctrl+Z</span>
+            </button>
+            <button
+              type="button"
+              style={{
+                ...menuItemStyle,
+                opacity: historyRef.current.canRedo() ? 1 : 0.45,
+              }}
+              disabled={!historyRef.current.canRedo()}
+              onClick={() => {
+                setOpenMenu('none');
+                handleRedo();
+              }}
+            >
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                <Redo2 size={14} />
+                <span>Redo</span>
+              </span>
+              <span style={{ fontSize: 10.5, opacity: 0.6 }}>Ctrl+Y</span>
+            </button>
+            {fileMenuItems && (
+              <>
+                <hr style={{ border: 'none', borderTop: `1px solid ${toolbarBorder}`, margin: '3px 0' }} />
+                <div onClick={() => setOpenMenu('none')}>{fileMenuItems}</div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Edit & Style Popover (Row ops + Excel-like formatting) */}
+        {openMenu === 'edit' && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 'calc(100% + 2px)',
+              left: hostMode === 'vscode' ? 10 : 72,
+              zIndex: 60,
+              width: 260,
               padding: 12,
               borderRadius: 6,
               background: isDark ? '#1f1f23' : '#ffffff',
               border: `1px solid ${toolbarBorder}`,
-              boxShadow: '0 8px 24px rgba(0,0,0,0.28)',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.32)',
               display: 'flex',
               flexDirection: 'column',
               gap: 10,
             }}
           >
-            <div style={{ fontWeight: 700, fontSize: 12 }}>Table Layout (.meta.jsonc)</div>
+            <div style={{ fontWeight: 700, fontSize: 12 }}>Rows</div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button
+                type="button"
+                style={{ ...btnStyle, flex: 1 }}
+                onClick={handleAddRow}
+                title="Insert empty row below selection"
+              >
+                <Plus size={13} />
+                <span>Insert Row</span>
+              </button>
+              <button
+                type="button"
+                style={{ ...btnStyle, flex: 1, opacity: selection.current ? 1 : 0.45 }}
+                onClick={handleDeleteRow}
+                disabled={!selection.current}
+                title="Delete selected row"
+              >
+                <Minus size={13} />
+                <span>Delete Row</span>
+              </button>
+            </div>
 
-            <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>First Row is Header</span>
-              <input
-                type="checkbox"
-                checked={meta.csv?.hasHeader ?? true}
-                onChange={(e) => patchMeta(['csv', 'hasHeader'], e.target.checked)}
-              />
-            </label>
-
-            <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>Freeze Columns</span>
-              <input
-                type="number"
-                min={0}
-                max={Math.max(0, visibleColIndices.length - 1)}
-                value={meta.table?.freezeColumns ?? 0}
-                onChange={(e) =>
-                  patchMeta(['table', 'freezeColumns'], Math.max(0, Number(e.target.value) || 0))
-                }
-                style={{ width: 64 }}
-              />
-            </label>
-
-            <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>Font Size (px)</span>
-              <input
-                type="number"
-                min={9}
-                max={32}
-                value={meta.table?.fontSize ?? DEFAULT_FONT_SIZE}
-                onChange={(e) =>
-                  patchMeta(
-                    ['table', 'fontSize'],
-                    Math.max(9, Math.min(32, Number(e.target.value) || DEFAULT_FONT_SIZE)),
-                  )
-                }
-                style={{ width: 64 }}
-              />
-            </label>
-
-            <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>Default Row Height (px)</span>
-              <input
-                type="number"
-                min={20}
-                max={200}
-                value={meta.table?.defaultRowHeight ?? DEFAULT_ROW_HEIGHT}
-                onChange={(e) =>
-                  patchMeta(
-                    ['table', 'defaultRowHeight'],
-                    Math.max(20, Math.min(200, Number(e.target.value) || DEFAULT_ROW_HEIGHT)),
-                  )
-                }
-                style={{ width: 64 }}
-              />
-            </label>
+            <hr style={{ border: 'none', borderTop: `1px solid ${toolbarBorder}`, margin: '2px 0' }} />
+            <div style={{ fontWeight: 700, fontSize: 12 }}>Cell Style (.meta.jsonc)</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                style={{ ...btnStyle, padding: '3px 8px' }}
+                title="Toggle Bold on selection"
+                onClick={() => applyStyleToSelection((s) => ({ ...s, bold: !s.bold }))}
+              >
+                <Bold size={13} />
+              </button>
+              <button
+                type="button"
+                style={{ ...btnStyle, padding: '3px 8px' }}
+                title="Toggle Italic on selection"
+                onClick={() => applyStyleToSelection((s) => ({ ...s, italic: !s.italic }))}
+              >
+                <Italic size={13} />
+              </button>
+              <span style={{ opacity: 0.35 }}>|</span>
+              {SWATCH_COLORS.map((sw) => (
+                <button
+                  key={sw.label}
+                  type="button"
+                  title={`Background: ${sw.label}`}
+                  style={{
+                    ...btnStyle,
+                    width: 24,
+                    height: 24,
+                    padding: 0,
+                    background: sw.value ?? (isDark ? '#1e1e1e' : '#ffffff'),
+                  }}
+                  onClick={() =>
+                    applyStyleToSelection((s) => ({ ...s, backgroundColor: sw.value }))
+                  }
+                >
+                  {sw.label === 'Clear' ? <X size={12} /> : ' '}
+                </button>
+              ))}
+            </div>
 
             {selectedDataRow !== undefined && (
-              <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>Selected Row #{selectedDataRow + 1} Height</span>
+              <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 }}>
+                <span>Row #{selectedDataRow + 1} Height</span>
                 <input
                   type="number"
                   min={20}
@@ -1136,41 +1868,11 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
                 />
               </label>
             )}
-
-            <hr style={{ border: 'none', borderTop: `1px solid ${toolbarBorder}`, margin: '2px 0' }} />
-            <div style={{ fontWeight: 700, fontSize: 12 }}>Visible Columns</div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {csvData.columnKeys.map((key, idx) => {
-                const colMeta = meta.columns?.[key];
-                const isVisible = colMeta?.visible !== false;
-                const label = colMeta?.label ?? csvData.headers[idx] ?? `column ${idx + 1}`;
-                return (
-                  <label
-                    key={key}
-                    style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isVisible}
-                      onChange={(e) => {
-                        // Keep at least one column visible
-                        if (!e.target.checked && visibleColIndices.length <= 1) return;
-                        patchMeta(['columns', key, 'visible'], e.target.checked);
-                      }}
-                    />
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {label}
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
           </div>
         )}
       </div>
 
-      {/* Filter Bar (Regex / NOT / Numeric Compare / grep -C / Dedupe / Facets / Presets) */}
+      {/* Row 2: Dedicated Filter Bar (Regex / NOT / Numeric Compare / grep -C / Dedupe / Facets / Presets) */}
       {csvData && (
         <FilterBar
           query={filterQuery}
@@ -1208,7 +1910,7 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
       )}
 
       {/* Grid container */}
-      <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+      <div ref={gridContainerRef} style={{ flex: 1, minHeight: 0, position: 'relative' }}>
         {showProgressOverlay && loadingProgress && (
           <div
             style={{
@@ -1262,7 +1964,9 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
             columns={columns}
             rows={viewRowIndices.length}
             getCellContent={getCellContent}
+            drawCell={drawCell}
             onCellEdited={onCellEdited}
+            onFinishedEditing={onFinishedEditing}
             onColumnResize={onColumnResize}
             onHeaderClicked={onHeaderClicked}
             gridSelection={selection}
@@ -1270,7 +1974,8 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
             rowHeight={rowHeight}
             headerHeight={meta.table?.headerHeight ?? DEFAULT_HEADER_HEIGHT}
             freezeColumns={meta.table?.freezeColumns ?? 0}
-            rowMarkers="number"
+            rowMarkers={appSettings?.showRowNumbers === false ? 'none' : 'number'}
+            trapFocus={true}
             smoothScrollX
             smoothScrollY
             theme={gridTheme}
@@ -1279,6 +1984,108 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
           />
         )}
       </div>
+
+      {/* Bottom Status Bar for Desktop & Web (VS Code uses native StatusBarItem) */}
+      {hostMode !== 'vscode' && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            height: 24,
+            padding: '0 10px',
+            background: toolbarBg,
+            borderTop: `1px solid ${toolbarBorder}`,
+            color: toolbarFg,
+            fontSize: 11.5,
+            flexShrink: 0,
+          }}
+        >
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+            <span
+              style={{
+                fontWeight: dirtyCsv ? 700 : 500,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+              title={fileName}
+            >
+              {fileName || 'MetaCSV'}
+              {dirtyCsv ? ' *' : ''}
+            </span>
+            {csvData && (
+              <span style={{ opacity: 0.65, whiteSpace: 'nowrap' }}>
+                {csvData.dialect.encoding.toUpperCase()} · {csvData.dialect.lineEnding.toUpperCase()}
+              </span>
+            )}
+            {statusMsg && (
+              <span style={{ opacity: 0.78, whiteSpace: 'nowrap' }}>{statusMsg}</span>
+            )}
+          </div>
+          {csvData && (
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, opacity: 0.85, whiteSpace: 'nowrap' }}>
+              <span>
+                {viewRowIndices.length !== rowsRef.current.length
+                  ? `Rows=${viewRowIndices.length.toLocaleString()} / ${rowsRef.current.length.toLocaleString()}, Cols=${csvData.headers.length}`
+                  : `Rows=${rowsRef.current.length.toLocaleString()}, Cols=${csvData.headers.length}`}
+              </span>
+              {markers.length > 0 && <span>Markers={markers.length}</span>}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Settings & About Dialogs */}
+      <SettingsModal
+        open={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+        hostMode={hostMode}
+        themeMode={themeMode}
+        themePreference={themePreference}
+        systemTheme={systemTheme}
+        onThemePreferenceChange={onThemePreferenceChange}
+        appSettings={appSettings ?? {}}
+        onAppSettingsChange={onAppSettingsChange}
+        onOpenHostSettings={onOpenSettings}
+        fileSettings={
+          csvData
+            ? ({
+                hasHeader: meta.csv?.hasHeader ?? true,
+                onHasHeaderChange: (next) => patchMeta(['csv', 'hasHeader'], next),
+                freezeColumns: meta.table?.freezeColumns ?? 0,
+                maxFreezeColumns: Math.max(0, visibleColIndices.length - 1),
+                onFreezeColumnsChange: (next) => patchMeta(['table', 'freezeColumns'], next),
+                fontSize: effectiveDefaultFontSize,
+                onFontSizeChange: (next) => patchMeta(['table', 'fontSize'], next),
+                defaultRowHeight: effectiveDefaultRowHeight,
+                onDefaultRowHeightChange: (next) =>
+                  patchMeta(['table', 'defaultRowHeight'], next),
+                columns: csvData.columnKeys.map((key, idx) => {
+                  const colMeta = meta.columns?.[key];
+                  return {
+                    key,
+                    label: colMeta?.label ?? getDefaultColumnTitle(idx),
+                    visible: colMeta?.visible !== false,
+                  };
+                }),
+                onToggleColumnVisible: (key, visible) => {
+                  if (!visible && visibleColIndices.length <= 1) return;
+                  patchMeta(['columns', key, 'visible'], visible);
+                },
+              } satisfies FileLayoutSettingsProps)
+            : undefined
+        }
+        extraSection={settingsExtraSection}
+      />
+      <AboutModal
+        open={showAboutModal}
+        onClose={() => setShowAboutModal(false)}
+        themeMode={themeMode}
+        hostMode={hostMode}
+      />
     </div>
   );
-};
+  },
+);

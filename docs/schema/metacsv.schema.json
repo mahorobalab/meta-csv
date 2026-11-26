@@ -129,6 +129,24 @@
               "collapseColumn": { "type": "string" }
             }
           }
+        },
+        "markers": {
+          "type": "array",
+          "description": "Bookmarked/marked data rows for rapid navigation and inspection (0-based raw data row index).",
+          "items": {
+            "type": "object",
+            "required": ["row"],
+            "additionalProperties": false,
+            "properties": {
+              "row": { "type": "integer", "minimum": 0 },
+              "color": {
+                "type": "string",
+                "enum": ["amber", "rose", "emerald", "sky", "violet"],
+                "default": "amber"
+              },
+              "note": { "type": "string" }
+            }
+          }
         }
       }
     },

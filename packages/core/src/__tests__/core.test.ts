@@ -5,6 +5,7 @@ import {
   buildSortedRowIndices,
   computeColumnFacets,
   createStyleResolverContext,
+  indexToExcelColumn,
   parseCsvBytes,
   parseMetaJsonc,
   patchMetaJsonc,
@@ -173,5 +174,41 @@ describe('@meta-csv/core', () => {
     const facets = computeColumnFacets(rows, base, 2);
     expect(facets.entries[0]).toEqual({ value: 'ok', count: 3 });
     expect(facets.uniqueCount).toBe(3);
+  });
+
+  it('persists view.markers with color and note while preserving JSONC comments', () => {
+    const original = [
+      '{',
+      '  "version": "0.1",',
+      '  // keep marker test comment',
+      '  "view": {',
+      '    "activeFilter": "status:blocked"',
+      '  }',
+      '}',
+      '',
+    ].join('\n');
+
+    const updated = patchMetaJsonc(original, ['view', 'markers'], [
+      { row: 2, color: 'rose', note: 'Investigate timeout' },
+      { row: 10, color: 'amber' },
+    ]);
+
+    expect(updated).toContain('// keep marker test comment');
+    const parsed = parseMetaJsonc(updated);
+    expect(parsed.view?.activeFilter).toBe('status:blocked');
+    expect(parsed.view?.markers).toEqual([
+      { row: 2, color: 'rose', note: 'Investigate timeout' },
+      { row: 10, color: 'amber' },
+    ]);
+  });
+
+  it('converts 0-based column indices to Excel-style column letters', () => {
+    expect(indexToExcelColumn(0)).toBe('A');
+    expect(indexToExcelColumn(1)).toBe('B');
+    expect(indexToExcelColumn(25)).toBe('Z');
+    expect(indexToExcelColumn(26)).toBe('AA');
+    expect(indexToExcelColumn(27)).toBe('AB');
+    expect(indexToExcelColumn(701)).toBe('ZZ');
+    expect(indexToExcelColumn(702)).toBe('AAA');
   });
 });

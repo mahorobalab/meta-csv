@@ -20,6 +20,18 @@ export interface ParsedCsvData {
   dialect: ResolvedCsvDialect;
 }
 
+/** Convert 0-based column index to Excel-style column label (0 -> A, 25 -> Z, 26 -> AA). */
+export function indexToExcelColumn(index: number): string {
+  let n = Math.max(0, Math.floor(index)) + 1;
+  let result = '';
+  while (n > 0) {
+    const rem = (n - 1) % 26;
+    result = String.fromCharCode(65 + rem) + result;
+    n = Math.floor((n - 1) / 26);
+  }
+  return result;
+}
+
 export function detectEncoding(bytes: Uint8Array): CsvEncoding {
   if (bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
     return 'utf-8-bom';
