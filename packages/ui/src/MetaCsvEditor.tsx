@@ -10,8 +10,10 @@ import {
   AlignCenter,
   AlignLeft,
   AlignRight,
+  ArrowDownWideNarrow,
   ArrowLeft,
   ArrowRight,
+  ArrowUpNarrowWide,
   Bold,
   ChevronDown,
   ChevronUp,
@@ -122,9 +124,12 @@ import { useInputHistory } from './useInputHistory';
 import { ZebraRowsIcon } from './icons/ZebraRowsIcon';
 import {
   readClipboardForColumnPaste,
+  readClipboardForRowPaste,
   writeColumnsToClipboard,
+  writeRowsToClipboard,
   type CopiedColumnMeta,
   type CopiedColumnPayload,
+  type CopiedRowsPayload,
   type NativeClipboardBridge,
 } from './columnClipboard';
 
@@ -265,6 +270,16 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
     colKeys: string[];
     label: string;
   } | null>(null);
+  const [rowContextMenu, setRowContextMenu] = useState<{
+    viewRows: number[];
+    dataRows: number[];
+    x: number;
+    y: number;
+  } | null>(null);
+  const [pendingDeleteRows, setPendingDeleteRows] = useState<{
+    dataRows: number[];
+    label: string;
+  } | null>(null);
   const [localConfirmHideCol, setLocalConfirmHideCol] = useState<boolean | null>(null);
   const shouldConfirmHideColumn =
     localConfirmHideCol ?? (appSettings?.confirmHideColumn !== false);
@@ -272,7 +287,9 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
     setLocalConfirmHideCol(null);
   }, [appSettings?.confirmHideColumn]);
   const copiedColumnRef = useRef<CopiedColumnPayload | null>(null);
+  const copiedRowsRef = useRef<CopiedRowsPayload | null>(null);
   const headerMenuRef = useRef<HTMLDivElement | null>(null);
+  const rowMenuRef = useRef<HTMLDivElement | null>(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [showAboutModal, setShowAboutModal] = useState(false);
@@ -329,14 +346,21 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
   }, [openMenu]);
 
   useEffect(() => {
-    if (!headerContextMenu) return;
+    if (!headerContextMenu && !rowContextMenu) return;
     const onDocDown = (e: MouseEvent) => {
-      if (headerMenuRef.current && !headerMenuRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (headerContextMenu && headerMenuRef.current && !headerMenuRef.current.contains(target)) {
         setHeaderContextMenu(null);
+      }
+      if (rowContextMenu && rowMenuRef.current && !rowMenuRef.current.contains(target)) {
+        setRowContextMenu(null);
       }
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setHeaderContextMenu(null);
+      if (e.key === 'Escape') {
+        setHeaderContextMenu(null);
+        setRowContextMenu(null);
+      }
     };
     document.addEventListener('mousedown', onDocDown);
     window.addEventListener('keydown', onKey);
@@ -344,7 +368,7 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
       document.removeEventListener('mousedown', onDocDown);
       window.removeEventListener('keydown', onKey);
     };
-  }, [headerContextMenu]);
+  }, [headerContextMenu, rowContextMenu]);
 
   useEffect(() => {
     onDirtyChange?.(dirtyCsv);
@@ -408,6 +432,7 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
     y: initialViewSnapshot?.scrollRow ?? 0,
   });
   const pendingRestoreSnapshotRef = useRef<EditorViewSnapshot | null>(initialViewSnapshot ?? null);
+  const pendingJumpAfterInsertRef = useRef<{ dataRow: number; count: number } | null>(null);
   const rowsRef = useRef<string[][]>([]);
   const historyRef = useRef(new UndoRedoHistory());
   const metaSaveTimerRef = useRef<number | null>(null);
@@ -674,11 +699,75 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
     return map;
   }, [filterColumnOptions]);
 
-  // Step 1: View sort indices (non-destructive)
-  const sortedRowIndices = useMemo(() => {
-    if (!csvData) return new Int32Array(0);
-    return buildSortedRowIndices(rowsRef.current, csvData.columnKeys, meta.view?.sort);
-  }, [csvData, meta.view?.sort, dataVersion]);
+  // Step 1: Stable row order (Excel-like: only re-sorts on file load or explicit sort action;
+  // editing cells or inserting/duplicating/deleting rows keeps items in-place without jumping away)
+  const [orderedRowIndices, setOrderedRowIndices] = useState<Int32Array>(() => new Int32Array(0));
+  const [sortApplyTick, setSortApplyTick] = useState(0);
+  const sortSpecKey = useMemo(() => JSON.stringify(meta.view?.sort ?? null), [meta.view?.sort]);
+
+  useEffect(() => {
+    if (!csvData) {
+      setOrderedRowIndices(new Int32Array(0));
+      return;
+    }
+    setOrderedRowIndices(
+      buildSortedRowIndices(rowsRef.current, csvData.columnKeys, meta.view?.sort),
+    );
+  }, [csvData?.rows, sortSpecKey, sortApplyTick]);
+
+  const sortedRowIndices = orderedRowIndices;
+
+  const insertRowsIntoOrder = useCallback(
+    (insertDataIdx: number, count: number, insertViewPos: number) => {
+      setOrderedRowIndices((prev) => {
+        const next = new Int32Array(prev.length + count);
+        const clampedPos = Math.max(0, Math.min(prev.length, insertViewPos));
+        let write = 0;
+        for (let i = 0; i < clampedPos; i++) {
+          const v = prev[i]!;
+          next[write++] = v >= insertDataIdx ? v + count : v;
+        }
+        for (let k = 0; k < count; k++) {
+          next[write++] = insertDataIdx + k;
+        }
+        for (let i = clampedPos; i < prev.length; i++) {
+          const v = prev[i]!;
+          next[write++] = v >= insertDataIdx ? v + count : v;
+        }
+        return next;
+      });
+    },
+    [],
+  );
+
+  const removeRowsFromOrder = useCallback((removedDesc: number[]) => {
+    const removedSet = new Set(removedDesc);
+    setOrderedRowIndices((prev) => {
+      const kept: number[] = [];
+      for (let i = 0; i < prev.length; i++) {
+        const v = prev[i]!;
+        if (removedSet.has(v)) continue;
+        let shift = 0;
+        for (let j = 0; j < removedDesc.length; j++) {
+          if (removedDesc[j]! < v) shift++;
+        }
+        kept.push(v - shift);
+      }
+      return Int32Array.from(kept);
+    });
+  }, []);
+
+  const appendRowsToOrder = useCallback((appendedDataRows: number[]) => {
+    if (appendedDataRows.length === 0) return;
+    setOrderedRowIndices((prev) => {
+      const next = new Int32Array(prev.length + appendedDataRows.length);
+      next.set(prev, 0);
+      for (let i = 0; i < appendedDataRows.length; i++) {
+        next[prev.length + i] = appendedDataRows[i]!;
+      }
+      return next;
+    });
+  }, []);
 
   // Step 2: Apply Excel-surpassing filter (Regex / NOT / compare / grep -C / dedupe)
   const filterState = useMemo(() => {
@@ -1003,21 +1092,14 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
   // Grid columns definition
   const columns: GridColumn[] = useMemo(() => {
     if (!csvData) return [];
-    const activeSort = meta.view?.sort?.[0];
     return visibleColIndices.map((actualColIdx) => {
       const key = csvData.columnKeys[actualColIdx]!;
       const colMeta = meta.columns?.[key];
       const baseTitle = colMeta?.label ?? getDefaultColumnTitle(actualColIdx);
-      const sortIndicator =
-        activeSort?.column === key
-          ? activeSort.direction === 'asc'
-            ? ' ▲'
-            : ' ▼'
-          : '';
       const baseWidth = colMeta?.width ?? autoWidths[actualColIdx] ?? 140;
       return {
         id: key,
-        title: `${baseTitle}${sortIndicator}`,
+        title: baseTitle,
         width: Math.max(40, Math.round(baseWidth * zoomScale)),
       };
     });
@@ -1025,7 +1107,6 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
     csvData,
     visibleColIndices,
     meta.columns,
-    meta.view?.sort,
     autoWidths,
     getDefaultColumnTitle,
     zoomScale,
@@ -1330,32 +1411,21 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
     [patchMeta, zoomScale],
   );
 
-  // Header double-click -> cycle view sort (asc -> desc -> none) & persist to .metatext.jsonc
-  const lastHeaderClickRef = useRef<{ colIndex: number; time: number } | null>(null);
-  const onHeaderClicked = useCallback(
-    (colIndex: number) => {
-      const now = Date.now();
-      const prev = lastHeaderClickRef.current;
-      if (!prev || prev.colIndex !== colIndex || now - prev.time > 400) {
-        lastHeaderClickRef.current = { colIndex, time: now };
-        return;
-      }
-      lastHeaderClickRef.current = null;
-
-      const col = columns[colIndex];
-      if (!col?.id) return;
-      const current = meta.view?.sort?.[0];
-      let nextSort: SortSpec[] | undefined;
-      if (!current || current.column !== col.id) {
-        nextSort = [{ column: col.id, direction: 'asc' }];
-      } else if (current.direction === 'asc') {
-        nextSort = [{ column: col.id, direction: 'desc' }];
-      } else {
-        nextSort = undefined;
-      }
+  // Apply explicit sort from column right-click menu
+  const handleSortColumn = useCallback(
+    (colKey: string, direction: 'asc' | 'desc' | null) => {
+      const nextSort: SortSpec[] | undefined = direction
+        ? [{ column: colKey, direction }]
+        : undefined;
       patchMeta(['view', 'sort'], nextSort);
+      setSortApplyTick((t) => t + 1);
+      setStatusMsg(
+        direction
+          ? `Sorted "${colKey}" (${direction === 'asc' ? 'ascending' : 'descending'})`
+          : 'Cleared sort order',
+      );
     },
-    [columns, meta.view?.sort, patchMeta],
+    [patchMeta],
   );
 
   const isContiguousCols = useCallback((cols: number[]): boolean => {
@@ -1585,6 +1655,7 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
           rowsRef.current.push(newRow);
           appendedDataRows.push(rowsRef.current.length - 1);
         }
+        appendRowsToOrder(appendedDataRows);
       }
 
       for (let r = 0; r < rowsNeeded; r++) {
@@ -2018,6 +2089,328 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
     ],
   );
 
+  // Row header (row marker) right-click -> select whole row (or keep contiguous multi-row selection) & open row menu
+  const onCellContextMenu = useCallback(
+    (
+      cell: Item,
+      event: { preventDefault: () => void; bounds: { x: number; y: number; width: number; height: number } },
+    ) => {
+      const [col, viewRow] = cell;
+      if (col !== -1 || viewRow < 0 || !csvData) return;
+      event.preventDefault();
+
+      const selectedViewRows = selection.rows.toArray();
+      const keepMulti =
+        selectedViewRows.length > 1 &&
+        isContiguousCols(selectedViewRows) &&
+        selectedViewRows.includes(viewRow);
+
+      const targetViewRows = keepMulti ? selectedViewRows : [viewRow];
+      const targetDataRows: number[] = [];
+      for (const vr of targetViewRows) {
+        const dr = viewRowIndices[vr];
+        if (dr !== undefined) targetDataRows.push(dr);
+      }
+      if (targetDataRows.length === 0) return;
+
+      setOpenMenu('none');
+      setHeaderContextMenu(null);
+      setEditingHeaderCol(null);
+
+      const nextRowSelection: GridSelection = {
+        rows: CompactSelection.fromSingleSelection([
+          targetViewRows[0]!,
+          targetViewRows[targetViewRows.length - 1]! + 1,
+        ]),
+        columns: CompactSelection.empty(),
+      };
+      setSelection(nextRowSelection);
+      // Re-assert full-row selection after Glide Data Grid's internal context-menu selection update
+      window.requestAnimationFrame(() => {
+        setSelection(nextRowSelection);
+      });
+
+      const menuW = 262;
+      const menuH = 310;
+      const vw = typeof window !== 'undefined' ? window.innerWidth : 1280;
+      const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
+      const x = Math.max(8, Math.min(event.bounds.x + event.bounds.width + 2, vw - menuW - 8));
+      const y = Math.max(8, Math.min(event.bounds.y, vh - menuH - 8));
+      setRowContextMenu({
+        viewRows: targetViewRows,
+        dataRows: targetDataRows,
+        x,
+        y,
+      });
+    },
+    [csvData, selection.rows, isContiguousCols, viewRowIndices],
+  );
+
+  const handleCopyRows = useCallback(
+    async (dataRows: number[]) => {
+      if (!csvData || dataRows.length === 0) return;
+      const matrix: string[][] = dataRows.map((dr) => {
+        const row = rowsRef.current[dr];
+        return csvData.columnKeys.map((_, cIdx) => row?.[cIdx] ?? '');
+      });
+      const rowStyles = dataRows.map((dr) => {
+        const ref = meta.rows?.[String(dr)]?.style;
+        return typeof ref === 'string' ? meta.styles?.[ref] : ref;
+      });
+      const payload = await writeRowsToClipboard(
+        { matrix, rowStyles },
+        nativeClipboard,
+      );
+      copiedRowsRef.current = payload;
+      setStatusMsg(`Copied ${dataRows.length.toLocaleString()} row${dataRows.length === 1 ? '' : 's'}`);
+    },
+    [csvData, meta.rows, meta.styles, nativeClipboard],
+  );
+
+  const handlePasteRows = useCallback(
+    async (startViewRow: number, withStyle: boolean) => {
+      if (!csvData || isReadOnly) return;
+      const parsed = await readClipboardForRowPaste(
+        withStyle,
+        copiedRowsRef.current,
+        nativeClipboard,
+      );
+      if (!parsed || parsed.matrix.length === 0) {
+        setStatusMsg('Clipboard is empty');
+        return;
+      }
+
+      const maxCols = Math.max(csvData.columnKeys.length, ...parsed.matrix.map((r) => r.length));
+      const nextHeaders = [...csvData.headers];
+      const nextKeys = [...csvData.columnKeys];
+      const nextWidths = [...autoWidths];
+      let colsExpanded = false;
+      while (nextKeys.length < maxCols) {
+        const idx = nextKeys.length;
+        const name = csvData.dialect.hasHeader
+          ? makeUniqueColKey(`column_${idx + 1}`, nextKeys)
+          : String(idx);
+        nextHeaders.push(csvData.dialect.hasHeader ? name : '');
+        nextKeys.push(name);
+        nextWidths.push(140);
+        colsExpanded = true;
+        for (let r = 0; r < rowsRef.current.length; r++) {
+          rowsRef.current[r]!.push('');
+        }
+      }
+
+      const targetDataRows: number[] = [];
+      const newlyAppendedRows: number[] = [];
+      for (let i = 0; i < parsed.matrix.length; i++) {
+        const vr = startViewRow + i;
+        if (vr < viewRowIndices.length) {
+          targetDataRows.push(viewRowIndices[vr]!);
+        } else {
+          const newRow = Array.from({ length: nextKeys.length }, () => '');
+          rowsRef.current.push(newRow);
+          const idx = rowsRef.current.length - 1;
+          targetDataRows.push(idx);
+          newlyAppendedRows.push(idx);
+        }
+      }
+      if (newlyAppendedRows.length > 0) {
+        appendRowsToOrder(newlyAppendedRows);
+      }
+
+      for (let i = 0; i < parsed.matrix.length; i++) {
+        const dr = targetDataRows[i]!;
+        const dst = rowsRef.current[dr];
+        if (!dst) continue;
+        const src = parsed.matrix[i]!;
+        for (let c = 0; c < nextKeys.length; c++) {
+          dst[c] = c < src.length ? (src[c] ?? '') : '';
+        }
+      }
+
+      if (colsExpanded) {
+        setCsvData({ ...csvData, headers: nextHeaders, columnKeys: nextKeys });
+        setAutoWidths(nextWidths);
+      }
+
+      if (withStyle && parsed.rowStyles && parsed.rowStyles.length > 0) {
+        let text = metaTextRef.current ?? '';
+        let patchedAny = false;
+        for (let i = 0; i < Math.min(targetDataRows.length, 500); i++) {
+          const st = parsed.rowStyles[i];
+          if (st && Object.keys(st).length > 0) {
+            text = patchMetaJsonc(text, ['rows', String(targetDataRows[i]!), 'style'], st);
+            patchedAny = true;
+          }
+        }
+        if (patchedAny) scheduleMetaSave(text);
+      }
+
+      setDirtyCsv(true);
+      setDataVersion((v) => v + 1);
+      onDocumentEdit?.(withStyle ? 'Paste row(s) with style' : 'Paste row values');
+      setStatusMsg(
+        `Pasted ${parsed.matrix.length.toLocaleString()} row${parsed.matrix.length === 1 ? '' : 's'}${
+          withStyle ? ' (with style)' : ' (values only)'
+        }`,
+      );
+    },
+    [
+      csvData,
+      isReadOnly,
+      autoWidths,
+      viewRowIndices,
+      makeUniqueColKey,
+      scheduleMetaSave,
+      onDocumentEdit,
+      nativeClipboard,
+    ],
+  );
+
+  const executeDeleteRows = useCallback(
+    (dataRows: number[], label: string) => {
+      if (!csvData || isReadOnly || dataRows.length === 0) return;
+      const uniqueDesc = Array.from(new Set(dataRows)).sort((a, b) => b - a);
+      const removedSet = new Set(uniqueDesc);
+      for (const dr of uniqueDesc) {
+        rowsRef.current.splice(dr, 1);
+      }
+      removeRowsFromOrder(uniqueDesc);
+      if (markers.length > 0) {
+        const nextMarkers = markers
+          .filter((m) => !removedSet.has(m.row))
+          .map((m) => {
+            let shift = 0;
+            for (const dr of uniqueDesc) {
+              if (dr < m.row) shift++;
+            }
+            return shift > 0 ? { ...m, row: m.row - shift } : m;
+          });
+        persistMarkers(nextMarkers);
+      }
+      setSelection({
+        rows: CompactSelection.empty(),
+        columns: CompactSelection.empty(),
+      });
+      setDirtyCsv(true);
+      setDataVersion((v) => v + 1);
+      onDocumentEdit?.(uniqueDesc.length > 1 ? 'Delete rows' : 'Delete row');
+      setStatusMsg(`Deleted ${label}`);
+    },
+    [csvData, isReadOnly, markers, persistMarkers, onDocumentEdit],
+  );
+
+  const handleDeleteRows = useCallback(
+    (dataRows: number[]) => {
+      if (!csvData || isReadOnly || dataRows.length === 0) return;
+      const label =
+        dataRows.length === 1
+          ? `行 #${dataRows[0]! + 1}`
+          : `選択中の ${dataRows.length} 行`;
+      setPendingDeleteRows({ dataRows, label });
+    },
+    [csvData, isReadOnly],
+  );
+
+  const handleDuplicateRows = useCallback(
+    (viewRows: number[], dataRows: number[], side: 'above' | 'below') => {
+      if (!csvData || isReadOnly || dataRows.length === 0) return;
+      const firstViewPos = viewRows.length > 0 ? Math.min(...viewRows) : 0;
+      const lastViewPos = viewRows.length > 0 ? Math.max(...viewRows) : 0;
+      const anchorDataRow =
+        side === 'above'
+          ? (viewRowIndices[firstViewPos] ?? dataRows[0]!)
+          : (viewRowIndices[lastViewPos] ?? dataRows[dataRows.length - 1]!);
+      const insertIdx = side === 'above' ? anchorDataRow : anchorDataRow + 1;
+      const insertViewPos = side === 'above' ? firstViewPos : lastViewPos + 1;
+
+      const copies = dataRows.map((dr) => [...(rowsRef.current[dr] ?? [])]);
+      rowsRef.current.splice(insertIdx, 0, ...copies);
+      insertRowsIntoOrder(insertIdx, copies.length, insertViewPos);
+
+      if (markers.length > 0 && markers.some((m) => m.row >= insertIdx)) {
+        persistMarkers(
+          markers.map((m) => (m.row >= insertIdx ? { ...m, row: m.row + copies.length } : m)),
+        );
+      }
+
+      setDirtyCsv(true);
+      setDataVersion((v) => v + 1);
+      onDocumentEdit?.(`Duplicate ${copies.length} row(s) ${side}`);
+      setStatusMsg(
+        `Duplicated ${copies.length} row${copies.length === 1 ? '' : 's'} ${side}`,
+      );
+    },
+    [csvData, isReadOnly, viewRowIndices, insertRowsIntoOrder, markers, persistMarkers, onDocumentEdit],
+  );
+
+  const handleInsertBlankRows = useCallback(
+    (viewRows: number[], dataRows: number[], side: 'above' | 'below') => {
+      if (!csvData || isReadOnly || dataRows.length === 0) return;
+      const count = dataRows.length;
+      const firstViewPos = viewRows.length > 0 ? Math.min(...viewRows) : 0;
+      const lastViewPos = viewRows.length > 0 ? Math.max(...viewRows) : 0;
+      const anchorDataRow =
+        side === 'above'
+          ? (viewRowIndices[firstViewPos] ?? dataRows[0]!)
+          : (viewRowIndices[lastViewPos] ?? dataRows[dataRows.length - 1]!);
+      const insertIdx = side === 'above' ? anchorDataRow : anchorDataRow + 1;
+      const insertViewPos = side === 'above' ? firstViewPos : lastViewPos + 1;
+
+      const colCount = csvData.columnKeys.length;
+      const blanks = Array.from({ length: count }, () =>
+        Array.from({ length: colCount }, () => ''),
+      );
+      rowsRef.current.splice(insertIdx, 0, ...blanks);
+      insertRowsIntoOrder(insertIdx, count, insertViewPos);
+
+      if (markers.length > 0 && markers.some((m) => m.row >= insertIdx)) {
+        persistMarkers(
+          markers.map((m) => (m.row >= insertIdx ? { ...m, row: m.row + count } : m)),
+        );
+      }
+
+      const hasActiveFilter = debouncedFilterQuery.trim().length > 0 || onlyMarked;
+      pendingJumpAfterInsertRef.current = { dataRow: insertIdx, count };
+
+      setDirtyCsv(true);
+      setDataVersion((v) => v + 1);
+      onDocumentEdit?.(`Insert ${count} blank row(s) ${side}`);
+      setStatusMsg(
+        hasActiveFilter
+          ? `Inserted ${count} blank row${count === 1 ? '' : 's'} (may be hidden by active filter)`
+          : `Inserted ${count} blank row${count === 1 ? '' : 's'} ${side}`,
+      );
+    },
+    [
+      csvData,
+      isReadOnly,
+      viewRowIndices,
+      insertRowsIntoOrder,
+      markers,
+      persistMarkers,
+      debouncedFilterQuery,
+      onlyMarked,
+      onDocumentEdit,
+    ],
+  );
+
+  // Scroll to and select newly inserted blank row(s) once viewRowIndices updates
+  useEffect(() => {
+    const pending = pendingJumpAfterInsertRef.current;
+    if (!pending) return;
+    pendingJumpAfterInsertRef.current = null;
+    const vr = viewRowIndices.indexOf(pending.dataRow);
+    if (vr === -1) return;
+    const endVr = Math.min(viewRowIndices.length, vr + pending.count);
+    setSelection({
+      rows: CompactSelection.fromSingleSelection([vr, endVr]),
+      columns: CompactSelection.empty(),
+    });
+    window.requestAnimationFrame(() => {
+      gridRef.current?.scrollTo(0, vr, 'vertical', 0, 0, { vAlign: 'center' });
+    });
+  }, [viewRowIndices]);
+
   const serializeCurrentCsv = useCallback((): Uint8Array | null => {
     if (!csvData) return null;
     if (csvData.format === 'jsonl' && csvData.jsonlOptions) {
@@ -2321,9 +2714,13 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
     zoomScale,
   ]);
 
-  // Column selection clipboard shortcuts (Ctrl+C, Ctrl+V, Ctrl+Shift+V) — capture phase to preempt grid default when full column(s) selected
+  // Column & Row selection clipboard shortcuts (Ctrl+C, Ctrl+V, Ctrl+Shift+V) — capture phase to preempt grid default
   useEffect(() => {
-    if (!isActive || !csvData || selection.columns.length === 0) return;
+    if (!isActive || !csvData) return;
+    const hasColSel = selection.columns.length > 0;
+    const hasRowSel = selection.rows.length > 0 && !hasColSel;
+    if (!hasColSel && !hasRowSel) return;
+
     const onKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       const inTextInput =
@@ -2336,31 +2733,60 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
       const key = e.key.toLowerCase();
       if (key !== 'c' && key !== 'v') return;
 
-      const selVisCols = selection.columns.toArray();
-      if (selVisCols.length === 0) return;
-      const targetVisCols = isContiguousCols(selVisCols) ? selVisCols : [selVisCols[0]!];
-      const targetActualCols: number[] = [];
-      const targetColKeys: string[] = [];
-      for (const vc of targetVisCols) {
-        const ac = visibleColIndices[vc];
-        if (ac === undefined) continue;
-        targetActualCols.push(ac);
-        targetColKeys.push(csvData.columnKeys[ac] ?? String(ac));
-      }
-      if (targetActualCols.length === 0) return;
+      if (hasColSel) {
+        const selVisCols = selection.columns.toArray();
+        if (selVisCols.length === 0) return;
+        const targetVisCols = isContiguousCols(selVisCols) ? selVisCols : [selVisCols[0]!];
+        const targetActualCols: number[] = [];
+        const targetColKeys: string[] = [];
+        for (const vc of targetVisCols) {
+          const ac = visibleColIndices[vc];
+          if (ac === undefined) continue;
+          targetActualCols.push(ac);
+          targetColKeys.push(csvData.columnKeys[ac] ?? String(ac));
+        }
+        if (targetActualCols.length === 0) return;
 
-      if (key === 'c' && !e.shiftKey) {
-        e.preventDefault();
-        e.stopPropagation();
-        void handleCopyColumns(targetActualCols, targetColKeys);
-      } else if (key === 'v' && !e.shiftKey && !isReadOnly) {
-        e.preventDefault();
-        e.stopPropagation();
-        void handlePasteColumns(targetActualCols[0]!, true);
-      } else if (key === 'v' && e.shiftKey && !isReadOnly) {
-        e.preventDefault();
-        e.stopPropagation();
-        void handlePasteColumns(targetActualCols[0]!, false);
+        if (key === 'c' && !e.shiftKey) {
+          e.preventDefault();
+          e.stopPropagation();
+          void handleCopyColumns(targetActualCols, targetColKeys);
+        } else if (key === 'v' && !e.shiftKey && !isReadOnly) {
+          e.preventDefault();
+          e.stopPropagation();
+          void handlePasteColumns(targetActualCols[0]!, true);
+        } else if (key === 'v' && e.shiftKey && !isReadOnly) {
+          e.preventDefault();
+          e.stopPropagation();
+          void handlePasteColumns(targetActualCols[0]!, false);
+        }
+        return;
+      }
+
+      if (hasRowSel) {
+        const selViewRows = selection.rows.toArray();
+        if (selViewRows.length === 0) return;
+        const targetViewRows = isContiguousCols(selViewRows) ? selViewRows : [selViewRows[0]!];
+        const targetDataRows: number[] = [];
+        for (const vr of targetViewRows) {
+          const dr = viewRowIndices[vr];
+          if (dr !== undefined) targetDataRows.push(dr);
+        }
+        if (targetDataRows.length === 0) return;
+
+        if (key === 'c' && !e.shiftKey) {
+          e.preventDefault();
+          e.stopPropagation();
+          void handleCopyRows(targetDataRows);
+        } else if (key === 'v' && !e.shiftKey && !isReadOnly) {
+          e.preventDefault();
+          e.stopPropagation();
+          void handlePasteRows(targetViewRows[0]!, true);
+        } else if (key === 'v' && e.shiftKey && !isReadOnly) {
+          e.preventDefault();
+          e.stopPropagation();
+          void handlePasteRows(targetViewRows[0]!, false);
+        }
       }
     };
     window.addEventListener('keydown', onKeyDown, true);
@@ -2369,11 +2795,15 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
     isActive,
     csvData,
     selection.columns,
+    selection.rows,
     isContiguousCols,
     visibleColIndices,
+    viewRowIndices,
     isReadOnly,
     handleCopyColumns,
     handlePasteColumns,
+    handleCopyRows,
+    handlePasteRows,
   ]);
 
   // Ctrl/Cmd + Mouse Wheel zoom on the grid container (non-passive so browser zoom is prevented)
@@ -2407,7 +2837,20 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
 
   const isColumnSelectionMode = selectedColumnKeys.length > 0;
 
-  // Apply style to selected columns (when entire column(s) selected), single cell, or multi-cell range
+  const selectedRowDataIndices = useMemo(() => {
+    if (!csvData || isColumnSelectionMode || selection.rows.length === 0) return [] as number[];
+    const list: number[] = [];
+    for (const vr of selection.rows.toArray()) {
+      const dr = viewRowIndices[vr];
+      if (dr !== undefined) list.push(dr);
+      if (list.length >= 500) break;
+    }
+    return list;
+  }, [csvData, isColumnSelectionMode, selection.rows, viewRowIndices]);
+
+  const isRowSelectionMode = selectedRowDataIndices.length > 0 && !isColumnSelectionMode;
+
+  // Apply style to selected columns, selected rows, single cell, or multi-cell range
   const applyStyleToSelection = useCallback(
     (updater: (current: CellStyle) => CellStyle, isClearAll = false) => {
       if (!csvData) return;
@@ -2447,6 +2890,27 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
             ['columns', colKey, 'numberFormat'],
             numberFormat && numberFormat.trim().length > 0 ? numberFormat : undefined,
           );
+        }
+        scheduleMetaSave(text);
+        return;
+      }
+
+      if (selectedRowDataIndices.length > 0) {
+        let text = metaTextRef.current ?? '';
+        for (const dr of selectedRowDataIndices) {
+          const rowKey = String(dr);
+          if (isClearAll) {
+            text = patchMetaJsonc(text, ['rows', rowKey, 'style'], undefined);
+            continue;
+          }
+          const existingRef = meta.rows?.[rowKey]?.style;
+          const existing: CellStyle =
+            typeof existingRef === 'string'
+              ? { ...(meta.styles?.[existingRef] ?? {}) }
+              : { ...(existingRef ?? {}) };
+          const next = updater(existing);
+          const hasAny = Object.values(next).some((v) => v !== undefined);
+          text = patchMetaJsonc(text, ['rows', rowKey, 'style'], hasAny ? next : undefined);
         }
         scheduleMetaSave(text);
         return;
@@ -2541,6 +3005,7 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
     [
       csvData,
       selectedColumnKeys,
+      selectedRowDataIndices,
       selection,
       visibleColIndices,
       viewRowIndices,
@@ -3577,11 +4042,20 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
           </div>
         )}
 
-        {/* Style Popover (Cell Style / Columns Style, Alignment, Colors, Number Format, Conditional Rules) */}
+        {/* Style Popover (Cell Style / Columns Style / Rows Style, Alignment, Colors, Format, Conditional Rules) */}
         {openMenu === 'edit' && (() => {
-          const hasStyleTarget = isColumnSelectionMode || Boolean(selection.current);
+          const hasStyleTarget =
+            isColumnSelectionMode || isRowSelectionMode || Boolean(selection.current);
           const firstColKey = selectedColumnKeys[0];
           const firstColCfg = firstColKey ? meta.columns?.[firstColKey] : undefined;
+          const firstRowDataIdx = selectedRowDataIndices[0];
+          const firstRowStyleRef =
+            firstRowDataIdx !== undefined ? meta.rows?.[String(firstRowDataIdx)]?.style : undefined;
+          const firstRowStyle: CellStyle | undefined =
+            typeof firstRowStyleRef === 'string'
+              ? meta.styles?.[firstRowStyleRef]
+              : firstRowStyleRef;
+
           const activeCellColIdx = selection.current
             ? visibleColIndices[selection.current.cell[0]]
             : undefined;
@@ -3590,6 +4064,7 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
             : undefined;
           const activeCellResolved =
             !isColumnSelectionMode &&
+            !isRowSelectionMode &&
             styleCtx &&
             activeCellColIdx !== undefined &&
             activeCellDataRow !== undefined &&
@@ -3608,10 +4083,14 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
 
           const activeWrap = isColumnSelectionMode
             ? Boolean(firstColCfg?.wrap)
-            : selectedCellWrap;
+            : isRowSelectionMode
+              ? Boolean(firstRowStyle?.wrap)
+              : selectedCellWrap;
           const activeAlign: ColumnAlign | undefined = isColumnSelectionMode
             ? firstColCfg?.align
-            : (activeCellResolved?.align ?? activeCellColMeta?.align);
+            : isRowSelectionMode
+              ? firstRowStyle?.align
+              : (activeCellResolved?.align ?? activeCellColMeta?.align);
           const activeNumFmt: string = isColumnSelectionMode
             ? (firstColCfg?.numberFormat ?? '')
             : (activeCellResolved?.numberFormat ?? activeCellColMeta?.numberFormat ?? '');
@@ -3648,7 +4127,9 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
                 <div style={{ fontWeight: 700, fontSize: 12 }}>
                   {isColumnSelectionMode
                     ? 'Columns Style (.metatext.jsonc)'
-                    : 'Cell Style (.metatext.jsonc)'}
+                    : isRowSelectionMode
+                      ? 'Rows Style (.metatext.jsonc)'
+                      : 'Cell Style (.metatext.jsonc)'}
                 </div>
                 <button
                   type="button"
@@ -3845,119 +4326,121 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
                 </div>
               </div>
 
-              {/* Number & Date Format (Excel / numfmt) */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: 11, opacity: 0.75 }}>Format (Number / Date)</span>
-                  {activeNumFmt && (
-                    <code style={{ fontSize: 10.5, opacity: 0.8 }}>{activeNumFmt}</code>
-                  )}
+              {/* Number & Date Format (hidden in Rows Style mode) */}
+              {!isRowSelectionMode && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: 11, opacity: 0.75 }}>Format (Number / Date)</span>
+                    {activeNumFmt && (
+                      <code style={{ fontSize: 10.5, opacity: 0.8 }}>{activeNumFmt}</code>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                    {NUMBER_FORMAT_PRESETS.map((preset) => {
+                      const isCurrent = activeNumFmt === preset.pattern;
+                      return (
+                        <button
+                          key={preset.label}
+                          type="button"
+                          disabled={!hasStyleTarget}
+                          title={`${preset.description}${preset.pattern ? ` (${preset.pattern})` : ''}`}
+                          style={{
+                            ...btnStyle,
+                            height: 22,
+                            padding: '1px 6px',
+                            fontSize: 11,
+                            borderColor: isCurrent ? '#3b82f6' : toolbarBorder,
+                            background: isCurrent
+                              ? isDark
+                                ? '#1e3a8a'
+                                : '#dbeafe'
+                              : btnStyle.background,
+                            opacity: hasStyleTarget ? 1 : 0.45,
+                          }}
+                          onClick={() => {
+                            setCustomNumFmt(preset.pattern);
+                            applyNumFmt(preset.pattern);
+                          }}
+                        >
+                          {preset.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                    {DATE_FORMAT_PRESETS.map((preset) => {
+                      const isCurrent = activeNumFmt === preset.pattern;
+                      return (
+                        <button
+                          key={preset.label}
+                          type="button"
+                          disabled={!hasStyleTarget}
+                          title={`${preset.description} (${preset.pattern})`}
+                          style={{
+                            ...btnStyle,
+                            height: 22,
+                            padding: '1px 6px',
+                            fontSize: 11,
+                            borderColor: isCurrent ? '#3b82f6' : toolbarBorder,
+                            background: isCurrent
+                              ? isDark
+                                ? '#1e3a8a'
+                                : '#dbeafe'
+                              : btnStyle.background,
+                            opacity: hasStyleTarget ? 1 : 0.45,
+                          }}
+                          onClick={() => {
+                            setCustomNumFmt(preset.pattern);
+                            applyNumFmt(preset.pattern);
+                          }}
+                        >
+                          {preset.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <input
+                      type="text"
+                      disabled={!hasStyleTarget}
+                      value={customNumFmt}
+                      placeholder={activeNumFmt || 'Custom e.g. #,##0, yyyy/mm/dd, mmm d, yyyy'}
+                      onChange={(e) => setCustomNumFmt(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && isCustomFmtValid) {
+                          applyNumFmt(customNumFmt);
+                        }
+                      }}
+                      style={{
+                        flex: 1,
+                        minWidth: 0,
+                        height: 24,
+                        padding: '2px 7px',
+                        fontSize: 11.5,
+                        borderRadius: 4,
+                        border: `1px solid ${isCustomFmtValid ? toolbarBorder : '#ef4444'}`,
+                        background: isDark ? '#141416' : '#ffffff',
+                        color: toolbarFg,
+                        outline: 'none',
+                      }}
+                    />
+                    <button
+                      type="button"
+                      disabled={!hasStyleTarget || !isCustomFmtValid}
+                      style={{
+                        ...btnStyle,
+                        height: 24,
+                        padding: '2px 8px',
+                        fontSize: 11,
+                        opacity: hasStyleTarget && isCustomFmtValid ? 1 : 0.45,
+                      }}
+                      onClick={() => applyNumFmt(customNumFmt)}
+                    >
+                      Apply
+                    </button>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                  {NUMBER_FORMAT_PRESETS.map((preset) => {
-                    const isCurrent = activeNumFmt === preset.pattern;
-                    return (
-                      <button
-                        key={preset.label}
-                        type="button"
-                        disabled={!hasStyleTarget}
-                        title={`${preset.description}${preset.pattern ? ` (${preset.pattern})` : ''}`}
-                        style={{
-                          ...btnStyle,
-                          height: 22,
-                          padding: '1px 6px',
-                          fontSize: 11,
-                          borderColor: isCurrent ? '#3b82f6' : toolbarBorder,
-                          background: isCurrent
-                            ? isDark
-                              ? '#1e3a8a'
-                              : '#dbeafe'
-                            : btnStyle.background,
-                          opacity: hasStyleTarget ? 1 : 0.45,
-                        }}
-                        onClick={() => {
-                          setCustomNumFmt(preset.pattern);
-                          applyNumFmt(preset.pattern);
-                        }}
-                      >
-                        {preset.label}
-                      </button>
-                    );
-                  })}
-                </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                  {DATE_FORMAT_PRESETS.map((preset) => {
-                    const isCurrent = activeNumFmt === preset.pattern;
-                    return (
-                      <button
-                        key={preset.label}
-                        type="button"
-                        disabled={!hasStyleTarget}
-                        title={`${preset.description} (${preset.pattern})`}
-                        style={{
-                          ...btnStyle,
-                          height: 22,
-                          padding: '1px 6px',
-                          fontSize: 11,
-                          borderColor: isCurrent ? '#3b82f6' : toolbarBorder,
-                          background: isCurrent
-                            ? isDark
-                              ? '#1e3a8a'
-                              : '#dbeafe'
-                            : btnStyle.background,
-                          opacity: hasStyleTarget ? 1 : 0.45,
-                        }}
-                        onClick={() => {
-                          setCustomNumFmt(preset.pattern);
-                          applyNumFmt(preset.pattern);
-                        }}
-                      >
-                        {preset.label}
-                      </button>
-                    );
-                  })}
-                </div>
-                <div style={{ display: 'flex', gap: 4 }}>
-                  <input
-                    type="text"
-                    disabled={!hasStyleTarget}
-                    value={customNumFmt}
-                    placeholder={activeNumFmt || 'Custom e.g. #,##0, yyyy/mm/dd, mmm d, yyyy'}
-                    onChange={(e) => setCustomNumFmt(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && isCustomFmtValid) {
-                        applyNumFmt(customNumFmt);
-                      }
-                    }}
-                    style={{
-                      flex: 1,
-                      minWidth: 0,
-                      height: 24,
-                      padding: '2px 7px',
-                      fontSize: 11.5,
-                      borderRadius: 4,
-                      border: `1px solid ${isCustomFmtValid ? toolbarBorder : '#ef4444'}`,
-                      background: isDark ? '#141416' : '#ffffff',
-                      color: toolbarFg,
-                      outline: 'none',
-                    }}
-                  />
-                  <button
-                    type="button"
-                    disabled={!hasStyleTarget || !isCustomFmtValid}
-                    style={{
-                      ...btnStyle,
-                      height: 24,
-                      padding: '2px 8px',
-                      fontSize: 11,
-                      opacity: hasStyleTarget && isCustomFmtValid ? 1 : 0.45,
-                    }}
-                    onClick={() => applyNumFmt(customNumFmt)}
-                  >
-                    Apply
-                  </button>
-                </div>
-              </div>
+              )}
 
               <button
                 type="button"
@@ -4096,8 +4579,8 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
                 onCellEdited={onCellEdited}
                 onFinishedEditing={onFinishedEditing}
                 onColumnResize={onColumnResize}
-                onHeaderClicked={onHeaderClicked}
                 onHeaderContextMenu={onHeaderContextMenu}
+                onCellContextMenu={onCellContextMenu}
                 onMouseMove={onGridMouseMove}
                 onVisibleRegionChanged={(range) => {
                   if (range.width <= 0 || range.height <= 0) return;
@@ -4540,6 +5023,252 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
                         <span>列を右にずらす</span>
                       </span>
                     </button>
+
+                    {sep}
+
+                    <button
+                      type="button"
+                      disabled={isMulti}
+                      style={ctxItemStyle(isMulti)}
+                      onClick={() => {
+                        if (isMulti) return;
+                        setHeaderContextMenu(null);
+                        handleSortColumn(firstKey, 'asc');
+                      }}
+                    >
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                        <ArrowUpNarrowWide size={13} />
+                        <span>昇順で並び替え (A→Z)</span>
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={isMulti}
+                      style={ctxItemStyle(isMulti)}
+                      onClick={() => {
+                        if (isMulti) return;
+                        setHeaderContextMenu(null);
+                        handleSortColumn(firstKey, 'desc');
+                      }}
+                    >
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                        <ArrowDownWideNarrow size={13} />
+                        <span>降順で並び替え (Z→A)</span>
+                      </span>
+                    </button>
+
+                    {(meta.view?.sort?.length ?? 0) > 0 && (
+                      <button
+                        type="button"
+                        style={ctxItemStyle(false)}
+                        onClick={() => {
+                          setHeaderContextMenu(null);
+                          handleSortColumn(firstKey, null);
+                        }}
+                      >
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                          <X size={13} />
+                          <span>並び替えを解除</span>
+                        </span>
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* Row Header Right-Click Context Menu */}
+              {rowContextMenu && (() => {
+                const { viewRows, dataRows, x, y } = rowContextMenu;
+                const isMulti = dataRows.length > 1;
+                const firstViewRow = viewRows[0]!;
+                const ctxItemStyle = (disabled = false): React.CSSProperties => ({
+                  ...menuItemStyle,
+                  padding: '5px 8px',
+                  opacity: disabled ? 0.42 : 1,
+                  cursor: disabled ? 'default' : 'pointer',
+                });
+                const sep = (
+                  <hr
+                    style={{
+                      border: 'none',
+                      borderTop: `1px solid ${toolbarBorder}`,
+                      margin: '3px 0',
+                    }}
+                  />
+                );
+
+                return (
+                  <div
+                    ref={rowMenuRef}
+                    role="menu"
+                    style={{
+                      position: 'fixed',
+                      left: x,
+                      top: y,
+                      zIndex: 80,
+                      width: 262,
+                      padding: 5,
+                      borderRadius: 6,
+                      background: isDark ? '#1f1f23' : '#ffffff',
+                      border: `1px solid ${toolbarBorder}`,
+                      boxShadow: '0 10px 28px rgba(0, 0, 0, 0.34)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 1,
+                      color: toolbarFg,
+                    }}
+                  >
+                    <button
+                      type="button"
+                      style={ctxItemStyle(false)}
+                      onClick={() => {
+                        setRowContextMenu(null);
+                        setSelection({
+                          rows: CompactSelection.fromSingleSelection([
+                            viewRows[0]!,
+                            viewRows[viewRows.length - 1]! + 1,
+                          ]),
+                          columns: CompactSelection.empty(),
+                        });
+                        setOpenMenu('edit');
+                      }}
+                    >
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                        <Palette size={13} />
+                        <span>スタイル</span>
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      style={ctxItemStyle(false)}
+                      onClick={() => {
+                        setRowContextMenu(null);
+                        void handleCopyRows(dataRows);
+                      }}
+                    >
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                        <Copy size={13} />
+                        <span>コピー</span>
+                      </span>
+                      <span style={{ fontSize: 10.5, opacity: 0.6 }}>Ctrl+C</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={isReadOnly}
+                      style={ctxItemStyle(isReadOnly)}
+                      onClick={() => {
+                        setRowContextMenu(null);
+                        void handlePasteRows(firstViewRow, true);
+                      }}
+                    >
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                        <ClipboardPaste size={13} />
+                        <span>貼り付け (スタイルあり)</span>
+                      </span>
+                      <span style={{ fontSize: 10.5, opacity: 0.6 }}>Ctrl+V</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={isReadOnly}
+                      style={ctxItemStyle(isReadOnly)}
+                      onClick={() => {
+                        setRowContextMenu(null);
+                        void handlePasteRows(firstViewRow, false);
+                      }}
+                    >
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                        <ClipboardPaste size={13} />
+                        <span>値のみ貼り付け</span>
+                      </span>
+                      <span style={{ fontSize: 10.5, opacity: 0.6 }}>Ctrl+Shift+V</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={isReadOnly}
+                      style={ctxItemStyle(isReadOnly)}
+                      onClick={() => {
+                        setRowContextMenu(null);
+                        handleDeleteRows(dataRows);
+                      }}
+                    >
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                        <Trash2 size={13} />
+                        <span>{isMulti ? `削除 (${dataRows.length}行)` : '削除'}</span>
+                      </span>
+                    </button>
+
+                    {sep}
+
+                    <button
+                      type="button"
+                      disabled={isReadOnly}
+                      style={ctxItemStyle(isReadOnly)}
+                      onClick={() => {
+                        setRowContextMenu(null);
+                        handleDuplicateRows(viewRows, dataRows, 'above');
+                      }}
+                    >
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                        <Copy size={13} />
+                        <span>{isMulti ? `${dataRows.length}行を上に複製` : '行を上に複製'}</span>
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={isReadOnly}
+                      style={ctxItemStyle(isReadOnly)}
+                      onClick={() => {
+                        setRowContextMenu(null);
+                        handleDuplicateRows(viewRows, dataRows, 'below');
+                      }}
+                    >
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                        <Copy size={13} />
+                        <span>{isMulti ? `${dataRows.length}行を下に複製` : '行を下に複製'}</span>
+                      </span>
+                    </button>
+
+                    {sep}
+
+                    <button
+                      type="button"
+                      disabled={isReadOnly}
+                      style={ctxItemStyle(isReadOnly)}
+                      onClick={() => {
+                        setRowContextMenu(null);
+                        handleInsertBlankRows(viewRows, dataRows, 'above');
+                      }}
+                    >
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                        <Plus size={13} />
+                        <span>
+                          {isMulti ? `上に空白行挿入 (${dataRows.length}行)` : '上に空白行挿入'}
+                        </span>
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={isReadOnly}
+                      style={ctxItemStyle(isReadOnly)}
+                      onClick={() => {
+                        setRowContextMenu(null);
+                        handleInsertBlankRows(viewRows, dataRows, 'below');
+                      }}
+                    >
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                        <Plus size={13} />
+                        <span>
+                          {isMulti ? `下に空白行挿入 (${dataRows.length}行)` : '下に空白行挿入'}
+                        </span>
+                      </span>
+                    </button>
                   </div>
                 );
               })()}
@@ -4923,6 +5652,82 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
         themeMode={themeMode}
         hostMode={hostMode}
       />
+
+      {/* Row Delete Confirmation Dialog */}
+      {pendingDeleteRows && (
+        <div
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setPendingDeleteRows(null);
+          }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 110,
+            background: 'rgba(0, 0, 0, 0.45)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="行の削除"
+            style={{
+              width: '100%',
+              maxWidth: 380,
+              borderRadius: 10,
+              background: isDark ? '#1f1f23' : '#ffffff',
+              color: toolbarFg,
+              border: `1px solid ${toolbarBorder}`,
+              boxShadow: '0 16px 48px rgba(0, 0, 0, 0.4)',
+              padding: 18,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 12,
+              fontSize: 13,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700 }}>
+              <Trash2 size={15} style={{ color: '#ef4444' }} />
+              <span>行の削除</span>
+            </div>
+            <div style={{ fontSize: 12.5, lineHeight: 1.6, opacity: 0.9 }}>
+              <strong>{pendingDeleteRows.label}</strong>を削除しますか？
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+              <button
+                type="button"
+                autoFocus
+                style={{ ...btnStyle, padding: '4px 12px', height: 28 }}
+                onClick={() => setPendingDeleteRows(null)}
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                style={{
+                  ...btnStyle,
+                  padding: '4px 12px',
+                  height: 28,
+                  background: '#dc2626',
+                  borderColor: '#ef4444',
+                  color: '#ffffff',
+                  fontWeight: 600,
+                }}
+                onClick={() => {
+                  const target = pendingDeleteRows;
+                  setPendingDeleteRows(null);
+                  executeDeleteRows(target.dataRows, target.label);
+                }}
+              >
+                削除する
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Column Delete Confirmation Dialog */}
       {pendingDeleteCol && (
