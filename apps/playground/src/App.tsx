@@ -126,7 +126,7 @@ export const App: React.FC = () => {
         color: barFg,
       }}
     >
-      {/* Top Playground Header */}
+      {/* Top Web / Playground Header */}
       <header
         style={{
           display: 'flex',
@@ -138,7 +138,21 @@ export const App: React.FC = () => {
           fontSize: 13,
         }}
       >
-        <span style={{ fontWeight: 700, marginRight: 6 }}>MetaCSV Playground</span>
+        <a
+          href="../"
+          title="Back to MetaCSV Home"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            fontWeight: 700,
+            marginRight: 6,
+            color: barFg,
+            textDecoration: 'none',
+          }}
+        >
+          <span>MetaCSV</span>
+        </a>
 
         <button style={tabBtn(preset === 'spec')} onClick={() => setPreset('spec')}>
           spec_setting.csv

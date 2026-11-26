@@ -1,0 +1,18 @@
+{
+  "name": "MetaCSV",
+  "short_name": "MetaCSV",
+  "description": "High-performance CSV editor & viewer with .meta.jsonc sidecar metadata",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "theme_color": "#18181b",
+  "background_color": "#1e1e1e",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

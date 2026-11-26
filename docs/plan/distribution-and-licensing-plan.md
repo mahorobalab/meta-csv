@@ -93,10 +93,46 @@ MetaCSV は **「ソースコードとフォーマット仕様はオープンソ
 
 | チャネル | 役割 | 価格 | 配布物・特徴 |
 | --- | --- | --- | --- |
-| **GitHub (`meta-csv`)** | 信頼の土台・仕様公開・開発拠点 | 無料（OSS） | ソースコード、`docs/SPEC.md`、JSON Schema、セルフビルド手順。<br>**※ GitHub Releases でのバイナリ配布は行わない。** |
-| **Web / PWA (`meta-csv.dev`)** | インストール不要のお試し・導線 | 無料 | `apps/playground` をベースに静的ホスティング（Cloudflare Pages / GitHub Pages）。Wasm 不要・完全オフライン動作。デスクトップ版への導線を設置。 |
-| **VS Code / Antigravity Marketplace** | 開発者向け集客・普及エンジン | 無料 | `.vsix` 拡張機能。IDE 内で `.meta.jsonc` の体験を広げ、単体デスクトップ版のファンを増やす。 |
+| **GitHub (`mahorobalab/meta-csv`)** | 信頼の土台・仕様公開・開発拠点 | 無料（OSS） | ソースコード、`docs/SPEC.md`、JSON Schema、セルフビルド手順。<br>**※ GitHub Releases でのバイナリ配布は行わない。** |
+| **GitHub Pages（Web / PWA ＋ LP）** | 公式サイト・お試しアプリ・ポリシー・スキーマ配信 | 無料 | 1 つの GitHub Pages 内でパス分割して運用（詳細は 4.1）。Wasm 不要・完全オフライン動作。将来独自ドメイン（`meta-csv.dev` 等）へそのまま移行可能。 |
+| **VS Code / Open VSX Marketplace** | 開発者向け集客・普及エンジン | 無料 | `.vsix` 拡張機能（VS Code Marketplace ＋ Antigravity / Cursor 等向け Open VSX）。IDE 内で `.meta.jsonc` の体験を広げ、単体デスクトップ版のファンを増やす。 |
 | **Microsoft Store / BOOTH** | 収益化・公式製品版配布 | 有料 | Windows（MSIX / 署名済み `.exe`）・macOS（Universal `.dmg` 等）の公式ビルド。自動アップデート・動作確認済み。 |
+
+### 4.1 GitHub Pages URL・ディレクトリ分割構成（採用方針）
+Web 版・製品 LP・MS Store 審査用ページ・JSON Schema 配信を 1 つの GitHub Pages（`https://mahorobalab.github.io/meta-csv/`）内でパス分割して運用する：
+
+```text
+https://mahorobalab.github.io/meta-csv/
+├── /                    ← 製品トップページ（LP：概要・デモ導線・MS Store / BOOTH / VS Code 拡張リンク）
+├── /app/                ← Web / PWA アプリ本体（apps/playground を Web 版としてビルド、PWA スコープを隔離）
+├── /schema/             ← metacsv.schema.json の公式配信 URL（.meta.jsonc の "$schema" 参照先）
+└── /privacy/            ← プライバシーポリシー（Microsoft Store 申請等で必須）
+```
+
+- **メリット**:
+  - PWA の Service Worker スコープを `/app/` に閉じられるため、LP やポリシーページの更新と干渉しない。
+  - Microsoft Store・VS Code Marketplace が求める「ホームページ URL」「プライバシーポリシー URL」をすべてここで完結できる。
+  - `.meta.jsonc` 先頭の `"$schema"` が実在する公開 URL として機能し、拡張機能なしの VS Code でも JSON Schema 補完が効く。
+  - 将来独自ドメイン（例: `https://meta-csv.dev/`）を割り当てた際も、同じパス構造でシームレスに移行できる。
+
+**モノレポ内の配置方針**:
+- `apps/site/`（または `docs/site/`）: `/`（LP）および `/privacy/` の軽量静的ページ
+- `apps/playground/`（将来 `apps/web/` へ整理も可）: Vite の `base` を `/meta-csv/app/`（独自ドメイン時は `/app/`）に設定してビルド
+- `docs/schema/metacsv.schema.json`: Pages ビルド時に `/schema/` へ自動コピー
+
+### 4.2 VS Code / Open VSX Marketplace 向け構成
+Marketplace の拡張機能ページ自体は Web サイトを別途ホストする必要はなく、`.vsix` パッケージ内に同梱されたファイルがそのまま表示される。リポジトリルートの `README.md` とは役割を分け、`apps/vscode/` 配下に拡張機能専用のドキュメントを配置する：
+
+```text
+apps/vscode/
+├── package.json     # publisher ("mahorobalab"), icon, homepage (GitHub Pages /), repository, bugs, galleryBanner
+├── README.md        # Marketplace 紹介ページ本文（VS Code での使い方・スクショ中心）
+├── CHANGELOG.md     # Marketplace の変更履歴タブ
+└── assets/
+    └── icon.png     # 128x128 以上の公式アイコン
+```
+
+- 同一の `.vsix` で **Visual Studio Marketplace** と **Open VSX Registry** の両方に公開可能。
 
 ---
 
@@ -104,10 +140,10 @@ MetaCSV は **「ソースコードとフォーマット仕様はオープンソ
 
 ### 5.1 GitHub リポジトリ整備ファイル
 公開前に以下をリポジトリルートへ整備する：
-- `LICENSE`: 選択した OSS ライセンス全文（Copyright 表記含む）
+- `LICENSE`: MIT License 全文（`Copyright (c) 2026 MahorobaLab`）
 - `TRADEMARKS.md`（任意）: ブランド名・ロゴの利用ガイドライン
-- `README.md` / `README_ja.md`: 以下のセクションを追記
-  - **Download / Installation**: 公式ビルドは Microsoft Store / BOOTH で提供している旨（準備中は Coming Soon）、および GitHub Releases ではバイナリ配布しない旨を明記
+- `README.md` / `README_ja.md`: 以下のセクションを整備
+  - **Download & Official Builds**: 公式ビルドは Microsoft Store / BOOTH で提供予定である旨、および GitHub Releases ではバイナリ配布しない旨を明記
   - **Build from Source**: 開発者向けのセルフビルド手順（`pnpm.cmd install` → `pnpm.cmd build:desktop` 等）
   - **License & Trademarks**: コードライセンスとブランド権利留保の明記
 
@@ -115,6 +151,9 @@ MetaCSV は **「ソースコードとフォーマット仕様はオープンソ
 - **常時実行する CI (`ci.yml`)**:
   - トリガー: `push` / `pull_request`
   - 内容: `pnpm typecheck` / `pnpm test` / `pnpm build`
+- **GitHub Pages デプロイ (`deploy-pages.yml`)**:
+  - トリガー: `main` ブランチへの `push`（および `workflow_dispatch`）
+  - 内容: LP（`/`・`/privacy/`）＋ Web/PWA ビルド（`/app/`）＋ `metacsv.schema.json`（`/schema/`）を 1 つの成果物に統合して GitHub Pages へ自動デプロイ
 - **Desktop ビルド検証 (`desktop-build.yml`)**:
   - トリガー: 手動実行（`workflow_dispatch`）または特定タグ
   - 内容: Windows / macOS（Apple Silicon / Universal）での Tauri ビルド確認
@@ -132,29 +171,28 @@ MetaCSV は **「ソースコードとフォーマット仕様はオープンソ
 - [x] ライセンス確定（MIT）と Copyright 表記名（`MahorobaLab`）の決定
 - [x] `LICENSE` ファイル作成
 - [x] `README.md` / `README_ja.md` に `Download` / `Build from Source` / `License & Trademarks` を追記
-- [ ] 公式アプリアイコンの制作と `apps/desktop/src-tauri/icons/` への組み込み
+- [ ] 公式アプリアイコンの制作と `apps/desktop/src-tauri/icons/` および `apps/vscode/assets/` への組み込み
 
 ### Phase 2: GitHub 公開 & CI 構築
-- [ ] GitHub リポジトリ `meta-csv` への初回 Push
-- [ ] GitHub Actions（テスト・型チェック・ビルド検証）の追加
-- [ ] 現在の未コミット変更（`.vscode/launch.json`, テーマ/ウィンドウ復元設定など）の整理・コミット
+- [x] 変更の整理・コミットおよび GitHub リポジトリ `mahorobalab/meta-csv` への初回 Push
+- [x] GitHub Actions（`ci.yml`: テスト・型チェック・ビルド検証）の追加
 
 ### Phase 3: 普及チャネル展開（無料）
-- [ ] VS Code / Antigravity 向け `.vsix` パッケージ化・ドッグフーディング・Marketplace 公開
-- [ ] Web / PWA 版（`vite-plugin-pwa`）の静的デプロイ（GitHub Pages または Cloudflare Pages）
+- [x] GitHub Pages 構成の実装（`/` LP・`/privacy/`・`/app/` Web/PWA・`/schema/`）と `deploy-pages.yml` 自動デプロイ構築
+- [ ] `apps/vscode/` の Marketplace 向け整備（`README.md` / `CHANGELOG.md` / `icon.png` / `publisher: mahorobalab`）と `.vsix` パッケージ化
+- [ ] VS Code Marketplace および Open VSX Registry への公開
 
 ### Phase 4: 公式ビルド販売（有料）
 - [ ] Windows 向けコード署名・MSIX パッケージ化（既存 MH-Utilities パイプライン流用）
 - [ ] macOS 向けビルド・署名（必要に応じて）
-- [ ] Microsoft Store / BOOTH 商品ページ公開と README リンク更新
+- [ ] Microsoft Store / BOOTH 商品ページ公開と README / LP リンク更新
 
 ---
 
 ## 7. 未決事項（オーナー確認ポイント）
 
-1. **コードライセンス**: `MIT` と `Apache 2.0` のどちらにするか？（シンプルさ重視なら MIT、特許・商標条項の明文化重視なら Apache 2.0）
-2. **Copyright 表記名**: 個人名・屋号・ブランド名（例: `MH-Utilities` など）のどれを使うか？
-3. **ドメイン取得タイミング**: `meta-csv.dev` 等を今押さえるか、Web 版公開時に取るか？
-4. **有料版と OSS 版の差分方針**:
+1. **ドメイン取得タイミング**: まずは `https://mahorobalab.github.io/meta-csv/` で公開し、反響を見てから `meta-csv.dev` 等へ切り替えるか、最初から独自ドメインを取るか？
+2. **有料版と OSS 版の差分方針**:
    - **完全同一コード（ビルド販売型）**: 機能差なし。署名済み・自動更新・インストーラーの利便性で課金（推奨・最もクリーン）。
    - **オープンコア型**: 将来的に一部高度な機能のみ製品版に限定するか。
+3. **VS Code Marketplace の Publisher ID**: 既存の `mahorobalab` アカウントを使うか、新規に作成するか。

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#1e293b" />
+      <stop offset="100%" stop-color="#1d4ed8" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)" />
+  <!-- Spreadsheet grid frame -->
+  <rect x="88" y="104" width="336" height="304" rx="28" fill="#0f172a" fill-opacity="0.55" stroke="#93c5fd" stroke-width="18" />
+  <!-- Header row tint -->
+  <path d="M97 132c0-10.5 8.5-19 19-19h280c10.5 0 19 8.5 19 19v52H97v-52z" fill="#3b82f6" fill-opacity="0.45" />
+  <!-- Horizontal dividers -->
+  <line x1="97" y1="184" x2="415" y2="184" stroke="#93c5fd" stroke-width="14" />
+  <line x1="97" y1="260" x2="415" y2="260" stroke="#60a5fa" stroke-opacity="0.65" stroke-width="12" />
+  <line x1="97" y1="334" x2="415" y2="334" stroke="#60a5fa" stroke-opacity="0.65" stroke-width="12" />
+  <!-- Vertical dividers -->
+  <line x1="200" y1="113" x2="200" y2="399" stroke="#60a5fa" stroke-opacity="0.65" stroke-width="12" />
+  <line x1="312" y1="113" x2="312" y2="399" stroke="#60a5fa" stroke-opacity="0.65" stroke-width="12" />
+  <!-- JSONC curly-brace badge in bottom-right -->
+  <rect x="278" y="274" width="166" height="166" rx="40" fill="#0ea5e9" stroke="#e0f2fe" stroke-width="14" />
+  <text x="361" y="382" text-anchor="middle" font-family="'Segoe UI', Consolas, monospace" font-size="108" font-weight="800" fill="#ffffff">{}</text>
+</svg>
