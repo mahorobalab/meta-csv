@@ -1,0 +1,21 @@
+今の構成のまま、コマンド 1 発で 単体の Windows 実行ファイル（.exe） を作れます！
+
+1. 単体 .exe（ポータブル版）を作るコマンド
+powershell
+pnpm.cmd --filter @meta-csv/desktop tauri:build
+出力先: apps/desktop/src-tauri/target/release/meta-csv-desktop.exe
+特徴:
+Windows 10 / 11 標準の Edge WebView2 を使うため、数 MB〜10 MB 程度の .exe 1 ファイルだけでそのまま動きます。
+コマンドライン引数対応（get_initial_file）を入れてあるので、.csv ファイルをこの .exe にドラッグ＆ドロップしたり、Windows の「プログラムから開く」で関連付けて直接開くこともできます。
+2. 配布用インストーラー（.msi / *-setup.exe）を作る場合
+
+現在は開発用に tauri.conf.json で "bundle": { "active": false } としているため、単体 .exe のみ生成されます。インストーラーまで出したいときは：
+
+アプリアイコン用の PNG（1024×1024 推奨）を用意して一括生成：
+powershell
+pnpm.cmd --filter @meta-csv/desktop exec tauri icon path/to/icon.png
+tauri.conf.json の bundle.active を true にして tauri:build を実行
+apps/desktop/src-tauri/target/release/bundle/msi/（.msi）
+apps/desktop/src-tauri/target/release/bundle/nsis/（*-setup.exe） にインストーラーが生成されます。
+
+（ちなみに初回 tauri:build は Rust の release 最適化コンパイルが走るので 1〜2 分かかりますが、2 回目以降は差分ビルドで速くなります！）

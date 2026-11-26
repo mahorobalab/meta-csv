@@ -1,14 +1,49 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
-import { MetaCsvEditor } from '@meta-csv/ui';
+import {
+  MetaCsvEditor,
+  resolveThemeMode,
+  useSystemTheme,
+  type ThemePreference,
+} from '@meta-csv/ui';
 import { createTauriAdapter } from './tauriAdapter';
+
+interface DesktopAppSettings {
+  theme: ThemePreference;
+  lastDirectory?: string | null;
+}
+
+function getParentDirectory(filePath: string): string {
+  const idx = Math.max(filePath.lastIndexOf('\\'), filePath.lastIndexOf('/'));
+  return idx > 0 ? filePath.slice(0, idx) : '';
+}
 
 export const App: React.FC = () => {
   const [filePath, setFilePath] = useState<string | null>(null);
-  const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark');
+  const [themePref, setThemePref] = useState<ThemePreference>('system');
+  const [lastDirectory, setLastDirectory] = useState<string | undefined>(undefined);
+  const systemTheme = useSystemTheme();
+  const resolvedTheme = resolveThemeMode(themePref, systemTheme);
 
   useEffect(() => {
+    invoke<DesktopAppSettings>('get_app_settings')
+      .then((settings) => {
+        if (
+          settings.theme === 'system' ||
+          settings.theme === 'light' ||
+          settings.theme === 'dark'
+        ) {
+          setThemePref(settings.theme);
+        }
+        if (settings.lastDirectory) {
+          setLastDirectory(settings.lastDirectory);
+        }
+      })
+      .catch(() => {
+        // Ignore when running outside Tauri
+      });
+
     invoke<string | null>('get_initial_file')
       .then((initial) => {
         if (initial) setFilePath(initial);
@@ -18,6 +53,13 @@ export const App: React.FC = () => {
       });
   }, []);
 
+  const handleThemeChange = (next: ThemePreference) => {
+    setThemePref(next);
+    invoke('update_app_settings', { theme: next }).catch(() => {
+      // Ignore when running outside Tauri
+    });
+  };
+
   const adapter = useMemo(
     () => (filePath ? createTauriAdapter(filePath) : null),
     [filePath],
@@ -26,6 +68,7 @@ export const App: React.FC = () => {
   const handleOpenFile = async () => {
     const selected = await open({
       multiple: false,
+      defaultPath: lastDirectory,
       filters: [
         { name: 'CSV / TSV', extensions: ['csv', 'tsv', 'txt'] },
         { name: 'All Files', extensions: ['*'] },
@@ -33,10 +76,17 @@ export const App: React.FC = () => {
     });
     if (typeof selected === 'string') {
       setFilePath(selected);
+      const dir = getParentDirectory(selected);
+      if (dir) {
+        setLastDirectory(dir);
+        invoke('update_app_settings', { lastDirectory: dir }).catch(() => {
+          // Ignore when running outside Tauri
+        });
+      }
     }
   };
 
-  const isDark = themeMode === 'dark';
+  const isDark = resolvedTheme === 'dark';
   const barBg = isDark ? '#18181b' : '#e2e8f0';
   const barFg = isDark ? '#f8fafc' : '#0f172a';
   const border = isDark ? '#333338' : '#cbd5e1';
@@ -91,19 +141,36 @@ export const App: React.FC = () => {
             {filePath}
           </span>
         )}
-        <div style={{ marginLeft: 'auto' }}>
-          <button
-            style={btnStyle}
-            onClick={() => setThemeMode((m) => (m === 'dark' ? 'light' : 'dark'))}
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <label
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              fontSize: 12,
+            }}
           >
-            Theme: {themeMode}
-          </button>
+            <span style={{ opacity: 0.8 }}>Theme:</span>
+            <select
+              aria-label="Theme mode"
+              value={themePref}
+              onChange={(e) => handleThemeChange(e.target.value as ThemePreference)}
+              style={{
+                ...btnStyle,
+                padding: '3px 8px',
+              }}
+            >
+              <option value="system">System ({systemTheme})</option>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select>
+          </label>
         </div>
       </header>
 
       <main style={{ flex: 1, minHeight: 0 }}>
         {adapter ? (
-          <MetaCsvEditor adapter={adapter} themeMode={themeMode} />
+          <MetaCsvEditor adapter={adapter} themeMode={resolvedTheme} />
         ) : (
           <div
             style={{

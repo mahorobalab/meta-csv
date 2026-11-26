@@ -11,6 +11,7 @@
 [![VS Code Extension](https://img.shields.io/badge/VS%20Code-Extension-007ACC?style=for-the-badge&logo=visualstudiocode&logoColor=white)](https://code.visualstudio.com/)
 [![Vite](https://img.shields.io/badge/Vite-6-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vite.dev/)
 [![pnpm](https://img.shields.io/badge/pnpm-Monorepo-F69220?style=for-the-badge&logo=pnpm&logoColor=white)](https://pnpm.io/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](LICENSE)
 
 [English](README.md) | **日本語 (Japanese)**
 
@@ -132,3 +133,23 @@ VS Code / Antigravity IDE で本リポジトリを開き **`F5`** を押すと�
 - JSON Schema: [docs/schema/metacsv.schema.json](docs/schema/metacsv.schema.json)
 - サンプルメタデータ: [docs/examples/spec_setting.csv.meta.jsonc](docs/examples/spec_setting.csv.meta.jsonc)
 - AI エージェント／開発者ガイド: [AGENTS.md](AGENTS.md)
+
+---
+
+## ダウンロード・公式ビルドについて
+
+- **公式の実行版（Windows / macOS 向けコード署名済みビルド・インストーラー）** は **Microsoft Store** および **BOOTH** にて配布（販売）予定です（*Coming Soon*）。
+- **GitHub Releases でのバイナリ配布は行いません。** 本リポジトリではソースコード、`.meta.jsonc` 仕様書、およびセルフビルド手順を公開しています。
+- ご自身でビルドして利用される場合は、以下のコマンドでデスクトップ版をビルドできます：
+
+```powershell
+pnpm.cmd install
+pnpm.cmd build:desktop
+```
+
+---
+
+## ライセンス・商標について
+
+- **ソースコードおよび仕様書**: [MIT License](LICENSE)（`Copyright (c) 2026 MahorobaLab`）のもとで公開しています。
+- **名称・アイコン等のブランド権利**: **「MetaCSV」** の名称および公式アプリアイコン・ロゴに関する権利は作者（MahorobaLab）に帰属し、MIT ライセンスの許諾範囲には含まれません。ご自身でビルドしたバイナリや改変版を再配布・公開される場合は、公式ビルドとの混同を避けるため、名称およびアイコンを変更してください。

@@ -3,3 +3,6 @@ pnpm.cmd dev
 
 # デスクトップアプリ起動 (Tauri v2)
 pnpm.cmd dev:desktop
+
+# exe ビルド
+pnpm.cmd --filter @meta-csv/desktop tauri:build

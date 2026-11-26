@@ -11,6 +11,7 @@
 [![VS Code Extension](https://img.shields.io/badge/VS%20Code-Extension-007ACC?style=for-the-badge&logo=visualstudiocode&logoColor=white)](https://code.visualstudio.com/)
 [![Vite](https://img.shields.io/badge/Vite-6-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vite.dev/)
 [![pnpm](https://img.shields.io/badge/pnpm-Monorepo-F69220?style=for-the-badge&logo=pnpm&logoColor=white)](https://pnpm.io/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](LICENSE)
 
 **English** | [日本語 (Japanese)](README_ja.md)
 
@@ -132,3 +133,23 @@ Open this repository in VS Code (or Antigravity IDE) and press **`F5`** to launc
 - JSON Schema: [docs/schema/metacsv.schema.json](docs/schema/metacsv.schema.json)
 - Example Metadata: [docs/examples/spec_setting.csv.meta.jsonc](docs/examples/spec_setting.csv.meta.jsonc)
 - Agent / Contributor Guide: [AGENTS.md](AGENTS.md)
+
+---
+
+## Download & Official Builds
+
+- **Official signed desktop builds (Windows / macOS)** will be distributed via **Microsoft Store** and **BOOTH** *(Coming Soon)*.
+- **GitHub Releases does not distribute prebuilt binaries.** This repository provides the full open-source code, `.meta.jsonc` specification, and build instructions.
+- Developers who prefer to build from source can compile the desktop executable locally:
+
+```powershell
+pnpm.cmd install
+pnpm.cmd build:desktop
+```
+
+---
+
+## License & Trademarks
+
+- **Source Code & Specification**: Licensed under the [MIT License](LICENSE) (`Copyright (c) 2026 MahorobaLab`).
+- **Trademarks & Brand Assets**: The name **"MetaCSV"** and the official application icons/logos are the property of MahorobaLab and are not covered by the MIT License. If you distribute your own builds or forks, please use a different name and icon to avoid confusion with the official builds.

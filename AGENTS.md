@@ -40,3 +40,8 @@ Note: On Windows where PowerShell execution policy restricts `.ps1`, use `pnpm.c
 - Run Tauri Desktop app (port 15174): `pnpm.cmd dev:desktop`
 - Debug VS Code extension: Press `F5` in VS Code / Antigravity IDE (`.vscode/launch.json`)
 - Rust check only: `cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml`
+
+## Completion Criteria (Definition of Completion)
+- All reported findings must include reliable "relative file paths" and "line numbers."
+- If tests or type checks have been performed, the commands used and their results must be provided.
+- Do not include speculative figures that have not been measured or verified (if a value has not been verified, label it as "not measured").

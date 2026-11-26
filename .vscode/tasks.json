@@ -6,6 +6,12 @@
       "type": "shell",
       "command": "pnpm.cmd --filter meta-csv build",
       "problemMatcher": []
+    },
+    {
+      "label": "build-desktop-exe",
+      "type": "shell",
+      "command": "pnpm.cmd build:desktop",
+      "problemMatcher": []
     }
   ]
 }

@@ -1,5 +1,39 @@
+import { useEffect, useState } from 'react';
 import type { Theme } from '@glideapps/glide-data-grid';
 import { DEFAULT_FONT_SIZE, type TableConfig } from '@meta-csv/schema';
+
+export type ThemePreference = 'system' | 'light' | 'dark';
+
+export function getSystemTheme(): 'light' | 'dark' {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return 'dark';
+  }
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+export function useSystemTheme(): 'light' | 'dark' {
+  const [systemTheme, setSystemTheme] = useState<'light' | 'dark'>(getSystemTheme);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return;
+    }
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const update = () => setSystemTheme(mq.matches ? 'dark' : 'light');
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+
+  return systemTheme;
+}
+
+export function resolveThemeMode(
+  preference: ThemePreference,
+  systemTheme: 'light' | 'dark',
+): 'light' | 'dark' {
+  return preference === 'system' ? systemTheme : preference;
+}
 
 function readCssVar(name: string): string | undefined {
   if (typeof window === 'undefined' || typeof document === 'undefined') return undefined;

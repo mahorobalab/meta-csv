@@ -1,10 +1,12 @@
 {
   "name": "meta-csv-monorepo",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "pnpm --filter @meta-csv/playground dev",
     "dev:desktop": "pnpm --filter @meta-csv/desktop tauri:dev",
+    "build:desktop": "pnpm --filter @meta-csv/desktop tauri:build",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test"

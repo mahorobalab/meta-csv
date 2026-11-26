@@ -1,5 +1,10 @@
-import React, { useMemo, useState } from 'react';
-import { MetaCsvEditor } from '@meta-csv/ui';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  MetaCsvEditor,
+  resolveThemeMode,
+  useSystemTheme,
+  type ThemePreference,
+} from '@meta-csv/ui';
 import {
   LARGE_CSV_META,
   SPEC_SETTING_CSV,
@@ -10,16 +15,53 @@ import {
 
 type PresetKey = 'spec' | 'large100k' | 'custom';
 
+const STORAGE_KEY = 'metacsv:playground-settings:v1';
+
+interface PlaygroundSettings {
+  theme: ThemePreference;
+  showMetaPanel: boolean;
+}
+
+function loadPlaygroundSettings(): PlaygroundSettings {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return { theme: 'system', showMetaPanel: true };
+    const parsed = JSON.parse(raw) as Partial<PlaygroundSettings>;
+    const theme: ThemePreference =
+      parsed.theme === 'light' || parsed.theme === 'dark' || parsed.theme === 'system'
+        ? parsed.theme
+        : 'system';
+    const showMetaPanel =
+      typeof parsed.showMetaPanel === 'boolean' ? parsed.showMetaPanel : true;
+    return { theme, showMetaPanel };
+  } catch {
+    return { theme: 'system', showMetaPanel: true };
+  }
+}
+
 export const App: React.FC = () => {
+  const initial = useMemo(() => loadPlaygroundSettings(), []);
   const [preset, setPreset] = useState<PresetKey>('spec');
-  const [themeMode, setThemeMode] = useState<'dark' | 'light'>('dark');
-  const [showMetaPanel, setShowMetaPanel] = useState(true);
+  const [themePref, setThemePref] = useState<ThemePreference>(initial.theme);
+  const [showMetaPanel, setShowMetaPanel] = useState<boolean>(initial.showMetaPanel);
   const [metaText, setMetaText] = useState<string>(SPEC_SETTING_META);
   const [customFile, setCustomFile] = useState<{
     fileName: string;
     csvBytes: Uint8Array;
     metaText: string | null;
   } | null>(null);
+
+  const systemTheme = useSystemTheme();
+  const resolvedTheme = resolveThemeMode(themePref, systemTheme);
+
+  useEffect(() => {
+    try {
+      const payload: PlaygroundSettings = { theme: themePref, showMetaPanel };
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    } catch {
+      // Ignore storage errors
+    }
+  }, [themePref, showMetaPanel]);
 
   const adapter = useMemo(() => {
     if (preset === 'spec') {
@@ -58,7 +100,7 @@ export const App: React.FC = () => {
     setPreset('custom');
   };
 
-  const isDark = themeMode === 'dark';
+  const isDark = resolvedTheme === 'dark';
   const barBg = isDark ? '#18181b' : '#e2e8f0';
   const barFg = isDark ? '#f8fafc' : '#0f172a';
   const border = isDark ? '#333338' : '#cbd5e1';
@@ -114,13 +156,30 @@ export const App: React.FC = () => {
           />
         </label>
 
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-          <button
-            style={tabBtn(false)}
-            onClick={() => setThemeMode((m) => (m === 'dark' ? 'light' : 'dark'))}
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <label
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              fontSize: 12,
+            }}
           >
-            Theme: {themeMode}
-          </button>
+            <span style={{ opacity: 0.8 }}>Theme:</span>
+            <select
+              aria-label="Theme mode"
+              value={themePref}
+              onChange={(e) => setThemePref(e.target.value as ThemePreference)}
+              style={{
+                ...tabBtn(false),
+                padding: '3px 8px',
+              }}
+            >
+              <option value="system">System ({systemTheme})</option>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select>
+          </label>
           <button
             style={tabBtn(showMetaPanel)}
             onClick={() => setShowMetaPanel((s) => !s)}
@@ -135,7 +194,7 @@ export const App: React.FC = () => {
         <div style={{ flex: 1, minWidth: 0, height: '100%' }}>
           <MetaCsvEditor
             adapter={adapter}
-            themeMode={themeMode}
+            themeMode={resolvedTheme}
             externalMetaText={metaText}
             onMetaTextChange={setMetaText}
           />

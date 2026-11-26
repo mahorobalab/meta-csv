@@ -11,6 +11,25 @@
       ],
       "outFiles": ["${workspaceFolder}/apps/vscode/dist/**/*.js"],
       "preLaunchTask": "build-vscode-extension"
+    },
+    {
+      "name": "Run MetaCSV Desktop (.exe)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "& \"${workspaceFolder}/apps/desktop/src-tauri/target/release/meta-csv-desktop.exe\""
+    },
+    {
+      "name": "Build & Run MetaCSV Desktop (.exe)",
+      "type": "node-terminal",
+      "request": "launch",
+      "preLaunchTask": "build-desktop-exe",
+      "command": "& \"${workspaceFolder}/apps/desktop/src-tauri/target/release/meta-csv-desktop.exe\""
+    },
+    {
+      "name": "Run MetaCSV Desktop (Tauri Dev)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "pnpm.cmd dev:desktop"
     }
   ]
 }
