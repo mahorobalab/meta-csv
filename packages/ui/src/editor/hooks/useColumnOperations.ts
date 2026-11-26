@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { CompactSelection, type GridSelection } from '@glideapps/glide-data-grid';
-import type { MetaCsvDocument, MetaTextFormat } from '@meta-csv/schema';
-import { patchMetaJsonc, type ParsedCsvData } from '@meta-csv/core';
+import type { MetaTextDocument, MetaTextFormat } from '@metatext-editor/schema';
+import { patchMetaJsonc, type ParsedCsvData } from '@metatext-editor/core';
 import type { CopiedColumnPayload, NativeClipboardBridge } from '../../columnClipboard';
 import type {
   EditingHeaderColState,
@@ -19,7 +19,7 @@ import { useColumnClipboard } from './useColumnClipboard';
 export interface UseColumnOperationsParams {
   csvData: ParsedCsvData | null;
   setCsvData: React.Dispatch<React.SetStateAction<ParsedCsvData | null>>;
-  meta: MetaCsvDocument;
+  meta: MetaTextDocument;
   metaTextRef: React.MutableRefObject<string | null>;
   rowsRef: React.MutableRefObject<string[][]>;
   copiedColumnRef: React.MutableRefObject<CopiedColumnPayload | null>;

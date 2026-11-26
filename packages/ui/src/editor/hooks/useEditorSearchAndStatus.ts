@@ -1,17 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { DataEditorRef, GridSelection } from '@glideapps/glide-data-grid';
-import type { MetaCsvDocument, MetaTextFormat } from '@meta-csv/schema';
+import type { MetaTextDocument, MetaTextFormat } from '@metatext-editor/schema';
 import {
   resolveCellStyle,
   searchVisibleRows,
   type ParsedCsvData,
   type SearchMatch,
-} from '@meta-csv/core';
+} from '@metatext-editor/core';
 import type { EditorStatusInfo } from '../types';
 
 export interface UseEditorSearchAndStatusParams {
   csvData: ParsedCsvData | null;
-  meta: MetaCsvDocument;
+  meta: MetaTextDocument;
   activeFormat: MetaTextFormat;
   isReadOnly: boolean;
   fileName: string;

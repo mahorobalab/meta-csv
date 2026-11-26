@@ -27,7 +27,7 @@ import {
   serializeLog,
 } from '../index';
 
-describe('@meta-csv/core', () => {
+describe('@metatext-editor/core', () => {
   it('preserves comments when patching JSONC metadata', () => {
     const original = [
       '{',
@@ -113,16 +113,16 @@ describe('@meta-csv/core', () => {
   it('supports command-based undo and redo for cells and rows', () => {
     const rows = [['hello', 'world']];
     const history = new UndoRedoHistory();
-    rows[0]![1] = 'meta-csv';
+    rows[0]![1] = 'metatext-editor';
     history.push({
       type: 'editCells',
-      changes: [{ dataRow: 0, col: 1, before: 'world', after: 'meta-csv' }],
+      changes: [{ dataRow: 0, col: 1, before: 'world', after: 'metatext-editor' }],
     });
 
     history.undo(rows);
     expect(rows[0]![1]).toBe('world');
     history.redo(rows);
-    expect(rows[0]![1]).toBe('meta-csv');
+    expect(rows[0]![1]).toBe('metatext-editor');
 
     const inserted = ['new', 'row'];
     rows.splice(1, 0, inserted);

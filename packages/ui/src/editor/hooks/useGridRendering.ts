@@ -11,7 +11,7 @@ import {
   type Item,
   type Theme,
 } from '@glideapps/glide-data-grid';
-import type { CellStyle, MetaCsvDocument, MetaTextFormat, RowMarker } from '@meta-csv/schema';
+import type { CellStyle, MetaTextDocument, MetaTextFormat, RowMarker } from '@metatext-editor/schema';
 import {
   UndoRedoHistory,
   doesCellMatchFilterTerms,
@@ -20,14 +20,14 @@ import {
   type ParsedCsvData,
   type ParsedFilterTerm,
   type SearchMatch,
-} from '@meta-csv/core';
+} from '@metatext-editor/core';
 import { buildGridTheme } from '../../theme';
 import { MARKER_PALETTE } from '../../MarkerControls';
 import { computeNextCellPosition, type CellMoveDirection } from '../utils/cellNavigationUtils';
 
 export interface UseGridRenderingParams {
   csvData: ParsedCsvData | null;
-  meta: MetaCsvDocument;
+  meta: MetaTextDocument;
   themeMode: 'light' | 'dark';
   activeFormat: MetaTextFormat;
   isReadOnly: boolean;

@@ -594,5 +594,5 @@ pub fn run() {
             write_clipboard_html
         ])
         .run(tauri::generate_context!())
-        .expect("error while running MetaCSV desktop application");
+        .expect("error while running MetaText Editor desktop application");
 }

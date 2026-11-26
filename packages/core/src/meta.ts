@@ -5,7 +5,7 @@ import {
   type ConditionalRule,
   type MetaTextDocument,
   type StyleRef,
-} from '@meta-csv/schema';
+} from '@metatext-editor/schema';
 
 export function parseMetaJsonc(text: string | null): MetaTextDocument {
   if (!text || text.trim().length === 0) {

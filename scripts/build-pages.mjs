@@ -13,7 +13,7 @@ const outDir = path.join(rootDir, 'dist-pages');
 
 if (!fs.existsSync(path.join(appDistDir, 'index.html'))) {
   throw new Error(
-    `Missing built Web/Playground bundle at ${appDistDir}. Run "pnpm --filter @meta-csv/playground build" first.`,
+    `Missing built Web/Playground bundle at ${appDistDir}. Run "pnpm --filter @metatext-editor/playground build" first.`,
   );
 }
 

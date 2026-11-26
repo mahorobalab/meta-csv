@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { MetaTextFormat } from '@meta-csv/schema';
+import type { MetaTextFormat } from '@metatext-editor/schema';
 
 export interface EditorStatusBarProps {
   isDark: boolean;

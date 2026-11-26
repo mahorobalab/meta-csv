@@ -1,13 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, Code2, ExternalLink, FileSpreadsheet } from 'lucide-react';
 import {
-  MetaCsvEditor,
+  MetaTextEditor,
   resolveThemeMode,
   useSystemTheme,
   type EditorAppSettings,
   type EditorStatusInfo,
   type ThemePreference,
-} from '@meta-csv/ui';
+} from '@metatext-editor/ui';
 import {
   APP_LOG,
   APP_LOG_META,
@@ -23,7 +23,7 @@ import {
 
 type PresetKey = 'spec' | 'jsonl' | 'log' | 'large100k' | 'new' | 'custom';
 
-const STORAGE_KEY = 'metacsv:playground-settings:v1';
+const STORAGE_KEY = 'metatext:playground-settings:v1';
 
 interface PlaygroundSettings extends EditorAppSettings {
   theme: ThemePreference;
@@ -288,7 +288,7 @@ export const App: React.FC = () => {
       />
 
       <div style={{ flex: 1, minWidth: 0, height: '100%' }}>
-        <MetaCsvEditor
+        <MetaTextEditor
           adapter={adapter}
           hostMode="web"
           themeMode={resolvedTheme}

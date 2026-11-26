@@ -1,4 +1,4 @@
-import type { CellStyle, ColumnAlign } from '@meta-csv/schema';
+import type { CellStyle, ColumnAlign } from '@metatext-editor/schema';
 
 export interface NativeClipboardBridge {
   readText: () => Promise<string>;

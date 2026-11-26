@@ -24,14 +24,14 @@ MetaCSV の開発を通じて確立したアーキテクチャ（Tauri + Web Wor
 
 - **仕様リポジトリ**: `metatext-spec`（ドキュメント・JSON Schema v0.1・形式別サンプルのみ）
   - 公式 Schema URL 予定: `https://mahorobalab.github.io/metatext-spec/schemas/v0.1/metatext.schema.json`
-- **アプリモノレポ**: `meta-csv`（将来 `metatext-editor` / `@metatext/*` への整理を計画）
+- **アプリモノレポ**: `metatext-editor`（将来 `metatext-editor` / `@metatext/*` への整理を計画）
   - [`scripts/sync-schema.mjs`](../../scripts/sync-schema.mjs)（`pnpm.cmd run sync:schema`）により、`../metatext-spec/schemas/v0.1/metatext.schema.json` を `docs/schema/metatext.schema.json` および `apps/vscode/schemas/metatext.schema.json` へ同期する（仕様リポジトリを Single Source of Truth とする）。
 
 ```mermaid
 flowchart LR
   Spec["仕様リポジトリ (metatext-spec)<br/>SPEC.md / metatext.schema.json / examples"]
   Sync["scripts/sync-schema.mjs<br/>(pnpm.cmd run sync:schema)"]
-  App["統合アプリモノレポ<br/>MetaText Editor (現 meta-csv)<br/>Desktop / VS Code / Web"]
+  App["統合アプリモノレポ<br/>MetaText Editor (現 metatext-editor)<br/>Desktop / VS Code / Web"]
   CSV["CSV / TSV 編集<br/>(Phase A 移行済)"]
   JSONL[".jsonl 自動列展開<br/>(Phase B1 最優先)"]
   Log[".log 正規表現分割<br/>(Phase B2 後続)"]
@@ -111,7 +111,7 @@ flowchart LR
 ## 4. プロダクト名称・モノレポ方針
 
 - **プロダクト方向性**: MetaCSV とログ・JSONL 機能を分けず、統合アプリ **`MetaText Editor`** として展開する。
-- **モノレポ構成**: 共通パッケージ（現 `@meta-csv/*` → 将来 `@metatext/*`、リポジトリ名も将来的に `metatext-editor` へ整理可能）の中で Desktop / VS Code / Web を一貫して保守する。
+- **モノレポ構成**: 共通パッケージ（現 `@metatext-editor/*` → 将来 `@metatext/*`、リポジトリ名も将来的に `metatext-editor` へ整理可能）の中で Desktop / VS Code / Web を一貫して保守する。
 
 ---
 
@@ -128,11 +128,11 @@ flowchart LR
 ### Phase A: `.metatext.jsonc` 仕様統一 ＆ 移行（完了）
 - [x] 仕様リポジトリ `metatext-spec` の構築（`schemas/v0.1/metatext.schema.json`, `SPEC.md`, `README*`, CSV/TSV/Log サンプル）
 - [x] `scripts/sync-schema.mjs`（`pnpm.cmd run sync:schema`）によるアプリ側スキーマ自動同期
-- [x] `@meta-csv/schema` の `MetaTextDocument`（`format`, `readOnly`, `log`, `extensions`, `x-*`）拡張
+- [x] `@metatext-editor/schema` の `MetaTextDocument`（`format`, `readOnly`, `log`, `extensions`, `x-*`）拡張
 - [x] Desktop / VS Code / Web / UI / ドキュメント・LP の `.metatext.jsonc` 完全移行と全テスト・ビルド通過
 
 ### Phase B1: JSONL 自動列展開 ＆ Read-Only 制御（実装・検証完了）
-- [x] `metatext-spec` と `@meta-csv/schema` に `jsonl` 設定ブロック（`flattenDepth`, `arrayMode`, `encoding`, `lineEnding`）と JSONL サンプルを追加・同期
+- [x] `metatext-spec` と `@metatext-editor/schema` に `jsonl` 設定ブロック（`flattenDepth`, `arrayMode`, `encoding`, `lineEnding`）と JSONL サンプルを追加・同期
 - [x] `packages/core` に `parseJsonlBytes()`（全行キースキャン＋ドット連結フラット化＋非破壊シリアライズ）を実装し単体テストを追加
 - [x] `packages/ui` に `Read-Only` デフォルトロック表示／`Unlock Editing` 解除トグルを実装
 - [x] Web Worker・Desktop（ファイル選択 `*.jsonl`）・VS Code (`customEditors`)・Web Playground（サンプル JSONL 追加）へ組み込み

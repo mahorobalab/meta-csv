@@ -1,6 +1,6 @@
 import React from 'react';
-import type { MetaTextFormat } from '@meta-csv/schema';
-import type { ParseProgress } from '@meta-csv/core';
+import type { MetaTextFormat } from '@metatext-editor/schema';
+import type { ParseProgress } from '@metatext-editor/core';
 
 export interface LoadingProgressOverlayProps {
   loadingProgress: ParseProgress;

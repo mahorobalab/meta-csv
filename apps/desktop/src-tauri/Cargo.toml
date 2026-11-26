@@ -6,7 +6,7 @@ authors = ["MahorobaLab"]
 edition = "2021"
 
 [lib]
-name = "meta_csv_desktop_lib"
+name = "metatext_editor_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

@@ -4,11 +4,11 @@ import {
   type DataEditorRef,
   type GridSelection,
 } from '@glideapps/glide-data-grid';
-import type { ParsedCsvData } from '@meta-csv/core';
-import type { EditorViewSnapshot, MetaCsvEditorHandle } from '../types';
+import type { ParsedCsvData } from '@metatext-editor/core';
+import type { EditorViewSnapshot, MetaTextEditorHandle } from '../types';
 
 export interface UseViewSnapshotRestoreParams {
-  ref: React.ForwardedRef<MetaCsvEditorHandle>;
+  ref: React.ForwardedRef<MetaTextEditorHandle>;
   csvData: ParsedCsvData | null;
   visibleColCount: number;
   viewRowCount: number;

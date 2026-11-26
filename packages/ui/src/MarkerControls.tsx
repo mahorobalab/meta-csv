@@ -7,7 +7,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import type { MarkerColor, RowMarker } from '@meta-csv/schema';
+import type { MarkerColor, RowMarker } from '@metatext-editor/schema';
 
 export const MARKER_COLORS: MarkerColor[] = ['amber', 'rose', 'emerald', 'sky', 'violet'];
 

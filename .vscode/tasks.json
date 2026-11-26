@@ -4,9 +4,9 @@
     {
       "label": "build-vscode-extension",
       "type": "shell",
-      "command": "pnpm --filter meta-csv build",
+      "command": "pnpm --filter metatext-editor build",
       "windows": {
-        "command": "pnpm.cmd --filter meta-csv build"
+        "command": "pnpm.cmd --filter metatext-editor build"
       },
       "problemMatcher": []
     },

@@ -1,10 +1,10 @@
 export {
-  MetaCsvEditor,
+  MetaTextEditor,
   type EditorStatusInfo,
   type EditorViewSnapshot,
-  type MetaCsvEditorHandle,
-  type MetaCsvEditorProps,
-} from './MetaCsvEditor';
+  type MetaTextEditorHandle,
+  type MetaTextEditorProps,
+} from './MetaTextEditor';
 export type { NativeClipboardBridge } from './columnClipboard';
 export {
   SettingsModal,

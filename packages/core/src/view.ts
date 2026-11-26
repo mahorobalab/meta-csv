@@ -1,4 +1,4 @@
-import type { SortSpec } from '@meta-csv/schema';
+import type { SortSpec } from '@metatext-editor/schema';
 
 function isNumericColumn(rows: string[][], colIdx: number): boolean {
   const limit = Math.min(rows.length, 64);

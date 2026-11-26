@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import {
-  MetaCsvEditor,
+  MetaTextEditor,
   type EditorAppSettings,
-  type MetaCsvEditorHandle,
-} from '@meta-csv/ui';
+  type MetaTextEditorHandle,
+} from '@metatext-editor/ui';
 import { createVsCodeAdapter } from './vscodeAdapter';
 
 const VsCodeApp: React.FC = () => {
@@ -19,7 +19,7 @@ const VsCodeApp: React.FC = () => {
     updateSettings,
     openSettings,
   } = useMemo(() => createVsCodeAdapter(), []);
-  const editorRef = useRef<MetaCsvEditorHandle | null>(null);
+  const editorRef = useRef<MetaTextEditorHandle | null>(null);
   const [themeMode, setThemeMode] = useState<'light' | 'dark'>(() =>
     document.body.classList.contains('vscode-light') ? 'light' : 'dark',
   );
@@ -57,7 +57,7 @@ const VsCodeApp: React.FC = () => {
 
   return (
     <div style={{ width: '100vw', height: '100vh', overflow: 'hidden' }}>
-      <MetaCsvEditor
+      <MetaTextEditor
         ref={editorRef}
         adapter={adapter}
         hostMode="vscode"

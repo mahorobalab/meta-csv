@@ -5,11 +5,11 @@ import type {
   CellStyle,
   ConditionalRule,
   MarkerColor,
-  MetaCsvDocument,
+  MetaTextDocument,
   MetaTextFormat,
   RowMarker,
-} from '@meta-csv/schema';
-import type { ParsedCsvData, resolveCellStyle } from '@meta-csv/core';
+} from '@metatext-editor/schema';
+import type { ParsedCsvData, resolveCellStyle } from '@metatext-editor/core';
 import type { EditorHostMode } from '../../SettingsAboutDialogs';
 import { MarkerControls } from '../../MarkerControls';
 import { EditorSearchBox } from './EditorSearchBox';
@@ -33,7 +33,7 @@ export interface EditorToolbarProps {
   isReadOnly: boolean;
   dirtyCsv: boolean;
   csvData: ParsedCsvData | null;
-  meta: MetaCsvDocument;
+  meta: MetaTextDocument;
   rows: string[][];
   canUndo: boolean;
   canRedo: boolean;

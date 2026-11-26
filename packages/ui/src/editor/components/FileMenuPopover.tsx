@@ -1,6 +1,6 @@
 import React from 'react';
 import { FilePlus, FolderOpen, Redo2, Save, SaveAll, Undo2, X } from 'lucide-react';
-import type { MetaTextFormat } from '@meta-csv/schema';
+import type { MetaTextFormat } from '@metatext-editor/schema';
 import type { EditorHostMode } from '../../SettingsAboutDialogs';
 
 export interface FileMenuPopoverProps {

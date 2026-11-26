@@ -7,8 +7,8 @@ import {
   Layers,
   X,
 } from 'lucide-react';
-import type { FilterPreset } from '@meta-csv/schema';
-import { computeColumnFacets } from '@meta-csv/core';
+import type { FilterPreset } from '@metatext-editor/schema';
+import { computeColumnFacets } from '@metatext-editor/core';
 import { useInputHistory } from './useInputHistory';
 
 export interface FilterColumnOption {
@@ -65,7 +65,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   const [showPresets, setShowPresets] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [presetName, setPresetName] = useState('');
-  const history = useInputHistory('metacsv.filterHistory');
+  const history = useInputHistory('metatext.filterHistory');
 
   // Auto-record valid filter queries after user pauses typing (1.5s)
   useEffect(() => {

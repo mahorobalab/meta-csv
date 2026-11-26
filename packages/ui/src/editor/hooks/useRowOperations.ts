@@ -5,8 +5,8 @@ import {
   type GridSelection,
   type Item,
 } from '@glideapps/glide-data-grid';
-import type { MetaCsvDocument, RowMarker } from '@meta-csv/schema';
-import { patchMetaJsonc, type ParsedCsvData } from '@meta-csv/core';
+import type { MetaTextDocument, RowMarker } from '@metatext-editor/schema';
+import { patchMetaJsonc, type ParsedCsvData } from '@metatext-editor/core';
 import {
   readClipboardForRowPaste,
   writeRowsToClipboard,
@@ -24,7 +24,7 @@ import { isContiguousIndices, makeUniqueColumnKey } from '../utils/rowOrderUtils
 export interface UseRowOperationsParams {
   csvData: ParsedCsvData | null;
   setCsvData: React.Dispatch<React.SetStateAction<ParsedCsvData | null>>;
-  meta: MetaCsvDocument;
+  meta: MetaTextDocument;
   metaTextRef: React.MutableRefObject<string | null>;
   rowsRef: React.MutableRefObject<string[][]>;
   copiedRowsRef: React.MutableRefObject<CopiedRowsPayload | null>;

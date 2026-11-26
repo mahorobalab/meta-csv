@@ -3,7 +3,7 @@ import type {
   JsonlParserConfig,
   LogParserConfig,
   MetaTextFormat,
-} from '@meta-csv/schema';
+} from '@metatext-editor/schema';
 import {
   estimateColumnWidths,
   parseCsvBytes,
@@ -11,7 +11,7 @@ import {
   parseLogBytes,
   type ParseProgress,
   type ParsedCsvData,
-} from '@meta-csv/core';
+} from '@metatext-editor/core';
 
 export interface ParseWorkerRequest {
   id: number;

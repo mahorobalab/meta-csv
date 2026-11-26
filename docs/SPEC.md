@@ -35,7 +35,7 @@ UI とコアロジックを Web 標準技術（TypeScript + React + Vite）で�
 ## 3. モノレポ構成案
 
 ```text
-meta-csv/
+metatext-editor/
 ├── package.json
 ├── pnpm-workspace.yaml
 ├── packages/

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'metacsv-web-v5';
+const CACHE_NAME = 'metatext-web-v5';
 const APP_SHELL = [
   './',
   './index.html',
@@ -22,7 +22,7 @@ self.addEventListener('activate', (event) => {
       .then((keys) =>
         Promise.all(
           keys
-            .filter((key) => key.startsWith('metacsv-web-') && key !== CACHE_NAME)
+            .filter((key) => key.startsWith('metatext-web-') && key !== CACHE_NAME)
             .map((key) => caches.delete(key)),
         ),
       )

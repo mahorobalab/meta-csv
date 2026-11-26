@@ -1,5 +1,5 @@
 {
-  "name": "@meta-csv/desktop",
+  "name": "@metatext-editor/desktop",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -12,9 +12,9 @@
     "test": "echo \"no tests in desktop\""
   },
   "dependencies": {
-    "@meta-csv/core": "workspace:*",
-    "@meta-csv/schema": "workspace:*",
-    "@meta-csv/ui": "workspace:*",
+    "@metatext-editor/core": "workspace:*",
+    "@metatext-editor/schema": "workspace:*",
+    "@metatext-editor/ui": "workspace:*",
     "@tauri-apps/api": "^2.5.0",
     "@tauri-apps/plugin-dialog": "^2.2.1",
     "lucide-react": "^1.79.0",

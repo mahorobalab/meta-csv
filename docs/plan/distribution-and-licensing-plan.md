@@ -24,9 +24,9 @@ MetaCSV は **「ソースコードとフォーマット仕様はオープンソ
 | 用途 | 表記 | 備考 |
 | --- | --- | --- |
 | プロダクト表示名・ロゴ | **MetaCSV** | タイトル・UI・ストア表記はパスカルケース |
-| GitHub リポジトリ名 | `meta-csv` | ケバブケースで視認性・検索性を確保 |
-| 独自ドメイン候補 | `meta-csv.dev` / `meta-csv.app` | リポジトリ名と完全一致 |
-| VS Code 拡張機能 ID | `<publisher>.meta-csv` | Marketplace 標準命名 |
+| GitHub リポジトリ名 | `metatext-editor` | ケバブケースで視認性・検索性を確保 |
+| 独自ドメイン候補 | `metatext-editor.dev` / `metatext-editor.app` | リポジトリ名と完全一致 |
+| VS Code 拡張機能 ID | `<publisher>.metatext-editor` | Marketplace 標準命名 |
 | サイドカー拡張子 | `.meta.jsonc` | 例: `spec_setting.csv.meta.jsonc` |
 
 ### 2.2 サイドカー拡張子を `.meta.jsonc` とする理由
@@ -41,11 +41,11 @@ MetaCSV は **「ソースコードとフォーマット仕様はオープンソ
 | --- | --- | --- |
 | 日本（J-PlatPat） | `MetaCSV`（商標・特許・意匠） | **0 件（クリア）** |
 | 米国（USPTO） | `MetaCSV` / `"Meta CSV"`（Status: Live, Class: 009 / 042） | **0 件（クリア）** |
-| ドメイン | `meta-csv.dev` 等 | 空き確認済み |
+| ドメイン | `metatext-editor.dev` 等 | 空き確認済み |
 
 > **公開前の追加確認項目**
 > - [ ] GitHub 上で同名・同機能の既存リポジトリ重複がないか最終確認
-> - [ ] VS Code Marketplace / npm で `meta-csv` / `@meta-csv/*` の重複確認
+> - [ ] VS Code Marketplace / npm で `metatext-editor` / `@metatext-editor/*` の重複確認
 
 ---
 
@@ -93,16 +93,16 @@ MetaCSV は **「ソースコードとフォーマット仕様はオープンソ
 
 | チャネル | 役割 | 価格 | 配布物・特徴 |
 | --- | --- | --- | --- |
-| **GitHub (`mahorobalab/meta-csv`)** | 信頼の土台・仕様公開・開発拠点 | 無料（OSS） | ソースコード、`docs/SPEC.md`、JSON Schema、セルフビルド手順。<br>**※ GitHub Releases でのバイナリ配布は行わない。** |
-| **GitHub Pages（Web / PWA ＋ LP）** | 公式サイト・お試しアプリ・ポリシー・スキーマ配信 | 無料 | 1 つの GitHub Pages 内でパス分割して運用（詳細は 4.1）。Wasm 不要・完全オフライン動作。将来独自ドメイン（`meta-csv.dev` 等）へそのまま移行可能。 |
+| **GitHub (`mahorobalab/metatext-editor`)** | 信頼の土台・仕様公開・開発拠点 | 無料（OSS） | ソースコード、`docs/SPEC.md`、JSON Schema、セルフビルド手順。<br>**※ GitHub Releases でのバイナリ配布は行わない。** |
+| **GitHub Pages（Web / PWA ＋ LP）** | 公式サイト・お試しアプリ・ポリシー・スキーマ配信 | 無料 | 1 つの GitHub Pages 内でパス分割して運用（詳細は 4.1）。Wasm 不要・完全オフライン動作。将来独自ドメイン（`metatext-editor.dev` 等）へそのまま移行可能。 |
 | **VS Code / Open VSX Marketplace** | 開発者向け集客・普及エンジン | 無料 | `.vsix` 拡張機能（VS Code Marketplace ＋ Antigravity / Cursor 等向け Open VSX）。IDE 内で `.meta.jsonc` の体験を広げ、単体デスクトップ版のファンを増やす。 |
 | **Microsoft Store / BOOTH** | 収益化・公式製品版配布 | 有料 | Windows（MSIX / 署名済み `.exe`）・macOS（Universal `.dmg` 等）の公式ビルド。自動アップデート・動作確認済み。 |
 
 ### 4.1 GitHub Pages URL・ディレクトリ分割構成（採用方針）
-Web 版・製品 LP・MS Store 審査用ページ・JSON Schema 配信を 1 つの GitHub Pages（`https://mahorobalab.github.io/meta-csv/`）内でパス分割して運用する：
+Web 版・製品 LP・MS Store 審査用ページ・JSON Schema 配信を 1 つの GitHub Pages（`https://mahorobalab.github.io/metatext-editor/`）内でパス分割して運用する：
 
 ```text
-https://mahorobalab.github.io/meta-csv/
+https://mahorobalab.github.io/metatext-editor/
 ├── /                    ← 製品トップページ（LP：概要・デモ導線・MS Store / BOOTH / VS Code 拡張リンク）
 ├── /app/                ← Web / PWA アプリ本体（apps/playground を Web 版としてビルド、PWA スコープを隔離）
 ├── /schema/             ← metacsv.schema.json の公式配信 URL（.meta.jsonc の "$schema" 参照先）
@@ -113,11 +113,11 @@ https://mahorobalab.github.io/meta-csv/
   - PWA の Service Worker スコープを `/app/` に閉じられるため、LP やポリシーページの更新と干渉しない。
   - Microsoft Store・VS Code Marketplace が求める「ホームページ URL」「プライバシーポリシー URL」をすべてここで完結できる。
   - `.meta.jsonc` 先頭の `"$schema"` が実在する公開 URL として機能し、拡張機能なしの VS Code でも JSON Schema 補完が効く。
-  - 将来独自ドメイン（例: `https://meta-csv.dev/`）を割り当てた際も、同じパス構造でシームレスに移行できる。
+  - 将来独自ドメイン（例: `https://metatext-editor.dev/`）を割り当てた際も、同じパス構造でシームレスに移行できる。
 
 **モノレポ内の配置方針**:
 - `apps/site/`（または `docs/site/`）: `/`（LP）および `/privacy/` の軽量静的ページ
-- `apps/playground/`（将来 `apps/web/` へ整理も可）: Vite の `base` を `/meta-csv/app/`（独自ドメイン時は `/app/`）に設定してビルド
+- `apps/playground/`（将来 `apps/web/` へ整理も可）: Vite の `base` を `/metatext-editor/app/`（独自ドメイン時は `/app/`）に設定してビルド
 - `docs/schema/metacsv.schema.json`: Pages ビルド時に `/schema/` へ自動コピー
 
 ### 4.2 VS Code / Open VSX Marketplace 向け構成
@@ -174,7 +174,7 @@ apps/vscode/
 - [ ] 公式アプリアイコンの制作と `apps/desktop/src-tauri/icons/` および `apps/vscode/assets/` への組み込み
 
 ### Phase 2: GitHub 公開 & CI 構築
-- [x] 変更の整理・コミットおよび GitHub リポジトリ `mahorobalab/meta-csv` への初回 Push
+- [x] 変更の整理・コミットおよび GitHub リポジトリ `mahorobalab/metatext-editor` への初回 Push
 - [x] GitHub Actions（`ci.yml`: テスト・型チェック・ビルド検証）の追加
 
 ### Phase 3: 普及チャネル展開（無料）
@@ -191,7 +191,7 @@ apps/vscode/
 
 ## 7. 未決事項（オーナー確認ポイント）
 
-1. **ドメイン取得タイミング**: まずは `https://mahorobalab.github.io/meta-csv/` で公開し、反響を見てから `meta-csv.dev` 等へ切り替えるか、最初から独自ドメインを取るか？
+1. **ドメイン取得タイミング**: まずは `https://mahorobalab.github.io/metatext-editor/` で公開し、反響を見てから `metatext-editor.dev` 等へ切り替えるか、最初から独自ドメインを取るか？
 2. **有料版と OSS 版の差分方針**:
    - **完全同一コード（ビルド販売型）**: 機能差なし。署名済み・自動更新・インストーラーの利便性で課金（推奨・最もクリーン）。
    - **オープンコア型**: 将来的に一部高度な機能のみ製品版に限定するか。

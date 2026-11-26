@@ -19,15 +19,15 @@ import {
   type ConditionalRule,
   type FilterPreset,
   type MarkerColor,
-  type MetaCsvDocument,
+  type MetaTextDocument,
   type MetaTextFormat,
   type SortSpec,
-} from '@meta-csv/schema';
+} from '@metatext-editor/schema';
 import {
   UndoRedoHistory,
   type ParseProgress,
   type ParsedCsvData,
-} from '@meta-csv/core';
+} from '@metatext-editor/core';
 import { FilterBar } from './FilterBar';
 import { AboutModal, SettingsModal } from './SettingsAboutDialogs';
 import { ConditionalRulesModal } from './ConditionalRulesModal';
@@ -38,8 +38,8 @@ import type {
   EditingHeaderColState,
   EditorViewSnapshot,
   HeaderContextMenuState,
-  MetaCsvEditorHandle,
-  MetaCsvEditorProps,
+  MetaTextEditorHandle,
+  MetaTextEditorProps,
   PendingDeleteColState,
   PendingDeleteRowsState,
   PendingHideColState,
@@ -78,12 +78,12 @@ import { EditorConfirmDialogs } from './editor/components/EditorConfirmDialogs';
 export type {
   EditorStatusInfo,
   EditorViewSnapshot,
-  MetaCsvEditorHandle,
-  MetaCsvEditorProps,
+  MetaTextEditorHandle,
+  MetaTextEditorProps,
 } from './editor/types';
 
-export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditorProps>(
-  function MetaCsvEditor(
+export const MetaTextEditor = React.forwardRef<MetaTextEditorHandle, MetaTextEditorProps>(
+  function MetaTextEditor(
     {
       adapter,
       hostMode = 'web',
@@ -115,7 +115,7 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
   ) {
   const [fileName, setFileName] = useState<string>('');
   const [csvData, setCsvData] = useState<ParsedCsvData | null>(null);
-  const [meta, setMeta] = useState<MetaCsvDocument>({ version: '0.1' });
+  const [meta, setMeta] = useState<MetaTextDocument>({ version: '0.1' });
   const [activeFormat, setActiveFormat] = useState<MetaTextFormat>('csv');
   const [isReadOnly, setIsReadOnly] = useState<boolean>(false);
   const [autoWidths, setAutoWidths] = useState<number[]>([]);
@@ -243,7 +243,7 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
 
   // Search state
   const [searchQuery, setSearchQuery] = useState(initialViewSnapshot?.searchQuery ?? '');
-  const searchHistory = useInputHistory('metacsv.searchHistory');
+  const searchHistory = useInputHistory('metatext.searchHistory');
 
   useEffect(() => {
     const trimmed = searchQuery.trim();

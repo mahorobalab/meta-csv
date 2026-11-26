@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
-import type { MetaCsvDocument } from '@meta-csv/schema';
-import { patchMetaJsonc, type ParsedCsvData } from '@meta-csv/core';
+import type { MetaTextDocument } from '@metatext-editor/schema';
+import { patchMetaJsonc, type ParsedCsvData } from '@metatext-editor/core';
 import {
   readClipboardForColumnPaste,
   writeColumnsToClipboard,
@@ -13,7 +13,7 @@ import { makeUniqueColumnKey } from '../utils/rowOrderUtils';
 export interface UseColumnClipboardParams {
   csvData: ParsedCsvData | null;
   setCsvData: React.Dispatch<React.SetStateAction<ParsedCsvData | null>>;
-  meta: MetaCsvDocument;
+  meta: MetaTextDocument;
   metaTextRef: React.MutableRefObject<string | null>;
   rowsRef: React.MutableRefObject<string[][]>;
   copiedColumnRef: React.MutableRefObject<CopiedColumnPayload | null>;

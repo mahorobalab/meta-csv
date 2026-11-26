@@ -5,12 +5,12 @@ import {
   type GridSelection,
   type Item,
 } from '@glideapps/glide-data-grid';
-import type { CellStyle, MetaCsvDocument } from '@meta-csv/schema';
+import type { CellStyle, MetaTextDocument } from '@metatext-editor/schema';
 import {
   patchMetaJsonc,
   resolveCellStyle,
   type ParsedCsvData,
-} from '@meta-csv/core';
+} from '@metatext-editor/core';
 import type { NativeClipboardBridge } from '../../columnClipboard';
 import type {
   CellContextMenuState,
@@ -34,7 +34,7 @@ import { makeUniqueColumnKey } from '../utils/rowOrderUtils';
 export interface UseCellOperationsParams {
   csvData: ParsedCsvData | null;
   setCsvData: React.Dispatch<React.SetStateAction<ParsedCsvData | null>>;
-  meta: MetaCsvDocument;
+  meta: MetaTextDocument;
   metaTextRef: React.MutableRefObject<string | null>;
   rowsRef: React.MutableRefObject<string[][]>;
   copiedCellsRef: React.MutableRefObject<CopiedCellsPayload | null>;

@@ -4,7 +4,7 @@ import type {
   JsonlParserConfig,
   LogParserConfig,
   MetaTextFormat,
-} from '@meta-csv/schema';
+} from '@metatext-editor/schema';
 import {
   estimateColumnWidths,
   parseCsvBytes,
@@ -12,7 +12,7 @@ import {
   parseLogBytes,
   type ParseProgress,
   type ParsedCsvData,
-} from '@meta-csv/core';
+} from '@metatext-editor/core';
 import CsvWorker from './csvWorker?worker&inline';
 import type { ParseWorkerRequest, ParseWorkerResponse } from './csvWorker';
 

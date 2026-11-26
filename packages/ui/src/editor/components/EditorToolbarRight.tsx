@@ -1,6 +1,6 @@
 import React from 'react';
 import { FileText, Info, Lock, Settings, Unlock } from 'lucide-react';
-import type { MetaTextFormat } from '@meta-csv/schema';
+import type { MetaTextFormat } from '@metatext-editor/schema';
 import { ZebraRowsIcon } from '../../icons/ZebraRowsIcon';
 
 export interface EditorToolbarRightProps {

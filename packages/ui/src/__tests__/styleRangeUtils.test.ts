@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { RangeStyleRule } from '@meta-csv/schema';
+import type { RangeStyleRule } from '@metatext-editor/schema';
 import {
   didUpdaterClearAnyProperty,
   getOverlappingRangeStyle,

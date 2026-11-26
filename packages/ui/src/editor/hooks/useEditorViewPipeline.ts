@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { MetaCsvDocument, MetaTextFormat } from '@meta-csv/schema';
+import type { MetaTextDocument, MetaTextFormat } from '@metatext-editor/schema';
 import {
   applyViewFilter,
   buildDefaultHighlightRules,
@@ -8,7 +8,7 @@ import {
   indexToExcelColumn,
   type ParsedCsvData,
   type ParsedFilterTerm,
-} from '@meta-csv/core';
+} from '@metatext-editor/core';
 import type { FilterColumnOption } from '../../FilterBar';
 import {
   appendRowsToOrderArray,
@@ -18,7 +18,7 @@ import {
 
 export interface UseEditorViewPipelineParams {
   csvData: ParsedCsvData | null;
-  meta: MetaCsvDocument;
+  meta: MetaTextDocument;
   activeFormat: MetaTextFormat;
   themeMode: 'light' | 'dark';
   noHeaderColumnStyle?: 'excel' | 'numbered';

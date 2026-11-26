@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from 'react';
 import type { GridSelection } from '@glideapps/glide-data-grid';
-import type { CellStyle, MetaCsvDocument, RangeStyleRule } from '@meta-csv/schema';
-import { parseRangeRef, patchMetaJsonc, resolveStyleRef, type ParsedCsvData } from '@meta-csv/core';
+import type { CellStyle, MetaTextDocument, RangeStyleRule } from '@metatext-editor/schema';
+import { parseRangeRef, patchMetaJsonc, resolveStyleRef, type ParsedCsvData } from '@metatext-editor/core';
 import {
   didUpdaterClearAnyProperty,
   getOverlappingRangeStyle,
@@ -11,7 +11,7 @@ import {
 
 export interface UseStyleActionsParams {
   csvData: ParsedCsvData | null;
-  meta: MetaCsvDocument;
+  meta: MetaTextDocument;
   metaTextRef: React.MutableRefObject<string | null>;
   selection: GridSelection;
   visibleColIndices: number[];

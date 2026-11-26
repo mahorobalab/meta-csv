@@ -1,4 +1,4 @@
-import type { CsvFilePayload, FileSystemAdapter } from '@meta-csv/core';
+import type { CsvFilePayload, FileSystemAdapter } from '@metatext-editor/core';
 
 export const SPEC_SETTING_CSV = [
   'A-9,MH-TranStroke,履歴・プリセット,プリセット,PresetSlotsAndLauncher,プリセット保存・切替（最大4スロット）・プリセット通知＆ランチャー',

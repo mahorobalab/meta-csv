@@ -1,5 +1,5 @@
-import type { CsvFilePayload, FileSystemAdapter } from '@meta-csv/core';
-import type { EditorAppSettings, EditorStatusInfo } from '@meta-csv/ui';
+import type { CsvFilePayload, FileSystemAdapter } from '@metatext-editor/core';
+import type { EditorAppSettings, EditorStatusInfo } from '@metatext-editor/ui';
 
 interface VsCodeApi {
   postMessage(message: unknown): void;

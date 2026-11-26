@@ -1,5 +1,5 @@
 {
-  "name": "@meta-csv/playground",
+  "name": "@metatext-editor/playground",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -11,9 +11,9 @@
     "test": "echo \"no tests in playground\""
   },
   "dependencies": {
-    "@meta-csv/core": "workspace:*",
-    "@meta-csv/schema": "workspace:*",
-    "@meta-csv/ui": "workspace:*",
+    "@metatext-editor/core": "workspace:*",
+    "@metatext-editor/schema": "workspace:*",
+    "@metatext-editor/ui": "workspace:*",
     "lucide-react": "^1.79.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"

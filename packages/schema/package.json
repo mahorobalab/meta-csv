@@ -1,5 +1,5 @@
 {
-  "name": "@meta-csv/schema",
+  "name": "@metatext-editor/schema",
   "version": "0.1.0",
   "private": true,
   "type": "module",

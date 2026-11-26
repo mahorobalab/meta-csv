@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo } from 'react';
 import type { GridMouseEventArgs } from '@glideapps/glide-data-grid';
-import type { MetaCsvDocument, MetaTextFormat } from '@meta-csv/schema';
+import type { MetaTextDocument, MetaTextFormat } from '@metatext-editor/schema';
 import {
   estimateAutoRowHeight,
   patchMetaJsonc,
   resolveCellStyle,
   type ParsedCsvData,
-} from '@meta-csv/core';
+} from '@metatext-editor/core';
 
 const AUTO_ROW_HEIGHT_ROW_LIMIT = 20_000;
 
@@ -30,7 +30,7 @@ export interface RowResizeDragState {
 
 export interface UseRowHeightParams {
   csvData: ParsedCsvData | null;
-  meta: MetaCsvDocument;
+  meta: MetaTextDocument;
   metaTextRef: React.MutableRefObject<string | null>;
   rowsRef: React.MutableRefObject<string[][]>;
   gridContainerRef: React.RefObject<HTMLDivElement | null>;

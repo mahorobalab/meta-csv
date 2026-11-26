@@ -3,7 +3,7 @@ import type {
   CsvLineEnding,
   LogParserConfig,
   MetaTextFormat,
-} from '@meta-csv/schema';
+} from '@metatext-editor/schema';
 import {
   decodeCsvBytes,
   detectLineEnding,

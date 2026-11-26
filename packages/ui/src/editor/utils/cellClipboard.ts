@@ -1,4 +1,4 @@
-import type { CellStyle } from '@meta-csv/schema';
+import type { CellStyle } from '@metatext-editor/schema';
 import {
   parsePlainTextToMatrix,
   type NativeClipboardBridge,

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Copy, FileText, X } from 'lucide-react';
-import type { MetaTextFormat } from '@meta-csv/schema';
+import type { MetaTextFormat } from '@metatext-editor/schema';
 
 export interface CellInspectorDrawerProps {
   isDark: boolean;

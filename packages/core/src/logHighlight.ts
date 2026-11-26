@@ -1,4 +1,4 @@
-import type { CellStyle, ConditionalRule, MetaTextFormat } from '@meta-csv/schema';
+import type { CellStyle, ConditionalRule, MetaTextFormat } from '@metatext-editor/schema';
 
 export interface DefaultHighlightRuleOptions {
   format?: MetaTextFormat;

@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { CsvFilePayload, FileSystemAdapter } from '@meta-csv/core';
+import type { CsvFilePayload, FileSystemAdapter } from '@metatext-editor/core';
 
 function extractFileName(filePath: string): string {
   const parts = filePath.split(/[\\/]/);

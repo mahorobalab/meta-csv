@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import type { JsonlArrayMode } from '@meta-csv/schema';
-import { LOG_PRESETS, previewLogPattern } from '@meta-csv/core';
+import type { JsonlArrayMode } from '@metatext-editor/schema';
+import { LOG_PRESETS, previewLogPattern } from '@metatext-editor/core';
 import type { EditorAppSettings, FileLayoutSettingsProps } from './types';
 
 export interface FileSettingsTabProps {

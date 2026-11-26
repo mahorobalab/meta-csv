@@ -1,17 +1,17 @@
 import type {
   JsonlArrayMode,
   LogParserConfig,
-  MetaCsvDocument,
+  MetaTextDocument,
   MetaTextFormat,
-} from '@meta-csv/schema';
-import { patchMetaJsonc, type ParsedCsvData } from '@meta-csv/core';
+} from '@metatext-editor/schema';
+import { patchMetaJsonc, type ParsedCsvData } from '@metatext-editor/core';
 import type { FileLayoutSettingsProps } from '../../SettingsAboutDialogs';
 
 export interface BuildFileLayoutSettingsParams {
   csvData: ParsedCsvData | null;
   activeFormat: MetaTextFormat;
   isReadOnly: boolean;
-  meta: MetaCsvDocument;
+  meta: MetaTextDocument;
   metaTextRef: React.MutableRefObject<string | null>;
   visibleColCount: number;
   effectiveDefaultFontSize: number;

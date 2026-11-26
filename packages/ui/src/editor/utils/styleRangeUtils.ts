@@ -1,5 +1,5 @@
-import { parseRangeRef, resolveStyleRef, type ParsedRange } from '@meta-csv/core';
-import type { CellStyle, RangeStyleRule } from '@meta-csv/schema';
+import { parseRangeRef, resolveStyleRef, type ParsedRange } from '@metatext-editor/core';
+import type { CellStyle, RangeStyleRule } from '@metatext-editor/schema';
 
 export function formatRangeRef(r: ParsedRange): string {
   return `${r.startRow}:${r.startCol}..${r.endRow}:${r.endCol}`;

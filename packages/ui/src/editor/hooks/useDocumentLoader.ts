@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
-import type { MetaCsvDocument, MetaTextFormat } from '@meta-csv/schema';
+import type { MetaTextDocument, MetaTextFormat } from '@metatext-editor/schema';
 import {
   UndoRedoHistory,
   detectTargetFormat,
@@ -8,7 +8,7 @@ import {
   type FileSystemAdapter,
   type ParseProgress,
   type ParsedCsvData,
-} from '@meta-csv/core';
+} from '@metatext-editor/core';
 import { parseTabularInWorker } from '../../parseInWorker';
 import type { EditorViewSnapshot } from '../types';
 
@@ -25,7 +25,7 @@ export interface UseDocumentLoaderParams {
   setActiveFormat: React.Dispatch<React.SetStateAction<MetaTextFormat>>;
   setFileName: React.Dispatch<React.SetStateAction<string>>;
   setFileBytes: React.Dispatch<React.SetStateAction<number>>;
-  setMeta: React.Dispatch<React.SetStateAction<MetaCsvDocument>>;
+  setMeta: React.Dispatch<React.SetStateAction<MetaTextDocument>>;
   setIsReadOnly: React.Dispatch<React.SetStateAction<boolean>>;
   setAutoWidths: React.Dispatch<React.SetStateAction<number[]>>;
   setDirtyCsv: React.Dispatch<React.SetStateAction<boolean>>;
@@ -155,7 +155,7 @@ export function useDocumentLoader({
         setDataVersion((v) => v + 1);
         setStatusMsg('');
         console.info(
-          `[MetaCSV] Loaded ${payload.fileName} (${resolvedFormat}): ${parsed.rows.length.toLocaleString()} rows × ${parsed.headers.length} cols in ${elapsedMs} ms`,
+          `[MetaText] Loaded ${payload.fileName} (${resolvedFormat}): ${parsed.rows.length.toLocaleString()} rows × ${parsed.headers.length} cols in ${elapsedMs} ms`,
         );
       })
       .catch((err) => {

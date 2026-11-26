@@ -2,8 +2,8 @@
 
 1. 単体 .exe（ポータブル版）を作るコマンド
 powershell
-pnpm.cmd --filter @meta-csv/desktop tauri:build
-出力先: apps/desktop/src-tauri/target/release/meta-csv-desktop.exe
+pnpm.cmd --filter @metatext-editor/desktop tauri:build
+出力先: apps/desktop/src-tauri/target/release/metatext-editor-desktop.exe
 特徴:
 Windows 10 / 11 標準の Edge WebView2 を使うため、数 MB〜10 MB 程度の .exe 1 ファイルだけでそのまま動きます。
 コマンドライン引数対応（get_initial_file）を入れてあるので、.csv ファイルをこの .exe にドラッグ＆ドロップしたり、Windows の「プログラムから開く」で関連付けて直接開くこともできます。
@@ -13,7 +13,7 @@ Windows 10 / 11 標準の Edge WebView2 を使うため、数 MB〜10 MB 程度�
 
 アプリアイコン用の PNG（1024×1024 推奨）を用意して一括生成：
 powershell
-pnpm.cmd --filter @meta-csv/desktop exec tauri icon path/to/icon.png
+pnpm.cmd --filter @metatext-editor/desktop exec tauri icon path/to/icon.png
 tauri.conf.json の bundle.active を true にして tauri:build を実行
 apps/desktop/src-tauri/target/release/bundle/msi/（.msi）
 apps/desktop/src-tauri/target/release/bundle/nsis/（*-setup.exe） にインストーラーが生成されます。

@@ -1,1 +1,1 @@
-{"default":{"identifier":"default","description":"Default capability for MetaCSV Desktop","local":true,"windows":["main"],"permissions":["core:default","dialog:default"]}}
+{"default":{"identifier":"default","description":"Default capability for MetaText Editor Desktop","local":true,"windows":["main"],"permissions":["core:default","dialog:default"]}}

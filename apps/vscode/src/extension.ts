@@ -18,7 +18,7 @@ interface EditorStatusPayload {
   readOnly?: boolean;
 }
 
-class MetaCsvDocument implements vscode.CustomDocument {
+class MetaTextDocument implements vscode.CustomDocument {
   constructor(public readonly uri: vscode.Uri) {}
 
   dispose(): void {
@@ -26,11 +26,11 @@ class MetaCsvDocument implements vscode.CustomDocument {
   }
 }
 
-class MetaCsvEditorProvider implements vscode.CustomEditorProvider<MetaCsvDocument> {
-  public static readonly viewType = 'metaCsv.editor';
+class MetaTextEditorProvider implements vscode.CustomEditorProvider<MetaTextDocument> {
+  public static readonly viewType = 'metatext.editor';
 
   private readonly _onDidChangeCustomDocument = new vscode.EventEmitter<
-    vscode.CustomDocumentEditEvent<MetaCsvDocument>
+    vscode.CustomDocumentEditEvent<MetaTextDocument>
   >();
   public readonly onDidChangeCustomDocument = this._onDidChangeCustomDocument.event;
 
@@ -63,11 +63,11 @@ class MetaCsvEditorProvider implements vscode.CustomEditorProvider<MetaCsvDocume
     this.statusBarItem.hide();
   }
 
-  async openCustomDocument(uri: vscode.Uri): Promise<MetaCsvDocument> {
-    return new MetaCsvDocument(uri);
+  async openCustomDocument(uri: vscode.Uri): Promise<MetaTextDocument> {
+    return new MetaTextDocument(uri);
   }
 
-  private async requestCsvBytesFromWebview(document: MetaCsvDocument): Promise<Buffer> {
+  private async requestCsvBytesFromWebview(document: MetaTextDocument): Promise<Buffer> {
     const panel = this.panelsByDoc.get(document.uri.toString());
     if (!panel) {
       throw new Error('Editor panel is not active.');
@@ -94,7 +94,7 @@ class MetaCsvEditorProvider implements vscode.CustomEditorProvider<MetaCsvDocume
     });
   }
 
-  async saveCustomDocument(document: MetaCsvDocument, _cancellation: vscode.CancellationToken): Promise<void> {
+  async saveCustomDocument(document: MetaTextDocument, _cancellation: vscode.CancellationToken): Promise<void> {
     const buf = await this.requestCsvBytesFromWebview(document);
     await fs.writeFile(document.uri.fsPath, buf);
     const panel = this.panelsByDoc.get(document.uri.toString());
@@ -104,7 +104,7 @@ class MetaCsvEditorProvider implements vscode.CustomEditorProvider<MetaCsvDocume
   }
 
   async saveCustomDocumentAs(
-    document: MetaCsvDocument,
+    document: MetaTextDocument,
     destination: vscode.Uri,
     _cancellation: vscode.CancellationToken,
   ): Promise<void> {
@@ -124,7 +124,7 @@ class MetaCsvEditorProvider implements vscode.CustomEditorProvider<MetaCsvDocume
     }
   }
 
-  async revertCustomDocument(document: MetaCsvDocument, _cancellation: vscode.CancellationToken): Promise<void> {
+  async revertCustomDocument(document: MetaTextDocument, _cancellation: vscode.CancellationToken): Promise<void> {
     const panel = this.panelsByDoc.get(document.uri.toString());
     if (panel) {
       await panel.webview.postMessage({ type: 'hostCommand', command: 'reload' });
@@ -132,7 +132,7 @@ class MetaCsvEditorProvider implements vscode.CustomEditorProvider<MetaCsvDocume
   }
 
   async backupCustomDocument(
-    _document: MetaCsvDocument,
+    _document: MetaTextDocument,
     context: vscode.CustomDocumentBackupContext,
     _cancellation: vscode.CancellationToken,
   ): Promise<vscode.CustomDocumentBackup> {
@@ -145,7 +145,7 @@ class MetaCsvEditorProvider implements vscode.CustomEditorProvider<MetaCsvDocume
   }
 
   async resolveCustomEditor(
-    document: MetaCsvDocument,
+    document: MetaTextDocument,
     webviewPanel: vscode.WebviewPanel,
   ): Promise<void> {
     const webview = webviewPanel.webview;
@@ -200,13 +200,13 @@ class MetaCsvEditorProvider implements vscode.CustomEditorProvider<MetaCsvDocume
           break;
 
         case 'openSettings':
-          await vscode.commands.executeCommand('workbench.action.openSettings', 'metaCsv.');
+          await vscode.commands.executeCommand('workbench.action.openSettings', 'metatext.');
           break;
 
         case 'updateConfig': {
           const patch = message.patch as Record<string, unknown> | undefined;
           if (patch && typeof patch === 'object') {
-            const cfg = vscode.workspace.getConfiguration('metaCsv');
+            const cfg = vscode.workspace.getConfiguration('metatext');
             const allowedKeys = [
               'defaultFontSize',
               'defaultRowHeight',
@@ -318,7 +318,7 @@ class MetaCsvEditorProvider implements vscode.CustomEditorProvider<MetaCsvDocume
     });
 
     const configDisposable = vscode.workspace.onDidChangeConfiguration((e) => {
-      if (e.affectsConfiguration('metaCsv')) {
+      if (e.affectsConfiguration('metatext')) {
         void webview.postMessage({
           type: 'configChanged',
           appSettings: readAppSettings(),
@@ -364,7 +364,7 @@ class MetaCsvEditorProvider implements vscode.CustomEditorProvider<MetaCsvDocume
 }
 
 function readAppSettings(): VsCodeAppSettings {
-  const cfg = vscode.workspace.getConfiguration('metaCsv');
+  const cfg = vscode.workspace.getConfiguration('metatext');
   const rawColor = cfg.get<string>('defaultMarkerColor', 'amber');
   const defaultMarkerColor =
     rawColor === 'amber' ||
@@ -406,9 +406,9 @@ export function activate(context: vscode.ExtensionContext): void {
   statusBarItem.tooltip = 'MetaText Editor active table dimensions';
   context.subscriptions.push(statusBarItem);
 
-  const provider = new MetaCsvEditorProvider(context, statusBarItem);
+  const provider = new MetaTextEditorProvider(context, statusBarItem);
   context.subscriptions.push(
-    vscode.window.registerCustomEditorProvider(MetaCsvEditorProvider.viewType, provider, {
+    vscode.window.registerCustomEditorProvider(MetaTextEditorProvider.viewType, provider, {
       webviewOptions: {
         retainContextWhenHidden: true,
       },
@@ -417,13 +417,13 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('metaCsv.openWithEditor', async (uri?: vscode.Uri) => {
+    vscode.commands.registerCommand('metatext.openWithEditor', async (uri?: vscode.Uri) => {
       const targetUri = uri ?? vscode.window.activeTextEditor?.document.uri;
       if (!targetUri) {
         void vscode.window.showWarningMessage('MetaText Editor: No file selected.');
         return;
       }
-      await vscode.commands.executeCommand('vscode.openWith', targetUri, MetaCsvEditorProvider.viewType);
+      await vscode.commands.executeCommand('vscode.openWith', targetUri, MetaTextEditorProvider.viewType);
     }),
   );
 }

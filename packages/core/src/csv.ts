@@ -6,7 +6,7 @@ import type {
   CsvLineEnding,
   JsonlArrayMode,
   MetaTextFormat,
-} from '@meta-csv/schema';
+} from '@metatext-editor/schema';
 
 export interface ResolvedJsonlOptions {
   flattenDepth: number;

@@ -10,14 +10,14 @@ import {
   X,
 } from 'lucide-react';
 import type { GridSelection } from '@glideapps/glide-data-grid';
-import type { CellStyle, ColumnAlign, ConditionalRule, MetaCsvDocument } from '@meta-csv/schema';
+import type { CellStyle, ColumnAlign, ConditionalRule, MetaTextDocument } from '@metatext-editor/schema';
 import {
   DATE_FORMAT_PRESETS,
   NUMBER_FORMAT_PRESETS,
   isValidNumberFormat,
   resolveCellStyle,
   type ParsedCsvData,
-} from '@meta-csv/core';
+} from '@metatext-editor/core';
 import { BG_SWATCH_COLORS, TEXT_SWATCH_COLORS } from '../../ConditionalRulesModal';
 import type { EditorHostMode } from '../../SettingsAboutDialogs';
 
@@ -37,7 +37,7 @@ export interface StylePopoverProps {
   viewRowIndices: Int32Array | number[];
   rows: string[][];
   csvData: ParsedCsvData | null;
-  meta: MetaCsvDocument;
+  meta: MetaTextDocument;
   styleCtx: Parameters<typeof resolveCellStyle>[0] | null;
   defaultHighlightRules: ConditionalRule[];
   customNumFmt: string;

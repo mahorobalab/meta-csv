@@ -1,9 +1,9 @@
 {
-  "name": "meta-csv",
+  "name": "metatext-editor",
   "displayName": "MetaText Editor",
   "description": "High-performance CSV, TSV, JSONL & Log editor and viewer with JSONC sidecar metadata (.metatext.jsonc)",
   "version": "0.1.0",
-  "publisher": "meta-csv",
+  "publisher": "metatext-editor",
   "private": true,
   "engines": {
     "vscode": "^1.85.0"
@@ -12,15 +12,11 @@
     "Other",
     "Visualization"
   ],
-  "activationEvents": [
-    "onCustomEditor:metaCsv.editor",
-    "onCommand:metaCsv.openWithEditor"
-  ],
   "main": "./dist/extension.js",
   "contributes": {
     "customEditors": [
       {
-        "viewType": "metaCsv.editor",
+        "viewType": "metatext.editor",
         "displayName": "MetaText Editor",
         "selector": [
           { "filenamePattern": "*.csv" },
@@ -34,14 +30,14 @@
     ],
     "commands": [
       {
-        "command": "metaCsv.openWithEditor",
+        "command": "metatext.openWithEditor",
         "title": "MetaText Editor: Open with MetaText Editor"
       }
     ],
     "menus": {
       "editor/title": [
         {
-          "command": "metaCsv.openWithEditor",
+          "command": "metatext.openWithEditor",
           "when": "resourceExtname == .csv || resourceExtname == .tsv || resourceExtname == .jsonl || resourceExtname == .ndjson || resourceExtname == .log",
           "group": "navigation"
         }
@@ -62,32 +58,32 @@
     "configuration": {
       "title": "MetaText Editor",
       "properties": {
-        "metaCsv.defaultFontSize": {
+        "metatext.defaultFontSize": {
           "type": "number",
           "default": 13,
           "minimum": 9,
           "maximum": 32,
           "description": "Default cell font size in pixels when not specified in .metatext.jsonc."
         },
-        "metaCsv.defaultRowHeight": {
+        "metatext.defaultRowHeight": {
           "type": "number",
           "default": 28,
           "minimum": 20,
           "maximum": 200,
           "description": "Default row height in pixels when not specified in .metatext.jsonc."
         },
-        "metaCsv.defaultMarkerColor": {
+        "metatext.defaultMarkerColor": {
           "type": "string",
           "enum": ["amber", "rose", "emerald", "sky", "violet"],
           "default": "amber",
           "description": "Default highlight color when adding a new row marker."
         },
-        "metaCsv.showRowNumbers": {
+        "metatext.showRowNumbers": {
           "type": "boolean",
           "default": true,
           "description": "Show 1-based row numbers in the left gutter."
         },
-        "metaCsv.noHeaderColumnStyle": {
+        "metatext.noHeaderColumnStyle": {
           "type": "string",
           "enum": ["excel", "numbered"],
           "default": "excel",
@@ -104,9 +100,9 @@
     "test": "echo \"no tests in vscode\""
   },
   "dependencies": {
-    "@meta-csv/core": "workspace:*",
-    "@meta-csv/schema": "workspace:*",
-    "@meta-csv/ui": "workspace:*",
+    "@metatext-editor/core": "workspace:*",
+    "@metatext-editor/schema": "workspace:*",
+    "@metatext-editor/ui": "workspace:*",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

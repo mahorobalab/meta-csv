@@ -1,6 +1,6 @@
 <div align="center">
 
-# MetaCSV
+# MetaText Editor
 
 **A high-performance CSV editor & viewer powered by JSONC sidecar metadata (`.metatext.jsonc`).**  
 *Keep your CSV files plain and Git-friendly — get Excel-like layout, styling, and memory across VS Code, Windows, and macOS.*
@@ -19,13 +19,13 @@
 
 ---
 
-## Why MetaCSV?
+## Why MetaText Editor?
 
 Working with CSV files in engineering and operations usually forces a painful trade-off:
 - **Excel** corrupts leading zeros (`001` → `1`), rewrites dates (`1-2` → `Jan 2`), breaks UTF-8/LF encodings, and freezes on large files.
 - **Plain CSV editors** forget your column widths, hidden columns, and sort order every time you close the tab.
 
-**MetaCSV** solves this by separating **data** (`data.csv`) from **presentation & view metadata** (`data.csv.metatext.jsonc`):
+**MetaText Editor** solves this by separating **data** (`data.csv`) from **presentation & view metadata** (`data.csv.metatext.jsonc`):
 - **Zero-Config & No Amnesia**: Opens any CSV immediately with auto-fitted column widths; the moment you resize a column, sort, or style a cell, `.metatext.jsonc` is created and updated automatically.
 - **Comment-Preserving JSONC**: Uses Microsoft's `jsonc-parser` (`modify` / `applyEdits`) so GUI updates never destroy hand-written comments or formatting.
 - **Git-Friendly**: Preserves original CSV encoding (`UTF-8` / `UTF-8 BOM` / `Shift-JIS`), line endings (`LF` / `CRLF`), and delimiter. View sorting never mutates the underlying CSV rows.
@@ -85,7 +85,7 @@ Tested on Windows 11 with a **1,000,000 rows × 10 columns (181.27 MB)** UTF-8 C
 ## Monorepo Structure
 
 ```text
-meta-csv/
+metatext-editor/
 ├── packages/
 │   ├── schema/      # TypeScript types matching metatext.schema.json
 │   ├── core/        # CSV parser/serializer, JSONC patcher, style resolver, sort/search, Undo/Redo, FileSystemAdapter
@@ -123,7 +123,7 @@ pnpm.cmd dev:desktop
 ```
 
 ### Debugging the VS Code Extension
-Open this repository in VS Code (or Antigravity IDE) and press **`F5`** to launch the Extension Development Host. Right-click any `.csv` file → **Open With... → MetaCSV Editor**.
+Open this repository in VS Code (or Antigravity IDE) and press **`F5`** to launch the Extension Development Host. Right-click any `.csv` file → **Open With... → MetaText Editor**.
 
 ---
 
@@ -152,4 +152,4 @@ pnpm.cmd build:desktop
 ## License & Trademarks
 
 - **Source Code & Specification**: Licensed under the [MIT License](LICENSE) (`Copyright (c) 2026 MahorobaLab`).
-- **Trademarks & Brand Assets**: The name **"MetaCSV"** and the official application icons/logos are the property of MahorobaLab and are not covered by the MIT License. If you distribute your own builds or forks, please use a different name and icon to avoid confusion with the official builds.
+- **Trademarks & Brand Assets**: The name **"MetaText Editor"** and the official application icons/logos are the property of MahorobaLab and are not covered by the MIT License. If you distribute your own builds or forks, please use a different name and icon to avoid confusion with the official builds.

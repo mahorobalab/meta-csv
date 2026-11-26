@@ -7,7 +7,7 @@ import {
   serializeLog,
   type FileSystemAdapter,
   type ParsedCsvData,
-} from '@meta-csv/core';
+} from '@metatext-editor/core';
 import type { EditorHostMode } from '../../SettingsAboutDialogs';
 
 export interface UseFileSaveAndUndoParams {

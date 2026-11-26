@@ -4,7 +4,7 @@ import type {
   LogParserConfig,
   MarkerColor,
   MetaTextFormat,
-} from '@meta-csv/schema';
+} from '@metatext-editor/schema';
 import type { ThemePreference } from '../theme';
 
 export type EditorHostMode = 'vscode' | 'desktop' | 'web';

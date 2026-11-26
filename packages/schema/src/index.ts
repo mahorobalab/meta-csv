@@ -153,9 +153,6 @@ export interface MetaTextDocument {
   [key: `x-${string}`]: unknown;
 }
 
-/** Backward-compatible alias for CSV-focused callers */
-export type MetaCsvDocument = MetaTextDocument;
-
 export const DEFAULT_META_VERSION = '0.1' as const;
 export const DEFAULT_ROW_HEIGHT = 28;
 export const DEFAULT_HEADER_HEIGHT = 32;

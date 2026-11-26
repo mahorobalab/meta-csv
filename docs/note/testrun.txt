@@ -5,4 +5,4 @@ pnpm.cmd dev
 pnpm.cmd dev:desktop
 
 # exe ビルド
-pnpm.cmd --filter @meta-csv/desktop tauri:build
+pnpm.cmd --filter @metatext-editor/desktop tauri:build

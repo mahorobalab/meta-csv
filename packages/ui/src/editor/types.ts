@@ -1,6 +1,6 @@
 import type React from 'react';
-import type { FileSystemAdapter } from '@meta-csv/core';
-import type { MetaTextFormat } from '@meta-csv/schema';
+import type { FileSystemAdapter } from '@metatext-editor/core';
+import type { MetaTextFormat } from '@metatext-editor/schema';
 import type { EditorAppSettings, EditorHostMode } from '../SettingsAboutDialogs';
 import type { ThemePreference } from '../theme';
 import type { NativeClipboardBridge } from '../columnClipboard';
@@ -18,7 +18,7 @@ export interface EditorViewSnapshot {
   showCellInspector: boolean;
 }
 
-export interface MetaCsvEditorHandle {
+export interface MetaTextEditorHandle {
   saveCsv: () => Promise<void>;
   serializeCurrentCsv: () => Uint8Array | null;
   undo: () => void;
@@ -42,7 +42,7 @@ export interface EditorStatusInfo {
   lineEnding?: string;
 }
 
-export interface MetaCsvEditorProps {
+export interface MetaTextEditorProps {
   adapter: FileSystemAdapter;
   hostMode?: EditorHostMode;
   isActive?: boolean;

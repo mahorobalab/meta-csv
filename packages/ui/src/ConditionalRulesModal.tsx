@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ArrowDown, ArrowUp, Plus, Sparkles, Trash2, X } from 'lucide-react';
-import type { CellStyle, ConditionalRule, RuleOperator } from '@meta-csv/schema';
-import { resolveStyleRef } from '@meta-csv/core';
+import type { CellStyle, ConditionalRule, RuleOperator } from '@metatext-editor/schema';
+import { resolveStyleRef } from '@metatext-editor/core';
 
 export interface StyleSwatch {
   label: string;

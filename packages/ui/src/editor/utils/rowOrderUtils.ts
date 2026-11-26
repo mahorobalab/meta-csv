@@ -1,5 +1,5 @@
 /**
- * Pure index / order / key helpers for MetaCsvEditor row & column operations.
+ * Pure index / order / key helpers for MetaTextEditor row & column operations.
  */
 
 export function insertRowsIntoOrderArray(

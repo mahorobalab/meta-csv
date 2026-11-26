@@ -4,7 +4,7 @@ import type {
   JsonlArrayMode,
   JsonlParserConfig,
   MetaTextFormat,
-} from '@meta-csv/schema';
+} from '@metatext-editor/schema';
 import {
   decodeCsvBytes,
   detectLineEnding,

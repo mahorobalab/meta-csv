@@ -5,9 +5,9 @@ import type {
   EditorAppSettings,
   EditorStatusInfo,
   EditorViewSnapshot,
-  MetaCsvEditorHandle,
+  MetaTextEditorHandle,
   ThemePreference,
-} from '@meta-csv/ui';
+} from '@metatext-editor/ui';
 import {
   createTauriAdapter,
   createUntitledDesktopAdapter,
@@ -64,7 +64,7 @@ export function useDesktopTabs() {
   const nextTabIdRef = useRef(1);
   const lastDirRef = useRef<string | undefined>(undefined);
   const tabsRef = useRef<DesktopTab[]>([]);
-  const editorRefs = useRef<Map<string, MetaCsvEditorHandle>>(new Map());
+  const editorRefs = useRef<Map<string, MetaTextEditorHandle>>(new Map());
   tabsRef.current = tabs;
   lastDirRef.current = lastDirectory;
 

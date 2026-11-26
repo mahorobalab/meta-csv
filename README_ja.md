@@ -1,6 +1,6 @@
 <div align="center">
 
-# MetaCSV
+# MetaText Editor
 
 **JSONC サイドカーメタデータ（`.metatext.jsonc`）で駆動する、100 万行対応の高速 CSV エディタ／ビューア**  
 *Git フレンドリーなプレーン CSV のまま、VS Code・Windows・macOS で Excel ライクな見た目と状態記憶を実現します。*
@@ -19,13 +19,13 @@
 
 ---
 
-## なぜ MetaCSV なのか？
+## なぜ MetaText Editor なのか？
 
 開発や実務で CSV を扱うとき、従来のツールにはつらいトレードオフがありました：
 - **Excel**: `001` が `1` に、`1-2` が日付に勝手に変換され、UTF-8 / LF が壊れたり、大容量ファイルで長時間フリーズする。
 - **一般的な CSV エディタ**: 列幅や非表示列・ソート順を調整しても、タブを閉じて開き直すたびにリセットされる（健忘症問題）。
 
-**MetaCSV** は **データ本体（`data.csv`）** と **見た目・表示設定（`data.csv.metatext.jsonc`）** を分離することでこれを解決します：
+**MetaText Editor** は **データ本体（`data.csv`）** と **見た目・表示設定（`data.csv.metatext.jsonc`）** を分離することでこれを解決します：
 - **Zero-Config & 脱・健忘症**: メタデータが無い CSV も自動列幅フィットで即座に開き、列幅ドラッグ・ソート・装飾を行った瞬間に `.metatext.jsonc` を自動生成・記憶します。
 - **コメント保持 JSONC**: Microsoft 公式の `jsonc-parser`（`modify` / `applyEdits`）を採用し、人間が書いたコメントや整形を壊さずに GUI から部分更新できます。
 - **Git フレンドリー**: 元の文字コード（`UTF-8` / `UTF-8 BOM` / `Shift-JIS`）・改行コード（`LF` / `CRLF`）・区切り文字をそのまま維持し、ソートもビュー上のみで非破壊適用します。
@@ -85,7 +85,7 @@ Windows 11 環境にて、日本語・クォートを含む **100 万行 × 10 �
 ## リポジトリ構成
 
 ```text
-meta-csv/
+metatext-editor/
 ├── packages/
 │   ├── schema/      # .metatext.jsonc の TypeScript 型定義
 │   ├── core/        # CSV パーサ/シリアライザ、JSONC パッチ、スタイル解決、ソート/検索、Undo/Redo、FileSystemAdapter
@@ -123,7 +123,7 @@ pnpm.cmd dev:desktop
 ```
 
 ### VS Code / Antigravity 拡張機能のデバッグ起動
-VS Code / Antigravity IDE で本リポジトリを開き **`F5`** を押すと、拡張機能開発ホストが起動します。CSV ファイルを右クリックして **「アプリケーションから開く...」→「MetaCSV Editor」** を選択してください。
+VS Code / Antigravity IDE で本リポジトリを開き **`F5`** を押すと、拡張機能開発ホストが起動します。CSV ファイルを右クリックして **「アプリケーションから開く...」→「MetaText Editor」** を選択してください。
 
 ---
 
@@ -152,4 +152,4 @@ pnpm.cmd build:desktop
 ## ライセンス・商標について
 
 - **ソースコードおよび仕様書**: [MIT License](LICENSE)（`Copyright (c) 2026 MahorobaLab`）のもとで公開しています。
-- **名称・アイコン等のブランド権利**: **「MetaCSV」** の名称および公式アプリアイコン・ロゴに関する権利は作者（MahorobaLab）に帰属し、MIT ライセンスの許諾範囲には含まれません。ご自身でビルドしたバイナリや改変版を再配布・公開される場合は、公式ビルドとの混同を避けるため、名称およびアイコンを変更してください。
+- **名称・アイコン等のブランド権利**: **「MetaText Editor」** の名称および公式アプリアイコン・ロゴに関する権利は作者（MahorobaLab）に帰属し、MIT ライセンスの許諾範囲には含まれません。ご自身でビルドしたバイナリや改変版を再配布・公開される場合は、公式ビルドとの混同を避けるため、名称およびアイコンを変更してください。

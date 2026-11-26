@@ -1,7 +1,7 @@
-# AGENTS.md — MetaCSV Project Guide
+# AGENTS.md — MetaText Editor Project Guide
 
 ## Overview
-**MetaCSV** is a high-performance CSV editor & viewer (targeting 100k+ rows at 60fps) that keeps CSV files clean and Git-friendly while persisting layout, styling, view sort order, and column metadata in an adjacent JSONC sidecar file (`<filename>.metatext.jsonc`).
+**MetaText Editor** is a high-performance CSV editor & viewer (targeting 100k+ rows at 60fps) that keeps CSV files clean and Git-friendly while persisting layout, styling, view sort order, and column metadata in an adjacent JSONC sidecar file (`<filename>.metatext.jsonc`).
 
 See [docs/SPEC.md](docs/SPEC.md) for the full design specification and [docs/schema/metatext.schema.json](docs/schema/metatext.schema.json) for the JSON Schema.
 
@@ -39,7 +39,7 @@ Keep source files modular, cohesive, and easy to test. Do not let components or 
    - **Pure logic & utilities** (`utils/*.ts`, `packages/core`): Extract React-free data transformations, parsers, clipboard helpers, and index/range calculations into `.ts` modules and cover them with unit tests.
    - **State & interaction handlers** (`hooks/use*.ts`): Group cohesive state, `useMemo`, `useCallback`, and domain operations (e.g. column ops, row ops, markers, file save/undo) into dedicated custom hooks.
    - **Presentational UI** (`components/*.tsx`, `dialogs/*.tsx`): Extract toolbars, popovers, context menus, modals, drawers, and status bars into focused components.
-   - **Container / orchestrator components** (`MetaCsvEditor.tsx`, `App.tsx`): Keep them focused on wiring hooks, layout, and child components together.
+   - **Container / orchestrator components** (`MetaTextEditor.tsx`, `App.tsx`): Keep them focused on wiring hooks, layout, and child components together.
 3. **Ongoing metrics check**:
    - Run `pnpm.cmd run metrics` after substantial feature additions or refactors to verify no production file exceeds the size limits.
 

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import type { GridSelection } from '@glideapps/glide-data-grid';
-import type { ParsedCsvData } from '@meta-csv/core';
+import type { ParsedCsvData } from '@metatext-editor/core';
 import type { EditorHostMode } from '../../SettingsAboutDialogs';
 import type { CellRangeRect } from '../types';
 import type { CellMoveDirection } from '../utils/cellNavigationUtils';

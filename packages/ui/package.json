@@ -1,5 +1,5 @@
 {
-  "name": "@meta-csv/ui",
+  "name": "@metatext-editor/ui",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -16,8 +16,8 @@
   },
   "dependencies": {
     "@glideapps/glide-data-grid": "^6.0.3",
-    "@meta-csv/core": "workspace:*",
-    "@meta-csv/schema": "workspace:*",
+    "@metatext-editor/core": "workspace:*",
+    "@metatext-editor/schema": "workspace:*",
     "lodash": "^4.17.21",
     "lucide-react": "^1.79.0",
     "marked": "^15.0.7"

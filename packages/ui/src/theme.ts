@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Theme } from '@glideapps/glide-data-grid';
-import { DEFAULT_FONT_SIZE, type TableConfig } from '@meta-csv/schema';
+import { DEFAULT_FONT_SIZE, type TableConfig } from '@metatext-editor/schema';
 
 export type ThemePreference = 'system' | 'light' | 'dark';
 

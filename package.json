@@ -1,13 +1,13 @@
 {
-  "name": "meta-csv-monorepo",
+  "name": "metatext-editor-monorepo",
   "private": true,
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "dev": "pnpm --filter @meta-csv/playground dev",
-    "dev:desktop": "pnpm --filter @meta-csv/desktop tauri:dev",
-    "build:desktop": "pnpm --filter @meta-csv/desktop tauri:build",
-    "build:pages": "pnpm --filter @meta-csv/playground build && node scripts/build-pages.mjs",
+    "dev": "pnpm --filter @metatext-editor/playground dev",
+    "dev:desktop": "pnpm --filter @metatext-editor/desktop tauri:dev",
+    "build:desktop": "pnpm --filter @metatext-editor/desktop tauri:build",
+    "build:pages": "pnpm --filter @metatext-editor/playground build && node scripts/build-pages.mjs",
     "sync:schema": "node scripts/sync-schema.mjs",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",

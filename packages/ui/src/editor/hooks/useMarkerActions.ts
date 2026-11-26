@@ -4,11 +4,11 @@ import {
   type DataEditorRef,
   type GridSelection,
 } from '@glideapps/glide-data-grid';
-import type { MarkerColor, MetaCsvDocument, RowMarker } from '@meta-csv/schema';
+import type { MarkerColor, MetaTextDocument, RowMarker } from '@metatext-editor/schema';
 import { MARKER_COLORS } from '../../MarkerControls';
 
 export interface UseMarkerActionsParams {
-  meta: MetaCsvDocument;
+  meta: MetaTextDocument;
   filterIndices: Int32Array;
   onlyMarked: boolean;
   setOnlyMarked: (next: boolean) => void;

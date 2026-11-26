@@ -3,12 +3,12 @@ import { invoke } from '@tauri-apps/api/core';
 import { Check, Code2, Info, Settings } from 'lucide-react';
 import {
   AboutModal,
-  MetaCsvEditor,
+  MetaTextEditor,
   SettingsModal,
   resolveThemeMode,
   useSystemTheme,
   type NativeClipboardBridge,
-} from '@meta-csv/ui';
+} from '@metatext-editor/ui';
 import { useDesktopTabs } from './hooks/useDesktopTabs';
 import { DesktopTabBar } from './components/DesktopTabBar';
 import { MetaJsoncSidePanel } from './components/MetaJsoncSidePanel';
@@ -158,7 +158,7 @@ export const App: React.FC = () => {
                     height: '100%',
                   }}
                 >
-                  <MetaCsvEditor
+                  <MetaTextEditor
                     ref={(handle) => {
                       if (handle) editorRefs.current.set(tab.id, handle);
                       else editorRefs.current.delete(tab.id);
