@@ -204,8 +204,19 @@ export const MetaTextEditor = React.forwardRef<MetaTextEditorHandle, MetaTextEdi
         setOpenMenu('none');
       }
     };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        setOpenMenu('none');
+      }
+    };
     document.addEventListener('mousedown', onDocDown);
-    return () => document.removeEventListener('mousedown', onDocDown);
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => {
+      document.removeEventListener('mousedown', onDocDown);
+      window.removeEventListener('keydown', onKeyDown, true);
+    };
   }, [openMenu]);
 
   useEffect(() => {

@@ -101,8 +101,17 @@ export const MarkerControls: React.FC<MarkerControlsProps> = ({
         setShowList(false);
       }
     };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowList(false);
+      }
+    };
     document.addEventListener('mousedown', onDocMouseDown);
-    return () => document.removeEventListener('mousedown', onDocMouseDown);
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onDocMouseDown);
+      window.removeEventListener('keydown', onKeyDown);
+    };
   }, [showList]);
 
   const isDark = themeMode === 'dark';
@@ -159,6 +168,7 @@ export const MarkerControls: React.FC<MarkerControlsProps> = ({
         aria-label="Toggle marker"
       >
         {selectedMarker ? <BookmarkCheck size={14} /> : <Bookmark size={14} />}
+        <span>Marker</span>
       </button>
 
       {/* Color swatches */}

@@ -165,6 +165,33 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = (p) => (
 
     <span style={{ opacity: 0.35 }}>|</span>
 
+    {p.csvData && (
+      <>
+        <MarkerControls
+          markers={p.markers}
+          visibleMarkerCount={p.visibleMarkerCount}
+          visibleMarkerRowSet={p.visibleMarkerRowSet}
+          selectedDataRow={p.selectedDataRow}
+          selectedMarker={p.selectedMarker}
+          activeColor={p.activeMarkerColor}
+          onActiveColorChange={p.onActiveMarkerColorChange}
+          onlyMarked={p.onlyMarked}
+          onOnlyMarkedChange={p.onOnlyMarkedChange}
+          onToggleSelectedMarker={p.onToggleSelectedMarker}
+          onJumpPrev={p.onJumpPrevMarker}
+          onJumpNext={p.onJumpNextMarker}
+          onJumpToRow={p.onJumpToDataRow}
+          onUpdateMarkerNote={p.onUpdateMarkerNote}
+          onCycleMarkerColor={p.onCycleMarkerColor}
+          onRemoveMarker={p.onRemoveMarker}
+          onClearAll={p.onClearAllMarkers}
+          getRowPreview={p.getRowPreview}
+          themeMode={p.themeMode}
+        />
+        <span style={{ opacity: 0.35 }}>|</span>
+      </>
+    )}
+
     <EditorSearchBox
       isDark={p.isDark}
       toolbarBorder={p.toolbarBorder}
@@ -181,32 +208,6 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = (p) => (
       onRemoveHistory={p.onRemoveSearchHistory}
       onClearHistory={p.onClearSearchHistory}
     />
-
-    <span style={{ opacity: 0.35 }}>|</span>
-
-    {p.csvData && (
-      <MarkerControls
-        markers={p.markers}
-        visibleMarkerCount={p.visibleMarkerCount}
-        visibleMarkerRowSet={p.visibleMarkerRowSet}
-        selectedDataRow={p.selectedDataRow}
-        selectedMarker={p.selectedMarker}
-        activeColor={p.activeMarkerColor}
-        onActiveColorChange={p.onActiveMarkerColorChange}
-        onlyMarked={p.onlyMarked}
-        onOnlyMarkedChange={p.onOnlyMarkedChange}
-        onToggleSelectedMarker={p.onToggleSelectedMarker}
-        onJumpPrev={p.onJumpPrevMarker}
-        onJumpNext={p.onJumpNextMarker}
-        onJumpToRow={p.onJumpToDataRow}
-        onUpdateMarkerNote={p.onUpdateMarkerNote}
-        onCycleMarkerColor={p.onCycleMarkerColor}
-        onRemoveMarker={p.onRemoveMarker}
-        onClearAll={p.onClearAllMarkers}
-        getRowPreview={p.getRowPreview}
-        themeMode={p.themeMode}
-      />
-    )}
 
     <EditorToolbarRight
       isDark={p.isDark}

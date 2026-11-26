@@ -1,13 +1,8 @@
 
-
-    
-・meta-csv の記述がまだ結構残ってる → Ctrl+Shift+F → metatext-editor
-
-
 ・Style ESCで閉じるように
-・マーカーアイコンの右に「マーカー」テキスト
+・マーカーアイコンの右に「Marker」テキスト
 ・マーカーとSearchの位置を逆に
-・D%Dでオープン、デスクトップ版とWeb版 → Web版は、編集が入っていたら確認ダイアログ
+・D%Dでオープン、デスクトップ版とWeb版 → デスクトップ版は、新規タブ、Web版は、編集が入っていたら確認ダイアログ VS Codeは、おまかせでいいはず
 
 ・新規で何もない画面出る 100x100 のセルが出るようにする
 ・Filterの幅広すぎ 2/3 位に
@@ -15,12 +10,13 @@
 ・Web版は、local strage に .metatext.jsonc 保存 パッケージのときに一緒に
 
 ・何も開いてない時の説明の文字がデカくてダサい、もう少し小さめに
-
-・LP ダサすぎる問題、いかにもAI
+・アバウトにオープンソースライセンス
 
 ・多言語化
-・アバウトにオープンソースライセンス
-・exe の名称は、MetaTextEditor.exe にする
+
+・WebLP ダサすぎる問題、いかにもAI モノトーンでビジネスっぽく
+
+・exe の名称は、MetaTextEditor.exe にする VS Code Extensionも？ 
 ・リリース
     MSIX
         npm install @microsoft/winappcli --save-dev
@@ -131,6 +127,7 @@ PLAN
     値のみ貼り付け
 ・選択セル内移動、Tab 右 一番右→左下、Enter 下 一番下 → セルない範囲の右上 ※ Excelに合わせる 
 ・F2でセル内編集 ※ Excelに合わせる 今はマーカーになってる？ マーカー編集とは、テキストが全部選択じゃなくてカーソルが一番後ろに入った状態になること
+・meta-csv の記述がまだ結構残ってる → Ctrl+Shift+F → metatext-editor
 
 
 ----------------------------------------

@@ -1,5 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { Check, Code2, Info, Settings } from 'lucide-react';
 import {
   AboutModal,
@@ -25,6 +26,7 @@ export const App: React.FC = () => {
     closeTab,
     handleNewTab,
     handleOpenFile,
+    openFilePathsInTabs,
     saveTabAs,
     saveTabAsStream,
     handleThemeChange,
@@ -37,6 +39,53 @@ export const App: React.FC = () => {
   const [showEmptySettings, setShowEmptySettings] = useState(false);
   const [showEmptyAbout, setShowEmptyAbout] = useState(false);
   const [showMetaPanel, setShowMetaPanel] = useState(false);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
+
+  useEffect(() => {
+    let unlisten: (() => void) | null = null;
+    let disposed = false;
+
+    const preventDefault = (e: DragEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener('dragover', preventDefault);
+    window.addEventListener('drop', preventDefault);
+
+    getCurrentWebview()
+      .onDragDropEvent((event) => {
+        if (disposed) return;
+        const payload = event.payload;
+        if (payload.type === 'enter' || payload.type === 'over') {
+          setIsDraggingFile(true);
+        } else if (payload.type === 'leave') {
+          setIsDraggingFile(false);
+        } else if (payload.type === 'drop') {
+          setIsDraggingFile(false);
+          const rawPaths = payload.paths ?? [];
+          if (rawPaths.length === 0) return;
+          const nonSidecar = rawPaths.filter((p) => !p.toLowerCase().endsWith('.metatext.jsonc'));
+          const targets =
+            nonSidecar.length > 0
+              ? nonSidecar
+              : rawPaths.map((p) => p.replace(/\.metatext\.jsonc$/i, ''));
+          if (targets.length > 0) {
+            openFilePathsInTabs(targets);
+          }
+        }
+      })
+      .then((fn) => {
+        if (disposed) fn();
+        else unlisten = fn;
+      })
+      .catch(() => {});
+
+    return () => {
+      disposed = true;
+      window.removeEventListener('dragover', preventDefault);
+      window.removeEventListener('drop', preventDefault);
+      unlisten?.();
+    };
+  }, [openFilePathsInTabs]);
 
   const systemTheme = useSystemTheme();
   const resolvedTheme = resolveThemeMode(themePref, systemTheme);
@@ -118,6 +167,37 @@ export const App: React.FC = () => {
     </label>
   );
 
+  const dropOverlay = isDraggingFile ? (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 9999,
+        pointerEvents: 'none',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: isDark ? 'rgba(15, 23, 42, 0.72)' : 'rgba(239, 246, 255, 0.82)',
+        border: '3px dashed #3b82f6',
+      }}
+    >
+      <div
+        style={{
+          padding: '16px 28px',
+          borderRadius: 10,
+          background: isDark ? '#1e293b' : '#ffffff',
+          color: barFg,
+          fontSize: 15,
+          fontWeight: 600,
+          boxShadow: '0 8px 30px rgba(0,0,0,0.22)',
+          border: `1px solid ${border}`,
+        }}
+      >
+        ドロップして新しいタブで開く (CSV / TSV / JSONL / LOG)
+      </div>
+    </div>
+  ) : null;
+
   if (tabs.length > 0) {
     return (
       <div
@@ -131,6 +211,7 @@ export const App: React.FC = () => {
           color: barFg,
         }}
       >
+        {dropOverlay}
         <DesktopTabBar
           tabs={tabs}
           activeTabId={activeTabId}
@@ -218,6 +299,7 @@ export const App: React.FC = () => {
         color: barFg,
       }}
     >
+      {dropOverlay}
       <div
         style={{
           display: 'flex',

@@ -498,6 +498,7 @@ export function useDesktopTabs() {
     closeTab,
     handleNewTab,
     handleOpenFile,
+    openFilePathsInTabs,
     saveTabAs,
     saveTabAsStream,
     handleThemeChange,

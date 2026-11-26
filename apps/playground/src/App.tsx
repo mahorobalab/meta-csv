@@ -69,8 +69,12 @@ export const App: React.FC = () => {
   });
   const [metaText, setMetaText] = useState<string>(SPEC_SETTING_META);
   const [customFile, setCustomFile] = useState<File | null>(null);
+  const [customMetaText, setCustomMetaText] = useState<string | null>(null);
   const [newSeq, setNewSeq] = useState<number>(0);
+  const [isDraggingFile, setIsDraggingFile] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const isDirtyRef = useRef<boolean>(false);
+  const dragDepthRef = useRef<number>(0);
 
   const systemTheme = useSystemTheme();
   const resolvedTheme = resolveThemeMode(themePref, systemTheme);
@@ -125,22 +129,59 @@ export const App: React.FC = () => {
       });
     }
     if (customFile) {
-      return createFileAdapter(customFile, null);
+      return createFileAdapter(customFile, customMetaText);
     }
     return createMemoryAdapter({
       fileName: 'spec_setting.csv',
       csvBytes: new TextEncoder().encode(SPEC_SETTING_CSV),
       metaText: SPEC_SETTING_META,
     });
-  }, [preset, customFile, newSeq]);
+  }, [preset, customFile, customMetaText, newSeq]);
+
+  const openDroppedFiles = async (fileList: FileList | null) => {
+    if (!fileList || fileList.length === 0) return;
+    const files = Array.from(fileList);
+    const sidecarFile = files.find((f) => f.name.toLowerCase().endsWith('.metatext.jsonc')) ?? null;
+    const dataFile = files.find((f) => !f.name.toLowerCase().endsWith('.metatext.jsonc'));
+    if (!dataFile) return;
+
+    if (
+      isDirtyRef.current &&
+      !window.confirm(`未保存の変更があります。破棄して "${dataFile.name}" を開きますか？`)
+    ) {
+      return;
+    }
+
+    let nextMeta: string | null = null;
+    if (sidecarFile) {
+      try {
+        nextMeta = await sidecarFile.text();
+      } catch {
+        nextMeta = null;
+      }
+    }
+    setCustomFile(dataFile);
+    setCustomMetaText(nextMeta);
+    setMetaText(nextMeta ?? '');
+    setPreset('custom');
+    setNewSeq((s) => s + 1);
+  };
 
   const handleOpenLocalCsv = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
+    if (
+      isDirtyRef.current &&
+      !window.confirm(`未保存の変更があります。破棄して "${file.name}" を開きますか？`)
+    ) {
+      return;
+    }
     setCustomFile(file);
+    setCustomMetaText(null);
     setMetaText('');
     setPreset('custom');
+    setNewSeq((s) => s + 1);
   };
 
   const isDark = resolvedTheme === 'dark';
@@ -271,14 +312,71 @@ export const App: React.FC = () => {
 
   return (
     <div
+      onDragEnter={(e) => {
+        if (!e.dataTransfer.types.includes('Files')) return;
+        e.preventDefault();
+        dragDepthRef.current += 1;
+        setIsDraggingFile(true);
+      }}
+      onDragOver={(e) => {
+        if (!e.dataTransfer.types.includes('Files')) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+      }}
+      onDragLeave={(e) => {
+        if (!e.dataTransfer.types.includes('Files')) return;
+        e.preventDefault();
+        dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+        if (dragDepthRef.current === 0) {
+          setIsDraggingFile(false);
+        }
+      }}
+      onDrop={(e) => {
+        if (!e.dataTransfer.types.includes('Files')) return;
+        e.preventDefault();
+        dragDepthRef.current = 0;
+        setIsDraggingFile(false);
+        void openDroppedFiles(e.dataTransfer.files);
+      }}
       style={{
         display: 'flex',
         width: '100vw',
         height: '100vh',
         background: isDark ? '#1e1e1e' : '#ffffff',
         color: barFg,
+        position: 'relative',
       }}
     >
+      {isDraggingFile && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            pointerEvents: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: isDark ? 'rgba(15, 23, 42, 0.72)' : 'rgba(239, 246, 255, 0.82)',
+            border: '3px dashed #3b82f6',
+          }}
+        >
+          <div
+            style={{
+              padding: '16px 28px',
+              borderRadius: 10,
+              background: isDark ? '#1e293b' : '#ffffff',
+              color: barFg,
+              fontSize: 15,
+              fontWeight: 600,
+              boxShadow: '0 8px 30px rgba(0,0,0,0.22)',
+              border: `1px solid ${border}`,
+            }}
+          >
+            ドロップしてファイルを開く (CSV / TSV / JSONL / LOG)
+          </div>
+        </div>
+      )}
       <input
         ref={fileInputRef}
         type="file"
@@ -374,6 +472,7 @@ export const App: React.FC = () => {
           fileMenuItems={fileMenuItems}
           settingsExtraSection={settingsExtraSection}
           onStatusChange={(info: EditorStatusInfo) => {
+            isDirtyRef.current = info.dirty;
             document.title = info.fileName
               ? `${info.fileName}${info.dirty ? ' *' : ''} — MetaText Editor`
               : 'MetaText Editor Web';
