@@ -9,6 +9,8 @@ import {
   type ThemePreference,
 } from '@meta-csv/ui';
 import {
+  APP_LOG,
+  APP_LOG_META,
   EVENTS_JSONL,
   EVENTS_JSONL_META,
   LARGE_CSV_META,
@@ -19,7 +21,7 @@ import {
   generateLargeCsvBytes,
 } from './datasets';
 
-type PresetKey = 'spec' | 'jsonl' | 'large100k' | 'custom';
+type PresetKey = 'spec' | 'jsonl' | 'log' | 'large100k' | 'custom';
 
 const STORAGE_KEY = 'metacsv:playground-settings:v1';
 
@@ -98,6 +100,13 @@ export const App: React.FC = () => {
         fileName: 'events.jsonl',
         csvBytes: new TextEncoder().encode(EVENTS_JSONL),
         metaText: EVENTS_JSONL_META,
+      });
+    }
+    if (preset === 'log') {
+      return createMemoryAdapter({
+        fileName: 'app.log',
+        csvBytes: new TextEncoder().encode(APP_LOG),
+        metaText: APP_LOG_META,
       });
     }
     if (preset === 'large100k') {
@@ -183,6 +192,20 @@ export const App: React.FC = () => {
         type="button"
         style={menuRowStyle}
         onClick={() => {
+          setMetaText(APP_LOG_META);
+          setPreset('log');
+        }}
+      >
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+          <Code2 size={13} />
+          <span>app.log (App Log + StackTrace)</span>
+        </span>
+        {preset === 'log' && <Check size={13} />}
+      </button>
+      <button
+        type="button"
+        style={menuRowStyle}
+        onClick={() => {
           setMetaText(LARGE_CSV_META);
           setPreset('large100k');
         }}
@@ -251,7 +274,7 @@ export const App: React.FC = () => {
       <input
         ref={fileInputRef}
         type="file"
-        accept=".csv,.tsv,.jsonl,.ndjson,.txt"
+        accept=".csv,.tsv,.jsonl,.ndjson,.log,.txt"
         onChange={handleOpenLocalCsv}
         style={{ display: 'none' }}
       />

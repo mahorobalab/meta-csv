@@ -138,6 +138,6 @@ flowchart LR
 - [x] Web Worker・Desktop（ファイル選択 `*.jsonl`）・VS Code (`customEditors`)・Web Playground（サンプル JSONL 追加）へ組み込み
 
 ### Phase B2: `.log` 正規表現パーサ ＆ CSV スタイル拡充
-- [ ] `parseLogLines()`（`log.linePattern` / `multilinePattern` / 組み込みプリセット）と設定 UI を実装
-- [ ] CSV 向け Excel ライクなスタイル操作（文字色・背景色パレット・条件付き書式 GUI）の拡充
+- [x] `parseLogLines()`（`log.linePattern` / `multilinePattern` / 組み込みプリセット）と設定 UI を実装
+- [x] CSV 向け Excel ライクなスタイル操作（文字色・背景色パレット・条件付き書式 GUI）の拡充
 - [ ] `MetaText Editor` へのリブランディング・パッケージ名整理の最終適用

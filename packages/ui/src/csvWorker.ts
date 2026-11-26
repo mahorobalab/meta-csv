@@ -1,12 +1,14 @@
 import type {
   CsvDialectConfig,
   JsonlParserConfig,
+  LogParserConfig,
   MetaTextFormat,
 } from '@meta-csv/schema';
 import {
   estimateColumnWidths,
   parseCsvBytes,
   parseJsonlBytes,
+  parseLogBytes,
   type ParseProgress,
   type ParsedCsvData,
 } from '@meta-csv/core';
@@ -17,6 +19,7 @@ export interface ParseWorkerRequest {
   format?: MetaTextFormat;
   override?: CsvDialectConfig;
   jsonlOverride?: JsonlParserConfig;
+  logOverride?: LogParserConfig;
 }
 
 export type ParseWorkerResponse =
@@ -31,7 +34,7 @@ export type ParseWorkerResponse =
   | { id: number; type: 'error'; message: string };
 
 self.onmessage = (event: MessageEvent<ParseWorkerRequest>) => {
-  const { id, bytes, format, override, jsonlOverride } = event.data;
+  const { id, bytes, format, override, jsonlOverride, logOverride } = event.data;
   try {
     const t0 = performance.now();
     const onProgress = (progress: ParseProgress) => {
@@ -41,7 +44,16 @@ self.onmessage = (event: MessageEvent<ParseWorkerRequest>) => {
     const parsed =
       format === 'jsonl'
         ? parseJsonlBytes(bytes, jsonlOverride, onProgress)
-        : parseCsvBytes(bytes, override, onProgress);
+        : format === 'log'
+          ? parseLogBytes(bytes, logOverride, onProgress, 'log')
+          : format === 'text'
+            ? parseLogBytes(
+                bytes,
+                { ...logOverride, linePattern: logOverride?.linePattern ?? '' },
+                onProgress,
+                'text',
+              )
+            : parseCsvBytes(bytes, override, onProgress);
     const autoWidths = estimateColumnWidths(parsed.headers, parsed.rows);
     const elapsedMs = Math.round(performance.now() - t0);
     const doneMsg: ParseWorkerResponse = {

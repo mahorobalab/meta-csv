@@ -1,7 +1,7 @@
 {
   "name": "meta-csv",
   "displayName": "MetaText Editor",
-  "description": "High-performance CSV, TSV & JSONL editor and viewer with JSONC sidecar metadata (.metatext.jsonc)",
+  "description": "High-performance CSV, TSV, JSONL & Log editor and viewer with JSONC sidecar metadata (.metatext.jsonc)",
   "version": "0.1.0",
   "publisher": "meta-csv",
   "private": true,
@@ -26,7 +26,8 @@
           { "filenamePattern": "*.csv" },
           { "filenamePattern": "*.tsv" },
           { "filenamePattern": "*.jsonl" },
-          { "filenamePattern": "*.ndjson" }
+          { "filenamePattern": "*.ndjson" },
+          { "filenamePattern": "*.log" }
         ],
         "priority": "option"
       }
@@ -41,7 +42,7 @@
       "editor/title": [
         {
           "command": "metaCsv.openWithEditor",
-          "when": "resourceExtname == .csv || resourceExtname == .tsv || resourceExtname == .jsonl || resourceExtname == .ndjson",
+          "when": "resourceExtname == .csv || resourceExtname == .tsv || resourceExtname == .jsonl || resourceExtname == .ndjson || resourceExtname == .log",
           "group": "navigation"
         }
       ]

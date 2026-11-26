@@ -14,6 +14,12 @@ export {
   type AboutModalProps,
 } from './SettingsAboutDialogs';
 export {
+  ConditionalRulesModal,
+  BG_SWATCH_COLORS,
+  TEXT_SWATCH_COLORS,
+  type ConditionalRulesModalProps,
+} from './ConditionalRulesModal';
+export {
   MarkerControls,
   MARKER_COLORS,
   MARKER_PALETTE,

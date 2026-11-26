@@ -92,7 +92,7 @@ export const App: React.FC = () => {
       multiple: false,
       defaultPath: lastDirectory,
       filters: [
-        { name: 'CSV / TSV / JSONL', extensions: ['csv', 'tsv', 'jsonl', 'ndjson', 'txt'] },
+        { name: 'CSV / TSV / JSONL / Log', extensions: ['csv', 'tsv', 'jsonl', 'ndjson', 'log', 'txt'] },
         { name: 'All Files', extensions: ['*'] },
       ],
     });
@@ -210,7 +210,7 @@ export const App: React.FC = () => {
       >
         <div style={{ fontSize: 20, fontWeight: 700 }}>MetaText Editor</div>
         <div style={{ fontSize: 13, opacity: 0.75 }}>
-          CSV / TSV / JSONL を開くと、隣の .metatext.jsonc を自動で読み書きします
+          CSV / TSV / JSONL / LOG を開くと、隣の .metatext.jsonc を自動で読み書きします
         </div>
         <button
           type="button"
@@ -225,7 +225,7 @@ export const App: React.FC = () => {
           }}
           onClick={() => void handleOpenFile()}
         >
-          CSV / JSONL ファイルを開く
+          ファイルを開く (CSV / JSONL / LOG)
         </button>
       </div>
 

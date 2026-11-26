@@ -1,6 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { X, Settings, Info, ExternalLink } from 'lucide-react';
-import type { JsonlArrayMode, MarkerColor, MetaTextFormat } from '@meta-csv/schema';
+import type {
+  JsonlArrayMode,
+  LogParserConfig,
+  MarkerColor,
+  MetaTextFormat,
+} from '@meta-csv/schema';
+import { LOG_PRESETS, previewLogPattern } from '@meta-csv/core';
 import { MARKER_COLORS, MARKER_PALETTE } from './MarkerControls';
 import type { ThemePreference } from './theme';
 
@@ -24,6 +30,14 @@ export interface FileLayoutSettingsProps {
   onJsonlFlattenDepthChange?: (next: number) => void;
   jsonlArrayMode?: JsonlArrayMode;
   onJsonlArrayModeChange?: (next: JsonlArrayMode) => void;
+  logLinePattern?: string;
+  logColumnNames?: string[];
+  logMultilinePattern?: string;
+  logWordWrap?: boolean;
+  logMatchedPresetId?: string;
+  logRegexError?: string;
+  logSampleLines?: string[];
+  onLogConfigChange?: (patch: Partial<LogParserConfig>) => void;
   freezeColumns: number;
   maxFreezeColumns: number;
   onFreezeColumnsChange: (next: number) => void;
@@ -65,16 +79,62 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   extraSection,
 }) => {
   const [activeTab, setActiveTab] = useState<'file' | 'app'>(fileSettings ? 'file' : 'app');
+  const [draftLinePattern, setDraftLinePattern] = useState(fileSettings?.logLinePattern ?? '');
+  const [draftColumnNamesText, setDraftColumnNamesText] = useState(
+    (fileSettings?.logColumnNames ?? []).join(', '),
+  );
+  const [draftMultilinePattern, setDraftMultilinePattern] = useState(
+    fileSettings?.logMultilinePattern ?? '',
+  );
+  const [draftPresetId, setDraftPresetId] = useState(
+    fileSettings?.logMatchedPresetId ?? 'custom',
+  );
 
   useEffect(() => {
     if (!open) return;
     setActiveTab(fileSettings ? 'file' : 'app');
+    setDraftLinePattern(fileSettings?.logLinePattern ?? '');
+    setDraftColumnNamesText((fileSettings?.logColumnNames ?? []).join(', '));
+    setDraftMultilinePattern(fileSettings?.logMultilinePattern ?? '');
+    setDraftPresetId(fileSettings?.logMatchedPresetId ?? 'custom');
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose, Boolean(fileSettings)]);
+  }, [
+    open,
+    onClose,
+    Boolean(fileSettings),
+    fileSettings?.logLinePattern,
+    fileSettings?.logMultilinePattern,
+    fileSettings?.logMatchedPresetId,
+    fileSettings?.logColumnNames?.join(','),
+  ]);
+
+  const draftColumnNames = useMemo(
+    () =>
+      draftColumnNamesText
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0),
+    [draftColumnNamesText],
+  );
+
+  const logPreview = useMemo(() => {
+    if (fileSettings?.format !== 'log' && fileSettings?.format !== 'text') return null;
+    return previewLogPattern(fileSettings.logSampleLines ?? [], {
+      linePattern: draftLinePattern,
+      columnNames: draftColumnNames.length > 0 ? draftColumnNames : undefined,
+      multilinePattern: draftMultilinePattern.trim() || undefined,
+    });
+  }, [
+    fileSettings?.format,
+    fileSettings?.logSampleLines,
+    draftLinePattern,
+    draftColumnNames,
+    draftMultilinePattern,
+  ]);
 
   if (!open) return null;
 
@@ -130,7 +190,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         aria-label="MetaText Editor Settings"
         style={{
           width: '100%',
-          maxWidth: 460,
+          maxWidth:
+            fileSettings?.format === 'log' || fileSettings?.format === 'text' ? 540 : 460,
           maxHeight: '88vh',
           overflowY: 'auto',
           borderRadius: 10,
@@ -238,6 +299,194 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <option value="join">Comma-joined (a, b)</option>
                   </select>
                 </label>
+              </>
+            ) : fileSettings.format === 'log' || fileSettings.format === 'text' ? (
+              <>
+                <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                  <span>Log Format Preset</span>
+                  <select
+                    value={draftPresetId}
+                    onChange={(e) => {
+                      const nextId = e.target.value;
+                      setDraftPresetId(nextId);
+                      const preset = LOG_PRESETS.find((p) => p.id === nextId);
+                      if (preset) {
+                        setDraftLinePattern(preset.linePattern);
+                        setDraftColumnNamesText(preset.columnNames.join(', '));
+                        setDraftMultilinePattern(preset.multilinePattern ?? '');
+                      }
+                    }}
+                    style={inputStyle}
+                  >
+                    {LOG_PRESETS.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.label}
+                      </option>
+                    ))}
+                    <option value="iis-w3c">IIS W3C (#Fields: Auto)</option>
+                    <option value="docker-json">Docker / JSON Log (Auto)</option>
+                    <option value="custom">Custom Pattern</option>
+                  </select>
+                </label>
+
+                <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <span style={{ fontSize: 12 }}>Line Pattern (Regex — named or numbered captures)</span>
+                  <input
+                    type="text"
+                    value={draftLinePattern}
+                    onChange={(e) => {
+                      setDraftLinePattern(e.target.value);
+                      setDraftPresetId('custom');
+                    }}
+                    placeholder="Empty = plain lines (single message column)"
+                    style={{
+                      ...inputStyle,
+                      fontFamily: "'Consolas', 'Courier New', monospace",
+                      fontSize: 11.5,
+                    }}
+                  />
+                </label>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <span style={{ fontSize: 12 }}>Column Names (numbered fallback)</span>
+                    <input
+                      type="text"
+                      value={draftColumnNamesText}
+                      onChange={(e) => setDraftColumnNamesText(e.target.value)}
+                      placeholder="timestamp, level, message"
+                      style={inputStyle}
+                    />
+                  </label>
+
+                  <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <span style={{ fontSize: 12 }}>Multiline Continuation Regex</span>
+                    <input
+                      type="text"
+                      value={draftMultilinePattern}
+                      onChange={(e) => setDraftMultilinePattern(e.target.value)}
+                      placeholder="^(\s+at\s+|Caused by:)"
+                      style={{
+                        ...inputStyle,
+                        fontFamily: "'Consolas', 'Courier New', monospace",
+                        fontSize: 11.5,
+                      }}
+                    />
+                  </label>
+                </div>
+
+                <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
+                  <span>Word Wrap (Default)</span>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(fileSettings.logWordWrap)}
+                    onChange={(e) =>
+                      fileSettings.onLogConfigChange?.({ wordWrap: e.target.checked })
+                    }
+                  />
+                </label>
+
+                {logPreview && (
+                  <div
+                    style={{
+                      padding: 8,
+                      borderRadius: 6,
+                      background: inputBg,
+                      border: `1px solid ${border}`,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 6,
+                      fontSize: 11.5,
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <strong>Live Preview</strong>
+                      <span style={{ opacity: 0.75 }}>
+                        Matched {logPreview.matchedEntries}/{logPreview.totalEntries} sample entries
+                      </span>
+                    </div>
+                    {(logPreview.error || fileSettings.logRegexError) && (
+                      <div style={{ color: '#f43f5e', fontSize: 11 }}>
+                        {logPreview.error ?? fileSettings.logRegexError}
+                      </div>
+                    )}
+                    {logPreview.rows.length > 0 && (
+                      <div style={{ overflowX: 'auto', maxHeight: 115 }}>
+                        <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: 11 }}>
+                          <thead>
+                            <tr>
+                              {logPreview.columns.map((col) => (
+                                <th
+                                  key={col}
+                                  style={{
+                                    textAlign: 'left',
+                                    padding: '2px 6px',
+                                    borderBottom: `1px solid ${border}`,
+                                    whiteSpace: 'nowrap',
+                                  }}
+                                >
+                                  {col}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {logPreview.rows.slice(0, 4).map((r, ri) => (
+                              <tr key={ri}>
+                                {logPreview.columns.map((_, ci) => (
+                                  <td
+                                    key={ci}
+                                    style={{
+                                      padding: '2px 6px',
+                                      borderBottom: `1px solid ${border}`,
+                                      maxWidth: 180,
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                      whiteSpace: 'nowrap',
+                                    }}
+                                  >
+                                    {r[ci] ?? ''}
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {fileSettings.onLogConfigChange && (
+                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const preset = LOG_PRESETS.find((p) => p.id === draftPresetId);
+                        fileSettings.onLogConfigChange?.({
+                          linePattern: draftLinePattern,
+                          columnNames:
+                            draftColumnNames.length > 0 ? draftColumnNames : undefined,
+                          multilinePattern: draftMultilinePattern.trim() || undefined,
+                          timestampColumn: preset?.timestampColumn,
+                          levelColumn: preset?.levelColumn,
+                        });
+                      }}
+                      style={{
+                        padding: '5px 12px',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        borderRadius: 6,
+                        border: '1px solid #3b82f6',
+                        background: '#2563eb',
+                        color: '#ffffff',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Apply Log Parser
+                    </button>
+                  </div>
+                )}
               </>
             ) : (
               <>
@@ -539,7 +788,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({
   const shortcuts: Array<[string, string]> = [
     ['Ctrl+M / Ctrl+F2', 'Toggle row marker'],
     ['F2 / Shift+F2', 'Jump to next / previous marker'],
-    ['Ctrl+S', 'Save CSV'],
+    ['Ctrl+S', 'Save file'],
     ['Ctrl+Z / Ctrl+Y', 'Undo / Redo'],
   ];
 
@@ -617,7 +866,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({
             </span>
           </div>
           <div style={{ fontSize: 12, opacity: 0.78, marginTop: 4 }}>
-            High-performance CSV, TSV &amp; JSONL editor &amp; viewer powered by <code>.metatext.jsonc</code> sidecar metadata.
+            High-performance CSV, TSV, JSONL &amp; Log editor &amp; viewer powered by <code>.metatext.jsonc</code> sidecar metadata.
           </div>
         </div>
 

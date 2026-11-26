@@ -1,6 +1,7 @@
 export * from './adapter';
 export * from './csv';
 export * from './jsonl';
+export * from './log';
 export * from './meta';
 export * from './view';
 export * from './filter';

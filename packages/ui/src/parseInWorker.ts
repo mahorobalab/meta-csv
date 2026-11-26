@@ -2,12 +2,14 @@
 import type {
   CsvDialectConfig,
   JsonlParserConfig,
+  LogParserConfig,
   MetaTextFormat,
 } from '@meta-csv/schema';
 import {
   estimateColumnWidths,
   parseCsvBytes,
   parseJsonlBytes,
+  parseLogBytes,
   type ParseProgress,
   type ParsedCsvData,
 } from '@meta-csv/core';
@@ -24,6 +26,7 @@ export interface TabularParseOptions {
   format?: MetaTextFormat;
   csv?: CsvDialectConfig;
   jsonl?: JsonlParserConfig;
+  log?: LogParserConfig;
 }
 
 let nextReqId = 1;
@@ -33,7 +36,16 @@ function parseSync(bytes: Uint8Array, options: TabularParseOptions, onProgress?:
   const parsed =
     options.format === 'jsonl'
       ? parseJsonlBytes(bytes, options.jsonl, onProgress)
-      : parseCsvBytes(bytes, options.csv, onProgress);
+      : options.format === 'log'
+        ? parseLogBytes(bytes, options.log, onProgress, 'log')
+        : options.format === 'text'
+          ? parseLogBytes(
+              bytes,
+              { ...options.log, linePattern: options.log?.linePattern ?? '' },
+              onProgress,
+              'text',
+            )
+          : parseCsvBytes(bytes, options.csv, onProgress);
   const autoWidths = estimateColumnWidths(parsed.headers, parsed.rows);
   return {
     parsed,
@@ -117,6 +129,7 @@ export function parseTabularInWorker(
       format: options.format,
       override: options.csv,
       jsonlOverride: options.jsonl,
+      logOverride: options.log,
     };
     worker.postMessage(req, transferable);
   });

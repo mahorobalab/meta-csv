@@ -85,6 +85,25 @@ export function resolveStyleRef(
   return ref;
 }
 
+const REGEX_CACHE = new Map<string, RegExp | null>();
+
+function getCachedRegex(pattern: string): RegExp | null {
+  if (REGEX_CACHE.has(pattern)) {
+    return REGEX_CACHE.get(pattern) ?? null;
+  }
+  let compiled: RegExp | null = null;
+  try {
+    compiled = new RegExp(pattern);
+  } catch {
+    compiled = null;
+  }
+  if (REGEX_CACHE.size >= 200) {
+    REGEX_CACHE.clear();
+  }
+  REGEX_CACHE.set(pattern, compiled);
+  return compiled;
+}
+
 export function evaluateRuleCondition(
   rule: ConditionalRule,
   rowValues: string[],
@@ -108,12 +127,10 @@ export function evaluateRuleCondition(
       return cellVal.trim().length === 0;
     case 'notEmpty':
       return cellVal.trim().length > 0;
-    case 'regex':
-      try {
-        return new RegExp(targetVal).test(cellVal);
-      } catch {
-        return false;
-      }
+    case 'regex': {
+      const re = getCachedRegex(targetVal);
+      return re ? re.test(cellVal) : false;
+    }
     default:
       return false;
   }

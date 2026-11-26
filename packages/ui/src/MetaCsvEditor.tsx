@@ -22,6 +22,7 @@ import {
   Save,
   Search,
   Settings,
+  Sparkles,
   Undo2,
   Unlock,
   X,
@@ -45,8 +46,10 @@ import {
   DEFAULT_HEADER_HEIGHT,
   DEFAULT_ROW_HEIGHT,
   type CellStyle,
+  type ConditionalRule,
   type FilterPreset,
   type JsonlArrayMode,
+  type LogParserConfig,
   type MarkerColor,
   type MetaCsvDocument,
   type MetaTextFormat,
@@ -57,6 +60,7 @@ import {
 import {
   UndoRedoHistory,
   applyViewFilter,
+  buildDefaultHighlightRules,
   buildSortedRowIndices,
   createStyleResolverContext,
   detectTargetFormat,
@@ -68,6 +72,7 @@ import {
   searchVisibleRows,
   serializeCsv,
   serializeJsonl,
+  serializeLog,
   type FileSystemAdapter,
   type ParseProgress,
   type ParsedCsvData,
@@ -85,6 +90,11 @@ import {
   type EditorHostMode,
   type FileLayoutSettingsProps,
 } from './SettingsAboutDialogs';
+import {
+  BG_SWATCH_COLORS,
+  ConditionalRulesModal,
+  TEXT_SWATCH_COLORS,
+} from './ConditionalRulesModal';
 import { useInputHistory } from './useInputHistory';
 
 export interface MetaCsvEditorHandle {
@@ -130,14 +140,6 @@ export interface MetaCsvEditorProps {
   onMetaTextChange?: (text: string) => void;
 }
 
-const SWATCH_COLORS = [
-  { label: 'Clear', value: undefined },
-  { label: 'Blue', value: 'rgba(59, 130, 246, 0.20)' },
-  { label: 'Green', value: 'rgba(16, 185, 129, 0.20)' },
-  { label: 'Amber', value: 'rgba(245, 158, 11, 0.22)' },
-  { label: 'Rose', value: 'rgba(244, 63, 94, 0.20)' },
-];
-
 export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditorProps>(
   function MetaCsvEditor(
     {
@@ -173,6 +175,7 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
   const [reloadTick, setReloadTick] = useState(0);
   const [openMenu, setOpenMenu] = useState<'none' | 'file' | 'edit' | 'unlock'>('none');
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showRulesModal, setShowRulesModal] = useState(false);
   const [showAboutModal, setShowAboutModal] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState<ParseProgress | null>(null);
   const [showProgressOverlay, setShowProgressOverlay] = useState(false);
@@ -260,6 +263,7 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
   const metaTextRef = useRef<string | null>(null);
   const isLoadingRef = useRef(false);
   const prevAdapterRef = useRef<FileSystemAdapter | null>(null);
+  const logConfigKeyRef = useRef<string>('{}');
 
   // Load from adapter & parse in Web Worker (releasing raw CSV bytes right after parse)
   useEffect(() => {
@@ -305,6 +309,12 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
         setFilterQuery(parsedMeta.view?.activeFilter ?? '');
         setDebouncedFilterQuery(parsedMeta.view?.activeFilter ?? '');
         setFilterContextRows(parsedMeta.view?.filterContextRows ?? 0);
+        logConfigKeyRef.current = JSON.stringify({
+          linePattern: parsedMeta.log?.linePattern,
+          columnNames: parsedMeta.log?.columnNames,
+          multilinePattern: parsedMeta.log?.multilinePattern,
+          encoding: parsedMeta.log?.encoding,
+        });
 
         const { parsed, autoWidths: widths, elapsedMs } = await parseTabularInWorker(
           payload.csvBytes,
@@ -312,6 +322,7 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
             format: resolvedFormat,
             csv: parsedMeta.csv,
             jsonl: parsedMeta.jsonl,
+            log: parsedMeta.log,
           },
           (prog) => {
             if (!cancelled) setLoadingProgress(prog);
@@ -361,12 +372,26 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
       }
 
       if (csvData) {
+        if (nextMeta.format && nextMeta.format !== activeFormat) {
+          setReloadTick((t) => t + 1);
+          return;
+        }
         if (csvData.format === 'jsonl') {
           const prevDepth = csvData.jsonlOptions?.flattenDepth ?? 2;
           const nextDepth = nextMeta.jsonl?.flattenDepth ?? 2;
           const prevArr = csvData.jsonlOptions?.arrayMode ?? 'json';
           const nextArr = nextMeta.jsonl?.arrayMode ?? 'json';
           if (prevDepth !== nextDepth || prevArr !== nextArr) {
+            setReloadTick((t) => t + 1);
+          }
+        } else if (csvData.format === 'log' || csvData.format === 'text') {
+          const nextLogKey = JSON.stringify({
+            linePattern: nextMeta.log?.linePattern,
+            columnNames: nextMeta.log?.columnNames,
+            multilinePattern: nextMeta.log?.multilinePattern,
+            encoding: nextMeta.log?.encoding,
+          });
+          if (nextLogKey !== logConfigKeyRef.current) {
             setReloadTick((t) => t + 1);
           }
         } else {
@@ -378,7 +403,7 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
         }
       }
     },
-    [csvData],
+    [csvData, activeFormat],
   );
 
   // Apply external JSONC edits (used by Playground side panel)
@@ -733,11 +758,25 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
     return parts.join(' · ');
   }, []);
 
+  // Built-in Zero-Config highlight rules for Log / JSONL when meta.rules is not explicitly set
+  const defaultHighlightRules = useMemo(() => {
+    if (!csvData || meta.rules !== undefined) return [];
+    return buildDefaultHighlightRules(csvData.columnKeys, {
+      format: activeFormat,
+      levelColumn: meta.log?.levelColumn ?? csvData.logOptions?.levelColumn,
+      themeMode,
+    });
+  }, [csvData, meta.rules, meta.log?.levelColumn, activeFormat, themeMode]);
+
   // Style resolver context
   const styleCtx = useMemo(() => {
     if (!csvData) return null;
-    return createStyleResolverContext(meta, csvData.columnKeys);
-  }, [csvData, meta]);
+    const effectiveMeta =
+      meta.rules === undefined && defaultHighlightRules.length > 0
+        ? { ...meta, rules: defaultHighlightRules }
+        : meta;
+    return createStyleResolverContext(effectiveMeta, csvData.columnKeys);
+  }, [csvData, meta, defaultHighlightRules]);
 
   // Search execution
   useEffect(() => {
@@ -901,7 +940,11 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
         data: val,
         displayData: displayVal,
         allowOverlay: !isReadOnly && !colMeta?.readonly,
-        allowWrapping: colMeta?.wrap ?? false,
+        allowWrapping:
+          colMeta?.wrap ??
+          (activeFormat === 'log' || activeFormat === 'text'
+            ? (meta.log?.wordWrap ?? false)
+            : false),
         contentAlign: colMeta?.align,
         themeOverride,
       };
@@ -921,6 +964,7 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
       filterState.positiveTerms,
       collapseColKey,
       isReadOnly,
+      activeFormat,
       dataVersion,
     ],
   );
@@ -1071,6 +1115,9 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
     if (!csvData) return null;
     if (csvData.format === 'jsonl' && csvData.jsonlOptions) {
       return serializeJsonl(csvData.columnKeys, rowsRef.current, csvData.jsonlOptions);
+    }
+    if ((csvData.format === 'log' || csvData.format === 'text') && csvData.logOptions) {
+      return serializeLog(csvData.columnKeys, rowsRef.current, csvData.logOptions);
     }
     return serializeCsv(csvData.headers, rowsRef.current, csvData.dialect);
   }, [csvData]);
@@ -1426,8 +1473,8 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
             {onOpenFile && (
               <button
                 type="button"
-                aria-label="Open CSV"
-                title="Open CSV..."
+                aria-label="Open File"
+                title="Open File..."
                 style={{ ...btnStyle, padding: '3px 6px' }}
                 onClick={onOpenFile}
               >
@@ -1855,7 +1902,7 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
               >
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
                   <FolderOpen size={14} />
-                  <span>Open CSV...</span>
+                  <span>Open File...</span>
                 </span>
               </button>
             )}
@@ -1878,9 +1925,13 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
                     ? hostMode === 'web'
                       ? 'Save / Download JSONL'
                       : 'Save JSONL'
-                    : hostMode === 'web'
-                      ? 'Save / Download CSV'
-                      : 'Save CSV'}
+                    : activeFormat === 'log' || activeFormat === 'text'
+                      ? hostMode === 'web'
+                        ? 'Save / Download Log'
+                        : 'Save Log'
+                      : hostMode === 'web'
+                        ? 'Save / Download CSV'
+                        : 'Save CSV'}
                 </span>
               </span>
               <span style={{ fontSize: 10.5, opacity: 0.6 }}>Ctrl+S</span>
@@ -1939,7 +1990,7 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
               top: 'calc(100% + 2px)',
               left: hostMode === 'vscode' ? 10 : 72,
               zIndex: 60,
-              width: 260,
+              width: 288,
               padding: 12,
               borderRadius: 6,
               background: isDark ? '#1f1f23' : '#ffffff',
@@ -1975,8 +2026,20 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
             </div>
 
             <hr style={{ border: 'none', borderTop: `1px solid ${toolbarBorder}`, margin: '2px 0' }} />
-            <div style={{ fontWeight: 700, fontSize: 12 }}>Cell Style (.metatext.jsonc)</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontWeight: 700, fontSize: 12 }}>Cell Style (.metatext.jsonc)</div>
+              <button
+                type="button"
+                style={{ ...btnStyle, height: 22, padding: '2px 6px', fontSize: 11 }}
+                title="Clear all style overrides on selection"
+                onClick={() => applyStyleToSelection(() => ({}))}
+              >
+                <X size={11} />
+                <span>Clear</span>
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <button
                 type="button"
                 style={{ ...btnStyle, padding: '3px 8px' }}
@@ -1984,6 +2047,7 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
                 onClick={() => applyStyleToSelection((s) => ({ ...s, bold: !s.bold }))}
               >
                 <Bold size={13} />
+                <span>Bold</span>
               </button>
               <button
                 type="button"
@@ -1992,28 +2056,81 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
                 onClick={() => applyStyleToSelection((s) => ({ ...s, italic: !s.italic }))}
               >
                 <Italic size={13} />
+                <span>Italic</span>
               </button>
-              <span style={{ opacity: 0.35 }}>|</span>
-              {SWATCH_COLORS.map((sw) => (
-                <button
-                  key={sw.label}
-                  type="button"
-                  title={`Background: ${sw.label}`}
-                  style={{
-                    ...btnStyle,
-                    width: 24,
-                    height: 24,
-                    padding: 0,
-                    background: sw.value ?? (isDark ? '#1e1e1e' : '#ffffff'),
-                  }}
-                  onClick={() =>
-                    applyStyleToSelection((s) => ({ ...s, backgroundColor: sw.value }))
-                  }
-                >
-                  {sw.label === 'Clear' ? <X size={12} /> : ' '}
-                </button>
-              ))}
             </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span style={{ fontSize: 11, opacity: 0.75 }}>Background Color</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                {BG_SWATCH_COLORS.map((sw) => (
+                  <button
+                    key={sw.label}
+                    type="button"
+                    title={`Background: ${sw.label}`}
+                    style={{
+                      ...btnStyle,
+                      width: 22,
+                      height: 22,
+                      padding: 0,
+                      background: sw.value ?? (isDark ? '#1e1e1e' : '#ffffff'),
+                    }}
+                    onClick={() =>
+                      applyStyleToSelection((s) => ({ ...s, backgroundColor: sw.value }))
+                    }
+                  >
+                    {sw.value === undefined ? <X size={11} /> : ' '}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span style={{ fontSize: 11, opacity: 0.75 }}>Text Color</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                {TEXT_SWATCH_COLORS.map((sw) => (
+                  <button
+                    key={sw.label}
+                    type="button"
+                    title={`Text Color: ${sw.label}`}
+                    style={{
+                      ...btnStyle,
+                      width: 22,
+                      height: 22,
+                      padding: 0,
+                      borderRadius: '50%',
+                      background: sw.value ?? (isDark ? '#1e1e1e' : '#ffffff'),
+                    }}
+                    onClick={() =>
+                      applyStyleToSelection((s) => ({ ...s, color: sw.value }))
+                    }
+                  >
+                    {sw.value === undefined ? <X size={11} /> : ' '}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              style={{ ...btnStyle, width: '100%', justifyContent: 'space-between' }}
+              onClick={() => {
+                setOpenMenu('none');
+                setShowRulesModal(true);
+              }}
+            >
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <Sparkles size={13} />
+                <span>Conditional Rules...</span>
+              </span>
+              <span style={{ opacity: 0.7 }}>
+                {meta.rules !== undefined
+                  ? meta.rules.length
+                  : defaultHighlightRules.length > 0
+                    ? `${defaultHighlightRules.length} (auto)`
+                    : 0}
+              </span>
+            </button>
 
             {selectedDataRow !== undefined && (
               <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 }}>
@@ -2231,6 +2348,21 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
                 onJsonlFlattenDepthChange: (next) => patchMeta(['jsonl', 'flattenDepth'], next),
                 jsonlArrayMode: meta.jsonl?.arrayMode ?? ('json' satisfies JsonlArrayMode),
                 onJsonlArrayModeChange: (next) => patchMeta(['jsonl', 'arrayMode'], next),
+                logLinePattern: meta.log?.linePattern ?? csvData.logOptions?.linePattern ?? '',
+                logColumnNames: meta.log?.columnNames ?? csvData.logOptions?.columnNames,
+                logMultilinePattern:
+                  meta.log?.multilinePattern ?? csvData.logOptions?.multilinePattern ?? '',
+                logWordWrap: meta.log?.wordWrap ?? csvData.logOptions?.wordWrap ?? false,
+                logMatchedPresetId: csvData.logOptions?.matchedPresetId,
+                logRegexError: csvData.logOptions?.regexError,
+                logSampleLines: csvData.sampleLines,
+                onLogConfigChange: (patch: Partial<LogParserConfig>) => {
+                  let text = metaTextRef.current ?? '';
+                  for (const [k, v] of Object.entries(patch)) {
+                    text = patchMetaJsonc(text, ['log', k], v);
+                  }
+                  scheduleMetaSave(text);
+                },
                 freezeColumns: meta.table?.freezeColumns ?? 0,
                 maxFreezeColumns: Math.max(0, visibleColIndices.length - 1),
                 onFreezeColumnsChange: (next) => patchMeta(['table', 'freezeColumns'], next),
@@ -2255,6 +2387,17 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
             : undefined
         }
         extraSection={settingsExtraSection}
+      />
+      <ConditionalRulesModal
+        open={showRulesModal}
+        onClose={() => setShowRulesModal(false)}
+        themeMode={themeMode}
+        columns={filterColumnOptions.map((c) => ({ key: c.key, label: c.label }))}
+        rules={meta.rules ?? []}
+        defaultRules={defaultHighlightRules}
+        usingDefaultRules={meta.rules === undefined && defaultHighlightRules.length > 0}
+        styles={meta.styles}
+        onChangeRules={(next: ConditionalRule[]) => patchMeta(['rules'], next)}
       />
       <AboutModal
         open={showAboutModal}

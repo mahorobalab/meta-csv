@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   UndoRedoHistory,
   applyViewFilter,
+  buildDefaultHighlightRules,
   buildSortedRowIndices,
   computeColumnFacets,
   createStyleResolverContext,
@@ -9,11 +10,15 @@ import {
   indexToExcelColumn,
   parseCsvBytes,
   parseJsonlBytes,
+  parseLogBytes,
+  parseLogLines,
   parseMetaJsonc,
   patchMetaJsonc,
+  previewLogPattern,
   resolveCellStyle,
   serializeCsv,
   serializeJsonl,
+  serializeLog,
 } from '../index';
 
 describe('@meta-csv/core', () => {
@@ -308,5 +313,179 @@ describe('@meta-csv/core', () => {
       latency: 42,
     });
     expect(outLines[2]).toBe('not valid json line');
+  });
+
+  it('parses log lines with named groups, multiline folding, _raw fallback, and round-trips', () => {
+    const logText = [
+      '=== App Startup Banner ===',
+      '2026-11-26 10:00:01.120 [INFO] auth.Service - User login ok',
+      '2026-11-26 10:00:02.450 [ERROR] db.Pool - Connection timeout',
+      '\tat db.Pool.acquire(Pool.java:42)',
+      'Caused by: java.net.SocketTimeoutException: connect timed out',
+    ].join('\r\n');
+
+    const bytes = new TextEncoder().encode('\uFEFF' + logText);
+    const parsed = parseLogBytes(bytes, {
+      linePattern:
+        '^(?<timestamp>\\d{4}-\\d{2}-\\d{2}[T ]\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?)\\s+\\[(?<level>[A-Z]+)\\]\\s+(?<logger>[\\w.-]+)\\s+-\\s+(?<message>.*)$',
+      multilinePattern: '^(\\s+at\\s+|Caused by:)',
+    });
+
+    expect(parsed.format).toBe('log');
+    expect(parsed.dialect.encoding).toBe('utf-8-bom');
+    expect(parsed.dialect.lineEnding).toBe('crlf');
+    expect(parsed.invalidLineCount).toBe(1);
+    expect(parsed.columnKeys).toEqual(['timestamp', 'level', 'logger', 'message', '_raw']);
+    expect(parsed.rows.length).toBe(3);
+    expect(parsed.rows[0]).toEqual(['', '', '', '', '=== App Startup Banner ===']);
+    expect(parsed.rows[1]).toEqual([
+      '2026-11-26 10:00:01.120',
+      'INFO',
+      'auth.Service',
+      'User login ok',
+      '',
+    ]);
+    expect(parsed.rows[2]![1]).toBe('ERROR');
+    expect(parsed.rows[2]![3]).toContain('Connection timeout\n\tat db.Pool.acquire');
+    expect(parsed.rows[2]![3]).toContain('Caused by: java.net.SocketTimeoutException');
+
+    const serialized = serializeLog(parsed.columnKeys, parsed.rows, parsed.logOptions!);
+    expect(serialized[0]).toBe(0xef);
+    expect(serialized[1]).toBe(0xbb);
+    expect(serialized[2]).toBe(0xbf);
+    const textOut = new TextDecoder().decode(serialized.subarray(3));
+    expect(textOut).toContain('=== App Startup Banner ===\r\n');
+    expect(textOut).toContain('Connection timeout\r\n\tat db.Pool.acquire');
+  });
+
+  it('auto-detects log presets, supports numbered capture groups, and handles invalid regex safely', () => {
+    const autoParsed = parseLogLines([
+      '127.0.0.1 - alice [26/Nov/2026:10:00:01 +0900] "GET /api/items HTTP/1.1" 200 1024',
+      '10.0.0.5 - bob [26/Nov/2026:10:00:02 +0900] "POST /api/login HTTP/1.1" 401 128',
+    ]);
+    expect(autoParsed.logOptions?.matchedPresetId).toBe('apache-nginx');
+    expect(autoParsed.columnKeys).toContain('method');
+    expect(autoParsed.rows[1]![autoParsed.columnKeys.indexOf('status')]).toBe('401');
+
+    const numbered = parseLogLines(
+      ['WARN|worker-1|Queue high', 'ERR|worker-2|Disk full'],
+      { linePattern: '^(\\w+)\\|([^|]+)\\|(.*)$', columnNames: ['level', 'worker', 'msg'] },
+    );
+    expect(numbered.columnKeys).toEqual(['level', 'worker', 'msg']);
+    expect(numbered.rows[0]).toEqual(['WARN', 'worker-1', 'Queue high']);
+
+    const badRegex = parseLogLines(['line 1', 'line 2'], { linePattern: '([unclosed' });
+    expect(badRegex.logOptions?.regexError).toContain('Invalid linePattern');
+    expect(badRegex.columnKeys).toEqual(['message']);
+    expect(badRegex.rows).toEqual([['line 1'], ['line 2']]);
+
+    const preview = previewLogPattern(
+      ['2026-11-26 10:00:01 [INFO] svc - hello', 'bad line'],
+      {
+        linePattern:
+          '^(?<timestamp>\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2})\\s+\\[(?<level>[A-Z]+)\\]\\s+(?<logger>\\S+)\\s+-\\s+(?<message>.*)$',
+      },
+    );
+    expect(preview.matchedEntries).toBe(1);
+    expect(preview.unmatchedEntries).toBe(1);
+    expect(preview.columns).toEqual(['timestamp', 'level', 'logger', 'message', '_raw']);
+  });
+
+  it('auto-detects nginx error, mysql, postgres, laravel, IIS W3C, and Docker JSON logs', () => {
+    const nginxErr = parseLogLines([
+      '2026/11/26 10:00:01 [error] 1024#1024: *12 upstream timed out (110: Connection timed out)',
+      '2026/11/26 10:00:02 [warn] 1024#1024: *13 an upstream response is buffered',
+    ]);
+    expect(nginxErr.logOptions?.matchedPresetId).toBe('nginx-error');
+    expect(nginxErr.rows[0]![nginxErr.columnKeys.indexOf('level')]).toBe('error');
+
+    const mysqlErr = parseLogLines([
+      '2026-11-26T10:00:01.123456Z 0 [Warning] [MY-010068] [Server] CA certificate is self signed.',
+      '2026-11-26T10:00:02.654321Z 14 [ERROR] [MY-013132] [Server] Connection refused',
+    ]);
+    expect(mysqlErr.logOptions?.matchedPresetId).toBe('mysql-error');
+    expect(mysqlErr.rows[1]![mysqlErr.columnKeys.indexOf('errorCode')]).toBe('MY-013132');
+
+    const pgLog = parseLogLines([
+      '2026-11-26 10:00:01.123 JST [1234] ERROR:  duplicate key value violates unique constraint',
+      '2026-11-26 10:00:01.124 JST [1234] STATEMENT:  INSERT INTO users (id) VALUES (1);',
+      '\tON CONFLICT DO NOTHING',
+    ]);
+    expect(pgLog.logOptions?.matchedPresetId).toBe('postgres');
+    expect(pgLog.rows.length).toBe(2);
+    expect(pgLog.rows[1]![pgLog.columnKeys.indexOf('message')]).toContain('\n\tON CONFLICT');
+
+    const laravelLog = parseLogLines([
+      '[2026-11-26 10:00:01] production.ERROR: SQLSTATE[HY000] [2002] Connection refused',
+      '#0 /var/www/vendor/laravel/framework/Connection.php(664): PDO->__construct()',
+      '[2026-11-26 10:00:02] production.INFO: Queue worker started',
+    ]);
+    expect(laravelLog.logOptions?.matchedPresetId).toBe('laravel');
+    expect(laravelLog.rows.length).toBe(2);
+    expect(laravelLog.rows[0]![laravelLog.columnKeys.indexOf('message')]).toContain('#0 /var/www');
+
+    const iisLog = parseLogLines([
+      '#Software: Microsoft Internet Information Services 10.0',
+      '#Fields: date time s-ip cs-method cs-uri-stem sc-status time-taken',
+      '2026-11-26 10:00:01 10.0.0.10 GET /api/health 200 12',
+      '2026-11-26 10:00:02 10.0.0.10 POST /api/orders 500 3102',
+    ]);
+    expect(iisLog.logOptions?.matchedPresetId).toBe('iis-w3c');
+    expect(iisLog.columnKeys).toEqual([
+      'date',
+      'time',
+      's-ip',
+      'cs-method',
+      'cs-uri-stem',
+      'sc-status',
+      'time-taken',
+    ]);
+    expect(iisLog.rows[1]![5]).toBe('500');
+
+    const dockerJson = parseLogLines([
+      '{"log":"Server listening on :8080\\n","stream":"stdout","time":"2026-11-26T10:00:01.000Z"}',
+      '{"log":"ERROR: DB connection lost\\n","stream":"stderr","time":"2026-11-26T10:00:02.000Z"}',
+    ]);
+    expect(dockerJson.logOptions?.matchedPresetId).toBe('docker-json');
+    expect(dockerJson.columnKeys).toEqual(['log', 'stream', 'time']);
+  });
+
+  it('builds default highlight rules for log levels, HTTP status codes, and stderr', () => {
+    expect(buildDefaultHighlightRules(['id', 'status'], { format: 'csv' })).toEqual([]);
+
+    const levelRules = buildDefaultHighlightRules(['timestamp', 'level', 'message'], {
+      format: 'log',
+      levelColumn: 'level',
+      themeMode: 'dark',
+    });
+    expect(levelRules.length).toBe(3);
+
+    const ctx = createStyleResolverContext({ version: '0.1', rules: levelRules }, [
+      'timestamp',
+      'level',
+      'message',
+    ]);
+    const errStyle = resolveCellStyle(ctx, 0, 2, ['t', 'ERROR', 'boom']);
+    expect(errStyle?.backgroundColor).toContain('244, 63, 94');
+
+    const nginxRules = buildDefaultHighlightRules(['ip', 'status', 'path'], {
+      format: 'log',
+      themeMode: 'light',
+    });
+    const nginxCtx = createStyleResolverContext({ version: '0.1', rules: nginxRules }, [
+      'ip',
+      'status',
+      'path',
+    ]);
+    expect(resolveCellStyle(nginxCtx, 0, 0, ['1.1.1.1', '502', '/'])?.backgroundColor).toContain(
+      '244, 63, 94',
+    );
+    expect(resolveCellStyle(nginxCtx, 1, 1, ['1.1.1.1', '301', '/'])?.color).toBe('#0284c7');
+
+    const dockerRules = buildDefaultHighlightRules(['log', 'stream', 'time'], {
+      format: 'log',
+    });
+    expect(dockerRules[0]?.when.column).toBe('stream');
+    expect(dockerRules[0]?.when.value).toBe('stderr');
   });
 });

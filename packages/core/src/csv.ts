@@ -15,6 +15,19 @@ export interface ResolvedJsonlOptions {
   lineEnding: CsvLineEnding;
 }
 
+export interface ResolvedLogOptions {
+  linePattern?: string;
+  columnNames: string[];
+  timestampColumn?: string;
+  levelColumn?: string;
+  multilinePattern?: string;
+  wordWrap: boolean;
+  encoding: CsvEncoding;
+  lineEnding: CsvLineEnding;
+  matchedPresetId?: string;
+  regexError?: string;
+}
+
 export interface ResolvedCsvDialect {
   hasHeader: boolean;
   delimiter: CsvDelimiter;
@@ -29,7 +42,9 @@ export interface ParsedCsvData {
   dialect: ResolvedCsvDialect;
   format?: MetaTextFormat;
   jsonlOptions?: ResolvedJsonlOptions;
+  logOptions?: ResolvedLogOptions;
   invalidLineCount?: number;
+  sampleLines?: string[];
 }
 
 /** Convert 0-based column index to Excel-style column label (0 -> A, 25 -> Z, 26 -> AA). */

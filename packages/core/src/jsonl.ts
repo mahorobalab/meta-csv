@@ -1,4 +1,6 @@
 import type {
+  CsvEncoding,
+  CsvLineEnding,
   JsonlArrayMode,
   JsonlParserConfig,
   MetaTextFormat,
@@ -87,24 +89,34 @@ function flattenObjectEntries(
   }
 }
 
+export interface ParseJsonlLinesOptions {
+  encoding?: CsvEncoding;
+  lineEnding?: CsvLineEnding;
+  format?: MetaTextFormat;
+  onProgress?: (progress: ParseProgress) => void;
+}
+
 /**
- * Parse JSON Lines (.jsonl / .ndjson) into a flat tabular grid, scanning all rows
+ * Parse pre-split JSON Lines into a flat tabular grid, scanning all rows
  * so sparse keys appearing on later lines become grid columns automatically.
  */
-export function parseJsonlBytes(
-  bytes: Uint8Array,
+export function parseJsonlLines(
+  lines: string[],
   override?: JsonlParserConfig,
-  onProgress?: (progress: ParseProgress) => void,
+  opts: ParseJsonlLinesOptions = {},
 ): ParsedCsvData {
-  onProgress?.({ phase: 'decoding', percent: 5, rowsParsed: 0 });
-  const { text, encoding } = decodeCsvBytes(bytes, override?.encoding);
-  const lineEnding = override?.lineEnding ?? detectLineEnding(text);
-  const flattenDepth = Math.max(0, Math.min(8, Math.floor(override?.flattenDepth ?? DEFAULT_FLATTEN_DEPTH)));
+  const encoding: CsvEncoding = override?.encoding ?? opts.encoding ?? 'utf-8';
+  const lineEnding: CsvLineEnding = override?.lineEnding ?? opts.lineEnding ?? 'lf';
+  const format: MetaTextFormat = opts.format ?? 'jsonl';
+  const onProgress = opts.onProgress;
+  const flattenDepth = Math.max(
+    0,
+    Math.min(8, Math.floor(override?.flattenDepth ?? DEFAULT_FLATTEN_DEPTH)),
+  );
   const arrayMode: JsonlArrayMode = override?.arrayMode ?? DEFAULT_ARRAY_MODE;
 
   onProgress?.({ phase: 'parsing', percent: 20, rowsParsed: 0 });
 
-  const lines = text.split(/\r?\n/);
   const keys: string[] = [];
   const colIndexByKey = new Map<string, number>();
   const sparseRows: Array<Array<[number, string]>> = [];
@@ -175,7 +187,7 @@ export function parseJsonlBytes(
     rows,
     columnKeys: keys,
     dialect: { hasHeader: true, delimiter: ',', encoding, lineEnding },
-    format: 'jsonl',
+    format,
     jsonlOptions: {
       flattenDepth,
       arrayMode,
@@ -184,6 +196,27 @@ export function parseJsonlBytes(
     },
     invalidLineCount,
   };
+}
+
+/**
+ * Parse JSON Lines (.jsonl / .ndjson) bytes into a flat tabular grid, scanning all rows
+ * so sparse keys appearing on later lines become grid columns automatically.
+ */
+export function parseJsonlBytes(
+  bytes: Uint8Array,
+  override?: JsonlParserConfig,
+  onProgress?: (progress: ParseProgress) => void,
+): ParsedCsvData {
+  onProgress?.({ phase: 'decoding', percent: 5, rowsParsed: 0 });
+  const { text, encoding } = decodeCsvBytes(bytes, override?.encoding);
+  const lineEnding = override?.lineEnding ?? detectLineEnding(text);
+  const lines = text.split(/\r?\n/);
+  return parseJsonlLines(lines, override, {
+    encoding,
+    lineEnding,
+    format: 'jsonl',
+    onProgress,
+  });
 }
 
 function parseCellToJsonValue(raw: string): unknown {

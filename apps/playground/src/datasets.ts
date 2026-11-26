@@ -158,7 +158,9 @@ function triggerBrowserDownload(fileName: string, bytes: Uint8Array): void {
   const mimeType =
     lower.endsWith('.jsonl') || lower.endsWith('.ndjson')
       ? 'application/x-ndjson;charset=utf-8'
-      : 'text/csv;charset=utf-8';
+      : lower.endsWith('.log') || lower.endsWith('.txt')
+        ? 'text/plain;charset=utf-8'
+        : 'text/csv;charset=utf-8';
   const blob = new Blob([copy], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -276,6 +278,85 @@ export const EVENTS_JSONL_META = `{
     "metrics.status": { "label": "HTTP", "width": 70, "align": "center" },
     "error.code": { "label": "Error Code", "width": 165 },
     "message": { "label": "Message", "width": 340 }
+  },
+
+  "rules": [
+    {
+      "name": "ERROR row highlight",
+      "target": "row",
+      "when": { "column": "level", "operator": "equals", "value": "ERROR" },
+      "style": "errorRow"
+    },
+    {
+      "name": "WARN row highlight",
+      "target": "row",
+      "when": { "column": "level", "operator": "equals", "value": "WARN" },
+      "style": "warnRow"
+    }
+  ]
+}
+`;
+
+export const APP_LOG = [
+  '=== MetaText Service v0.1.0 started on port 8080 ===',
+  '2026-11-26 08:00:01.102 [INFO] app.Bootstrap - Configuration loaded from /etc/metatext/config.jsonc',
+  '2026-11-26 08:00:02.340 [INFO] auth.TokenService - JWKS cache warmed up (4 keys)',
+  '2026-11-26 08:00:05.812 [WARN] db.ConnectionPool - Active connections reached 85% of pool limit (17/20)',
+  '2026-11-26 08:00:09.044 [ERROR] db.ConnectionPool - Failed to acquire database connection after 3000ms',
+  '\tat db.ConnectionPool.acquire(ConnectionPool.java:142)',
+  '\tat api.OrderController.createOrder(OrderController.java:88)',
+  'Caused by: java.net.SocketTimeoutException: connect timed out',
+  '2026-11-26 08:00:10.501 [INFO] db.ConnectionPool - Replica failover succeeded on read-node-2',
+  '2026-11-26 08:00:12.118 [WARN] worker.RetryQueue - Retrying job #4092 (attempt 2/5)',
+  '2026-11-26 08:00:14.775 [INFO] worker.RetryQueue - Job #4092 completed in 184ms',
+  '2026-11-26 08:00:18.920 [ERROR] billing.Webhook - Signature verification failed for event evt_9912',
+].join('\n');
+
+export const APP_LOG_META = `{
+  "$schema": "./metatext.schema.json",
+  "version": "0.1",
+  "format": "log",
+  "readOnly": true,
+
+  // Split plain log lines into timestamp / level / logger / message & fold Java stack traces
+  "log": {
+    "linePattern": "^(?<timestamp>\\\\d{4}-\\\\d{2}-\\\\d{2}[T ]\\\\d{2}:\\\\d{2}:\\\\d{2}(?:\\\\.\\\\d+)?)\\\\s+\\\\[(?<level>[A-Z]+)\\\\]\\\\s+(?<logger>[\\\\w.-]+)\\\\s+-\\\\s+(?<message>.*)$",
+    "columnNames": ["timestamp", "level", "logger", "message"],
+    "timestampColumn": "timestamp",
+    "levelColumn": "level",
+    "multilinePattern": "^(\\\\s+at\\\\s+|Caused by:)",
+    "wordWrap": false,
+    "encoding": "utf-8"
+  },
+
+  "table": {
+    "fontFamily": "'Consolas', 'Courier New', monospace",
+    "fontSize": 12,
+    "defaultRowHeight": 24,
+    "freezeColumns": 2
+  },
+
+  "view": {
+    "filterPresets": [
+      { "name": "Errors + Context", "query": "level:ERROR", "contextRows": 1 },
+      { "name": "Warnings & Errors", "query": "level:ERROR OR level:WARN", "contextRows": 1 }
+    ],
+    "markers": [
+      { "row": 4, "color": "rose", "note": "DB pool timeout + stack trace" }
+    ]
+  },
+
+  "styles": {
+    "errorRow": { "backgroundColor": "rgba(244, 63, 94, 0.18)" },
+    "warnRow": { "backgroundColor": "rgba(245, 158, 11, 0.18)" }
+  },
+
+  "columns": {
+    "timestamp": { "label": "Time", "width": 185 },
+    "level": { "label": "Level", "width": 75, "align": "center" },
+    "logger": { "label": "Logger", "width": 165 },
+    "message": { "label": "Message", "width": 480 },
+    "_raw": { "label": "Raw Fallback", "width": 320 }
   },
 
   "rules": [
