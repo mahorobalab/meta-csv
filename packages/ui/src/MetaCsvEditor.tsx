@@ -417,7 +417,7 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
     [csvData, appSettings?.noHeaderColumnStyle],
   );
 
-  // Column name + alias lookup for FilterBar (supports both raw column keys and .meta.jsonc labels)
+  // Column name + alias lookup for FilterBar (supports both raw column keys and .metatext.jsonc labels)
   const filterColumnOptions: FilterColumnOption[] = useMemo(() => {
     if (!csvData) return [];
     return csvData.columnKeys.map((key, idx) => ({
@@ -1001,7 +1001,7 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
     [csvData, columns.length, selection, viewRowIndices.length, visibleColIndices, meta.columns],
   );
 
-  // Column resize -> persist to .meta.jsonc
+  // Column resize -> persist to .metatext.jsonc
   const onColumnResize = useCallback(
     (column: GridColumn, newSize: number) => {
       if (!column.id) return;
@@ -1011,7 +1011,7 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
     [patchMeta],
   );
 
-  // Header click -> cycle view sort (asc -> desc -> none) & persist to .meta.jsonc
+  // Header click -> cycle view sort (asc -> desc -> none) & persist to .metatext.jsonc
   const onHeaderClicked = useCallback(
     (colIndex: number) => {
       const col = columns[colIndex];
@@ -1810,7 +1810,7 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
             </div>
 
             <hr style={{ border: 'none', borderTop: `1px solid ${toolbarBorder}`, margin: '2px 0' }} />
-            <div style={{ fontWeight: 700, fontSize: 12 }}>Cell Style (.meta.jsonc)</div>
+            <div style={{ fontWeight: 700, fontSize: 12 }}>Cell Style (.metatext.jsonc)</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
               <button
                 type="button"

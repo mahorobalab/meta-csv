@@ -108,8 +108,8 @@ class MetaCsvEditorProvider implements vscode.CustomEditorProvider<MetaCsvDocume
   ): Promise<void> {
     const buf = await this.requestCsvBytesFromWebview(document);
     await fs.writeFile(destination.fsPath, buf);
-    const srcMeta = `${document.uri.fsPath}.meta.jsonc`;
-    const dstMeta = `${destination.fsPath}.meta.jsonc`;
+    const srcMeta = `${document.uri.fsPath}.metatext.jsonc`;
+    const dstMeta = `${destination.fsPath}.metatext.jsonc`;
     try {
       const metaText = await fs.readFile(srcMeta, 'utf-8');
       await fs.writeFile(dstMeta, metaText, 'utf-8');
@@ -159,7 +159,7 @@ class MetaCsvEditorProvider implements vscode.CustomEditorProvider<MetaCsvDocume
     webview.html = this.getHtmlForWebview(webview, webviewRoot);
 
     const csvPath = document.uri.fsPath;
-    const metaPath = `${csvPath}.meta.jsonc`;
+    const metaPath = `${csvPath}.metatext.jsonc`;
 
     const sendFilePayload = async () => {
       try {
@@ -288,7 +288,7 @@ class MetaCsvEditorProvider implements vscode.CustomEditorProvider<MetaCsvDocume
             await fs.writeFile(metaPath, String(message.metaText ?? ''), 'utf-8');
             await webview.postMessage({ type: 'saved', target: 'meta', requestId: message.requestId });
           } catch (err) {
-            void vscode.window.showErrorMessage(`MetaCSV: Failed to save .meta.jsonc: ${String(err)}`);
+            void vscode.window.showErrorMessage(`MetaCSV: Failed to save .metatext.jsonc: ${String(err)}`);
             await webview.postMessage({
               type: 'saveError',
               requestId: message.requestId,

@@ -3,11 +3,11 @@ import {
   DEFAULT_META_VERSION,
   type CellStyle,
   type ConditionalRule,
-  type MetaCsvDocument,
+  type MetaTextDocument,
   type StyleRef,
 } from '@meta-csv/schema';
 
-export function parseMetaJsonc(text: string | null): MetaCsvDocument {
+export function parseMetaJsonc(text: string | null): MetaTextDocument {
   if (!text || text.trim().length === 0) {
     return { version: DEFAULT_META_VERSION };
   }
@@ -15,7 +15,7 @@ export function parseMetaJsonc(text: string | null): MetaCsvDocument {
   if (!parsed || typeof parsed !== 'object') {
     return { version: DEFAULT_META_VERSION };
   }
-  return parsed as MetaCsvDocument;
+  return parsed as MetaTextDocument;
 }
 
 export function createInitialMetaJsonc(schemaUrl?: string): string {
@@ -120,14 +120,14 @@ export function evaluateRuleCondition(
 }
 
 export interface StyleResolverContext {
-  meta: MetaCsvDocument;
+  meta: MetaTextDocument;
   columnKeys: string[];
   columnIndexByKey: Map<string, number>;
   parsedRanges: Array<{ range: ParsedRange; style: CellStyle }>;
 }
 
 export function createStyleResolverContext(
-  meta: MetaCsvDocument,
+  meta: MetaTextDocument,
   columnKeys: string[],
 ): StyleResolverContext {
   const columnIndexByKey = new Map<string, number>();

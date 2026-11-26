@@ -22,8 +22,9 @@ export const SPEC_SETTING_CSV = [
 ].join('\r\n');
 
 export const SPEC_SETTING_META = `{
-  "$schema": "./metacsv.schema.json",
+  "$schema": "./metatext.schema.json",
   "version": "0.1",
+  "format": "csv",
 
   // ヘッダー行が無い仕様一覧 CSV の例
   "csv": {
@@ -126,6 +127,7 @@ export function generateLargeCsvBytes(rowCount = 100_000): Uint8Array {
 
 export const LARGE_CSV_META = `{
   "version": "0.1",
+  "format": "csv",
   // 10万行ベンチマーク用メタデータ
   "csv": { "hasHeader": true },
   "table": { "freezeColumns": 1, "defaultRowHeight": 26 },

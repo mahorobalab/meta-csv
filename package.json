@@ -8,6 +8,7 @@
     "dev:desktop": "pnpm --filter @meta-csv/desktop tauri:dev",
     "build:desktop": "pnpm --filter @meta-csv/desktop tauri:build",
     "build:pages": "pnpm --filter @meta-csv/playground build && node scripts/build-pages.mjs",
+    "sync:schema": "node scripts/sync-schema.mjs",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test"

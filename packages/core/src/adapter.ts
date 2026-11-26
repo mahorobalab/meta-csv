@@ -3,7 +3,7 @@ export interface CsvFilePayload {
   fileName: string;
   /** Raw CSV bytes so dialect/encoding detection stays in core */
   csvBytes: Uint8Array;
-  /** Adjacent .meta.jsonc raw text, or null if not yet created */
+  /** Adjacent .metatext.jsonc raw text, or null if not yet created */
   metaText: string | null;
 }
 
@@ -12,7 +12,7 @@ export interface FileSystemAdapter {
   load(): Promise<CsvFilePayload>;
   /** Persist CSV bytes (already encoded in the target encoding) */
   saveCsv(bytes: Uint8Array): Promise<void>;
-  /** Persist .meta.jsonc text (creating it if it does not exist) */
+  /** Persist .metatext.jsonc text (creating it if it does not exist) */
   saveMeta(jsoncText: string): Promise<void>;
   /** Optional subscription to external file updates */
   onExternalChange?(callback: (target: 'csv' | 'meta') => void): () => void;

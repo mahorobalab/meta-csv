@@ -177,7 +177,7 @@ export const App: React.FC = () => {
       >
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
           <Code2 size={13} />
-          <span>{showMetaPanel ? 'Hide .meta.jsonc Panel' : 'Show .meta.jsonc Panel'}</span>
+          <span>{showMetaPanel ? 'Hide .metatext.jsonc Panel' : 'Show .metatext.jsonc Panel'}</span>
         </span>
         {showMetaPanel && <Check size={13} />}
       </button>
@@ -206,7 +206,7 @@ export const App: React.FC = () => {
         cursor: 'pointer',
       }}
     >
-      <span>Show live .meta.jsonc panel</span>
+      <span>Show live .metatext.jsonc panel</span>
       <input
         type="checkbox"
         checked={showMetaPanel}
@@ -276,7 +276,7 @@ export const App: React.FC = () => {
               borderBottom: `1px solid ${border}`,
             }}
           >
-            Live .meta.jsonc (drag columns / click header / add markers)
+            Live .metatext.jsonc (drag columns / click header / add markers)
           </div>
           <textarea
             value={metaText}

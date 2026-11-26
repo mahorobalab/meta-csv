@@ -2,7 +2,7 @@
 
 # MetaCSV
 
-**JSONC サイドカーメタデータ（`.meta.jsonc`）で駆動する、100 万行対応の高速 CSV エディタ／ビューア**  
+**JSONC サイドカーメタデータ（`.metatext.jsonc`）で駆動する、100 万行対応の高速 CSV エディタ／ビューア**  
 *Git フレンドリーなプレーン CSV のまま、VS Code・Windows・macOS で Excel ライクな見た目と状態記憶を実現します。*
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
@@ -25,8 +25,8 @@
 - **Excel**: `001` が `1` に、`1-2` が日付に勝手に変換され、UTF-8 / LF が壊れたり、大容量ファイルで長時間フリーズする。
 - **一般的な CSV エディタ**: 列幅や非表示列・ソート順を調整しても、タブを閉じて開き直すたびにリセットされる（健忘症問題）。
 
-**MetaCSV** は **データ本体（`data.csv`）** と **見た目・表示設定（`data.csv.meta.jsonc`）** を分離することでこれを解決します：
-- **Zero-Config & 脱・健忘症**: メタデータが無い CSV も自動列幅フィットで即座に開き、列幅ドラッグ・ソート・装飾を行った瞬間に `.meta.jsonc` を自動生成・記憶します。
+**MetaCSV** は **データ本体（`data.csv`）** と **見た目・表示設定（`data.csv.metatext.jsonc`）** を分離することでこれを解決します：
+- **Zero-Config & 脱・健忘症**: メタデータが無い CSV も自動列幅フィットで即座に開き、列幅ドラッグ・ソート・装飾を行った瞬間に `.metatext.jsonc` を自動生成・記憶します。
 - **コメント保持 JSONC**: Microsoft 公式の `jsonc-parser`（`modify` / `applyEdits`）を採用し、人間が書いたコメントや整形を壊さずに GUI から部分更新できます。
 - **Git フレンドリー**: 元の文字コード（`UTF-8` / `UTF-8 BOM` / `Shift-JIS`）・改行コード（`LF` / `CRLF`）・区切り文字をそのまま維持し、ソートもビュー上のみで非破壊適用します。
 - **マルチ環境で設定を完全共有**: VS Code で調整した列幅・色分け・ソート順を、そのまま Windows / macOS ネイティブアプリでも即座に再現できます。
@@ -87,7 +87,7 @@ Windows 11 環境にて、日本語・クォートを含む **100 万行 × 10 �
 ```text
 meta-csv/
 ├── packages/
-│   ├── schema/      # .meta.jsonc の TypeScript 型定義
+│   ├── schema/      # .metatext.jsonc の TypeScript 型定義
 │   ├── core/        # CSV パーサ/シリアライザ、JSONC パッチ、スタイル解決、ソート/検索、Undo/Redo、FileSystemAdapter
 │   └── ui/          # React + Glide Data Grid 共通エディタ & Web Worker パイプライン
 ├── apps/
@@ -96,8 +96,8 @@ meta-csv/
 │   └── desktop/     # Tauri v2 デスクトップアプリ（Windows / macOS）
 └── docs/
     ├── SPEC.md
-    ├── schema/metacsv.schema.json
-    └── examples/spec_setting.csv.meta.jsonc
+    ├── schema/metatext.schema.json
+    └── examples/spec_setting.csv.metatext.jsonc
 ```
 
 ---
@@ -130,8 +130,8 @@ VS Code / Antigravity IDE で本リポジトリを開き **`F5`** を押すと�
 ## ドキュメント
 
 - 詳細仕様書: [docs/SPEC.md](docs/SPEC.md)
-- JSON Schema: [docs/schema/metacsv.schema.json](docs/schema/metacsv.schema.json)
-- サンプルメタデータ: [docs/examples/spec_setting.csv.meta.jsonc](docs/examples/spec_setting.csv.meta.jsonc)
+- JSON Schema: [docs/schema/metatext.schema.json](docs/schema/metatext.schema.json)
+- サンプルメタデータ: [docs/examples/spec_setting.csv.metatext.jsonc](docs/examples/spec_setting.csv.metatext.jsonc)
 - AI エージェント／開発者ガイド: [AGENTS.md](AGENTS.md)
 
 ---
@@ -139,7 +139,7 @@ VS Code / Antigravity IDE で本リポジトリを開き **`F5`** を押すと�
 ## ダウンロード・公式ビルドについて
 
 - **公式の実行版（Windows / macOS 向けコード署名済みビルド・インストーラー）** は **Microsoft Store** および **BOOTH** にて配布（販売）予定です（*Coming Soon*）。
-- **GitHub Releases でのバイナリ配布は行いません。** 本リポジトリではソースコード、`.meta.jsonc` 仕様書、およびセルフビルド手順を公開しています。
+- **GitHub Releases でのバイナリ配布は行いません。** 本リポジトリではソースコード、`.metatext.jsonc` 仕様書、およびセルフビルド手順を公開しています。
 - ご自身でビルドして利用される場合は、以下のコマンドでデスクトップ版をビルドできます：
 
 ```powershell

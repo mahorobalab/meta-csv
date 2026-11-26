@@ -1,10 +1,15 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://meta-csv.dev/schemas/v0.1/metacsv.schema.json",
-  "title": "MetaCSV Metadata",
-  "description": "Sidecar metadata (.meta.jsonc) for MetaCSV editor and viewer.",
+  "$id": "https://mahorobalab.github.io/metatext-spec/schemas/v0.1/metatext.schema.json",
+  "title": "MetaText Sidecar Metadata",
+  "description": "Sidecar metadata (.metatext.jsonc) for plain-text tabular and log files (CSV, TSV, Log, JSONL).",
   "type": "object",
   "additionalProperties": false,
+  "patternProperties": {
+    "^x-": {
+      "description": "Custom vendor or tool extension fields preserved across editors."
+    }
+  },
   "properties": {
     "$schema": {
       "type": "string",
@@ -13,11 +18,20 @@
     "version": {
       "type": "string",
       "const": "0.1",
-      "description": "MetaCSV schema version."
+      "description": "MetaText schema version."
+    },
+    "format": {
+      "type": "string",
+      "enum": ["csv", "tsv", "log", "jsonl", "text"],
+      "description": "Target plain-text format. Omit to auto-detect from the target file extension."
+    },
+    "readOnly": {
+      "type": "boolean",
+      "description": "Open the target file in read-only mode by default (e.g. true for log files until explicitly unlocked)."
     },
     "csv": {
       "type": "object",
-      "description": "CSV dialect settings. Omit properties to use auto-detection.",
+      "description": "CSV/TSV dialect settings. Omit properties to use auto-detection.",
       "additionalProperties": false,
       "properties": {
         "hasHeader": {
@@ -39,6 +53,44 @@
           "type": "string",
           "enum": ["lf", "crlf"],
           "description": "Line ending preserved on save."
+        }
+      }
+    },
+    "log": {
+      "type": "object",
+      "description": "Log parsing and viewing settings for .log and unstructured text files.",
+      "additionalProperties": false,
+      "properties": {
+        "linePattern": {
+          "type": "string",
+          "description": "Regular expression used to split each log line into columns (supports named or numbered capture groups)."
+        },
+        "columnNames": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Optional column names mapped to numbered capture groups when named groups are not used."
+        },
+        "timestampColumn": {
+          "type": "string",
+          "description": "Column key representing the log entry timestamp."
+        },
+        "levelColumn": {
+          "type": "string",
+          "description": "Column key representing the log severity level (e.g. ERROR, WARN, INFO)."
+        },
+        "multilinePattern": {
+          "type": "string",
+          "description": "Regular expression identifying continuation lines (e.g. stack traces) to group with the preceding log entry."
+        },
+        "wordWrap": {
+          "type": "boolean",
+          "default": false,
+          "description": "Default word wrap setting for log lines."
+        },
+        "encoding": {
+          "type": "string",
+          "enum": ["utf-8", "utf-8-bom", "shift-jis"],
+          "description": "Character encoding of the log file."
         }
       }
     },
@@ -82,7 +134,7 @@
     },
     "view": {
       "type": "object",
-      "description": "Persistent view state (does not mutate CSV data).",
+      "description": "Persistent view state (does not mutate source data).",
       "additionalProperties": false,
       "properties": {
         "sort": {
@@ -215,6 +267,10 @@
       "additionalProperties": {
         "$ref": "#/definitions/styleRef"
       }
+    },
+    "extensions": {
+      "type": "object",
+      "description": "Namespaced tool-specific extension settings preserved without modification by other tools."
     }
   },
   "definitions": {

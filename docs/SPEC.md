@@ -9,9 +9,9 @@
 
 **「Git フレンドリーなプレーン CSV のまま、JSONC サイドカーファイルで Excel ライクな見た目・入力補助・状態記憶を実現する」**
 
-- **脱・健忘症**: 列幅・行の高さ・表示/非表示・ソート順などを `.meta.jsonc` に自動記憶し、次回開いた瞬間から前回の状態を復元する。
-- **Zero-Config**: メタデータが無い CSV でも即座に開ける（初回は内容から列幅を自動フィット）。ユーザーがレイアウトを変更したタイミングで `.meta.jsonc` を自動生成する。
-- **Git フレンドリー**: CSV 本体はデータのみをクリーンに保ち、見た目や表示設定は隣の `.meta.jsonc` に分離する。JSONC（コメント・末尾カンマ可）を採用し、人間による手書き編集と GUI からの自動更新を両立する。
+- **脱・健忘症**: 列幅・行の高さ・表示/非表示・ソート順などを `.metatext.jsonc` に自動記憶し、次回開いた瞬間から前回の状態を復元する。
+- **Zero-Config**: メタデータが無い CSV でも即座に開ける（初回は内容から列幅を自動フィット）。ユーザーがレイアウトを変更したタイミングで `.metatext.jsonc` を自動生成する。
+- **Git フレンドリー**: CSV 本体はデータのみをクリーンに保ち、見た目や表示設定は隣の `.metatext.jsonc` に分離する。JSONC（コメント・末尾カンマ可）を採用し、人間による手書き編集と GUI からの自動更新を両立する。
 - **10 年戦えるパフォーマンス**: 10 万行規模の CSV を想定し、Canvas 描画（Glide Data Grid）＋ Web Worker 分離を初期設計から組み込む。
 
 ---
@@ -40,7 +40,7 @@ meta-csv/
 ├── pnpm-workspace.yaml
 ├── packages/
 │   ├── core/                # CSVパーサ/シリアライザ、方言判定、JSONC管理、Undo/Redo、検索/ソート、Adapter型
-│   ├── schema/              # metacsv.schema.json および TypeScript 型定義
+│   ├── schema/              # metatext.schema.json および TypeScript 型定義
 │   └── ui/                  # React + Glide Data Grid（Canvas描画、テーマ連動、ツールバー、検索UI）
 ├── apps/
 │   ├── playground/          # Vite 開発用アプリ（サンプルCSV・10万行ベンチマーク・将来のオンラインデモ兼用）
@@ -49,7 +49,7 @@ meta-csv/
 └── docs/
     ├── SPEC.md              # 本仕様書
     ├── schema/              # JSON Schema ドラフト
-    └── examples/            # .meta.jsonc サンプル
+    └── examples/            # .metatext.jsonc サンプル
 ```
 
 ---
@@ -71,8 +71,8 @@ meta-csv/
 ## 5. 主要な設計方針（v0.1 暫定決定）
 
 ### 5.1 メタデータファイルの探索ルールと命名規則
-- **v0.1（基本ルール）**: CSV と同じディレクトリにある `<ファイル名>.meta.jsonc` を紐づける。
-  - 例: `spec_setting.csv` ⇔ `spec_setting.csv.meta.jsonc`
+- **v0.1（基本ルール）**: CSV と同じディレクトリにある `<ファイル名>.metatext.jsonc` を紐づける。
+  - 例: `spec_setting.csv` ⇔ `spec_setting.csv.metatext.jsonc`
 - **将来拡張（v0.2 以降）**: フォルダ共通設定（`.metacsv.jsonc`）や glob パターン（`logs_*.csv`）のフォールバック探索を追加可能な設計にしておく。
 
 ### 5.2 列の紐づけ方式（ヘッダーあり / なし両対応）
@@ -85,13 +85,13 @@ meta-csv/
 - **文字コード**: `utf-8`, `utf-8-bom`, `shift-jis` (CP932)
 - **改行コード**: `lf` (`\n`), `crlf` (`\r\n`)
 - **区切り文字**: `,` (CSV), `\t` (TSV)
-- **メタデータでの明示上書き**: 自動判定が外れる特殊なファイル向けに、`.meta.jsonc` の `csv` セクションで明示指定可能にする。
+- **メタデータでの明示上書き**: 自動判定が外れる特殊なファイル向けに、`.metatext.jsonc` の `csv` セクションで明示指定可能にする。
 
 ### 5.4 保存タイミングと dirty（未保存）管理
 | 対象 | 保存タイミング | 理由 |
 | --- | --- | --- |
 | **CSV 本体** | **明示保存（`Ctrl+S` / `Cmd+S`）** | 誤操作によるデータ破壊を防ぎ、Undo/Redo と組み合わせて安全に扱うため |
-| **メタデータ（`.meta.jsonc`）** | **デバウンス自動保存（500ms）** | 列幅ドラッグやソート切り替えをストレスなく即座に記憶するため |
+| **メタデータ（`.metatext.jsonc`）** | **デバウンス自動保存（500ms）** | 列幅ドラッグやソート切り替えをストレスなく即座に記憶するため |
 
 - **初回生成タイミング**: メタデータファイルが存在しない CSV を開いた直後はファイルを自動生成しない。ユーザーが初めて列幅変更・スタイル設定・ソート等を行ったタイミングで生成する。
 
@@ -131,7 +131,7 @@ export interface CsvFilePayload {
   fileName: string;
   /** 生のバイト列（文字コード判定を core 側で行うため） */
   csvBytes: Uint8Array;
-  /** 隣接する .meta.jsonc の生テキスト（存在しない場合は null） */
+  /** 隣接する .metatext.jsonc の生テキスト（存在しない場合は null） */
   metaText: string | null;
 }
 
@@ -142,7 +142,7 @@ export interface FileSystemAdapter {
   /** CSV本体を保存する（元の文字コードにエンコード済みのバイト列） */
   saveCsv(bytes: Uint8Array): Promise<void>;
 
-  /** メタデータ(.meta.jsonc)を保存する（存在しない場合は新規作成） */
+  /** メタデータ(.metatext.jsonc)を保存する（存在しない場合は新規作成） */
   saveMeta(jsoncText: string): Promise<void>;
 
   /** 外部からのファイル変更を購読する（任意） */
@@ -159,8 +159,8 @@ export interface FileSystemAdapter {
 
 | Phase | 内容 | 完了の目安 |
 | --- | --- | --- |
-| **Phase 0** | 仕様設計 & スキーマ策定（現在） | `SPEC.md`・`metacsv.schema.json`・サンプルの合意 |
-| **Phase 1** | モノレポ構築 + コア + プレイグラウンド MVP | 10万行ダミー CSV が 60fps で動き、列幅・行高変更が `.meta.jsonc` に反映される |
+| **Phase 0** | 仕様設計 & スキーマ策定（現在） | `SPEC.md`・`metatext.schema.json`・サンプルの合意 |
+| **Phase 1** | モノレポ構築 + コア + プレイグラウンド MVP | 10万行ダミー CSV が 60fps で動き、列幅・行高変更が `.metatext.jsonc` に反映される |
 | **Phase 2** | VS Code / Antigravity 拡張機能化 | 自分の `spec_setting.csv` を IDE 内で開き、普段使い（ドッグフーディング）開始 |
 | **Phase 3** | リッチ表現 & エディタ機能拡充 | フォント・太字/イタリック・背景色・条件付き書式・ソート記憶・検索・Undo/Redo・方言維持 |
 | **Phase 4** | Tauri デスクトップアプリ化（Win / Mac） | Win / M1 Mac 実機ビルド、OS ショートカット対応、GitHub Actions 自動ビルド |

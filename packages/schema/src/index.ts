@@ -1,3 +1,7 @@
+export const METATEXT_SIDECAR_SUFFIX = '.metatext.jsonc' as const;
+
+export type MetaTextFormat = 'csv' | 'tsv' | 'log' | 'jsonl' | 'text';
+
 export type CsvDelimiter = ',' | '\t' | ';' | '|';
 export type CsvEncoding = 'utf-8' | 'utf-8-bom' | 'shift-jis';
 export type CsvLineEnding = 'lf' | 'crlf';
@@ -7,6 +11,16 @@ export interface CsvDialectConfig {
   delimiter?: CsvDelimiter;
   encoding?: CsvEncoding;
   lineEnding?: CsvLineEnding;
+}
+
+export interface LogParserConfig {
+  linePattern?: string;
+  columnNames?: string[];
+  timestampColumn?: string;
+  levelColumn?: string;
+  multilinePattern?: string;
+  wordWrap?: boolean;
+  encoding?: CsvEncoding;
 }
 
 export interface TableConfig {
@@ -105,10 +119,13 @@ export interface RowConfig {
   style?: StyleRef;
 }
 
-export interface MetaCsvDocument {
+export interface MetaTextDocument {
   $schema?: string;
   version?: '0.1';
+  format?: MetaTextFormat;
+  readOnly?: boolean;
   csv?: CsvDialectConfig;
+  log?: LogParserConfig;
   table?: TableConfig;
   view?: ViewConfig;
   styles?: Record<string, CellStyle>;
@@ -117,7 +134,12 @@ export interface MetaCsvDocument {
   ranges?: RangeStyleRule[];
   rows?: Record<string, RowConfig>;
   cells?: Record<string, StyleRef>;
+  extensions?: Record<string, unknown>;
+  [key: `x-${string}`]: unknown;
 }
+
+/** Backward-compatible alias for CSV-focused callers */
+export type MetaCsvDocument = MetaTextDocument;
 
 export const DEFAULT_META_VERSION = '0.1' as const;
 export const DEFAULT_ROW_HEIGHT = 28;

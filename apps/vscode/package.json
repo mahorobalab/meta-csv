@@ -1,7 +1,7 @@
 {
   "name": "meta-csv",
   "displayName": "MetaCSV",
-  "description": "High-performance CSV editor & viewer with JSONC sidecar metadata (.meta.jsonc)",
+  "description": "High-performance CSV editor & viewer with JSONC sidecar metadata (.metatext.jsonc)",
   "version": "0.1.0",
   "publisher": "meta-csv",
   "private": true,
@@ -47,13 +47,13 @@
     "languages": [
       {
         "id": "jsonc",
-        "extensions": [".meta.jsonc"]
+        "extensions": [".metatext.jsonc"]
       }
     ],
     "jsonValidation": [
       {
-        "fileMatch": ["*.meta.jsonc"],
-        "url": "./schemas/metacsv.schema.json"
+        "fileMatch": ["*.metatext.jsonc"],
+        "url": "./schemas/metatext.schema.json"
       }
     ],
     "configuration": {
@@ -64,14 +64,14 @@
           "default": 13,
           "minimum": 9,
           "maximum": 32,
-          "description": "Default cell font size in pixels when not specified in .meta.jsonc."
+          "description": "Default cell font size in pixels when not specified in .metatext.jsonc."
         },
         "metaCsv.defaultRowHeight": {
           "type": "number",
           "default": 28,
           "minimum": 20,
           "maximum": 200,
-          "description": "Default row height in pixels when not specified in .meta.jsonc."
+          "description": "Default row height in pixels when not specified in .metatext.jsonc."
         },
         "metaCsv.defaultMarkerColor": {
           "type": "string",

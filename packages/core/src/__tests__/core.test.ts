@@ -211,4 +211,36 @@ describe('@meta-csv/core', () => {
     expect(indexToExcelColumn(701)).toBe('ZZ');
     expect(indexToExcelColumn(702)).toBe('AAA');
   });
+
+  it('supports .metatext.jsonc log fields, readOnly, and preserves extensions/x-* across patches', () => {
+    const original = [
+      '{',
+      '  "version": "0.1",',
+      '  "format": "log",',
+      '  "readOnly": true,',
+      '  // keep log parser settings intact',
+      '  "log": {',
+      '    "linePattern": "^(?<timestamp>\\\\S+)\\\\s+(?<level>\\\\w+)\\\\s+(?<message>.*)$",',
+      '    "levelColumn": "level",',
+      '    "wordWrap": false',
+      '  },',
+      '  "extensions": {',
+      '    "metalog": { "tailFollow": true }',
+      '  },',
+      '  "x-customTool": { "enabled": true }',
+      '}',
+      '',
+    ].join('\n');
+
+    const updated = patchMetaJsonc(original, ['view', 'filterContextRows'], 3);
+    expect(updated).toContain('// keep log parser settings intact');
+    const parsed = parseMetaJsonc(updated);
+    expect(parsed.format).toBe('log');
+    expect(parsed.readOnly).toBe(true);
+    expect(parsed.log?.levelColumn).toBe('level');
+    expect(parsed.log?.wordWrap).toBe(false);
+    expect(parsed.extensions).toEqual({ metalog: { tailFollow: true } });
+    expect(parsed['x-customTool']).toEqual({ enabled: true });
+    expect(parsed.view?.filterContextRows).toBe(3);
+  });
 });

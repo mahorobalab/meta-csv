@@ -210,7 +210,7 @@ export const App: React.FC = () => {
       >
         <div style={{ fontSize: 20, fontWeight: 700 }}>MetaCSV Desktop</div>
         <div style={{ fontSize: 13, opacity: 0.75 }}>
-          CSV を開くと、隣の .meta.jsonc を自動で読み書きします
+          CSV を開くと、隣の .metatext.jsonc を自動で読み書きします
         </div>
         <button
           type="button"

@@ -21,9 +21,8 @@ Tauriで実装
   → 保存したい場合は、ロック解除してから
 
 ・~.csv.meta.jsonc じゃなくて、~.*.metatext.jsonc に拡張
-log やcsv 含めたJSON Schema定義する。
+    csv, tsv, log 含めたJSON Schema定義する。
 
 ・履歴管理は、gix
 
-
-.metatext.jsonc に関しては、別リポジトリでドキュメントだけのリポジトリ作る？
+・ .metatext.jsonc に関しては、別リポジトリでドキュメントだけのリポジトリ作る？

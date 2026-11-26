@@ -589,7 +589,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
             gap: 8,
           }}
         >
-          <strong>Filter Presets (.meta.jsonc)</strong>
+          <strong>Filter Presets (.metatext.jsonc)</strong>
           <div style={{ display: 'flex', gap: 6 }}>
             <input
               type="text"

@@ -258,7 +258,7 @@ fn load_csv_bytes(path: String) -> Result<Response, String> {
 
 #[tauri::command]
 fn load_meta_text(path: String) -> Option<String> {
-    let meta_path = format!("{path}.meta.jsonc");
+    let meta_path = format!("{path}.metatext.jsonc");
     fs::read_to_string(&meta_path).ok()
 }
 
@@ -283,8 +283,8 @@ fn save_csv_raw(request: Request<'_>) -> Result<(), String> {
 
 #[tauri::command]
 fn save_meta_text(path: String, meta_text: String) -> Result<(), String> {
-    let meta_path = format!("{path}.meta.jsonc");
-    fs::write(&meta_path, meta_text).map_err(|e| format!("Failed to write .meta.jsonc: {e}"))
+    let meta_path = format!("{path}.metatext.jsonc");
+    fs::write(&meta_path, meta_text).map_err(|e| format!("Failed to write .metatext.jsonc: {e}"))
 }
 
 fn percent_decode(input: &str) -> Result<String, String> {

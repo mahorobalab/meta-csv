@@ -177,7 +177,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               style={tabBtnStyle(effectiveTab === 'file')}
               onClick={() => setActiveTab('file')}
             >
-              File (.meta.jsonc)
+              File (.metatext.jsonc)
             </button>
             <button
               type="button"
@@ -565,7 +565,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({
             </span>
           </div>
           <div style={{ fontSize: 12, opacity: 0.78, marginTop: 4 }}>
-            High-performance CSV editor &amp; viewer powered by <code>.meta.jsonc</code> sidecar metadata.
+            High-performance CSV editor &amp; viewer powered by <code>.metatext.jsonc</code> sidecar metadata.
           </div>
         </div>
 

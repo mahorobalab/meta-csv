@@ -3,10 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MetaCSV — High-Performance CSV Editor with .meta.jsonc</title>
+    <title>MetaCSV — High-Performance CSV Editor with .metatext.jsonc</title>
     <meta
       name="description"
-      content="Keep CSV files plain and Git-friendly. Get 1,000,000-row 60fps Canvas performance, column layout memory, styling, and log-analysis filters powered by .meta.jsonc."
+      content="Keep CSV files plain and Git-friendly. Get 1,000,000-row 60fps Canvas performance, column layout memory, styling, and log-analysis filters powered by .metatext.jsonc."
     />
     <link rel="icon" type="image/svg+xml" href="./assets/icon.svg" />
     <style>
@@ -340,11 +340,11 @@
 
     <main class="container">
       <section class="hero">
-        <span class="pill" data-i18n="heroPill">1,000,000 Rows @ 60fps · Plain CSV + .meta.jsonc</span>
+        <span class="pill" data-i18n="heroPill">1,000,000 Rows @ 60fps · Plain CSV + .metatext.jsonc</span>
         <h1 data-i18n="heroTitle">Excel-like CSV comfort without corrupting your plain CSV files.</h1>
         <p data-i18n="heroDesc">
           MetaCSV stores column widths, styling, non-destructive view sorts, and filter presets in an adjacent
-          <code>.meta.jsonc</code> file — keeping your CSV data 100% plain, encoding-safe, and Git-friendly.
+          <code>.metatext.jsonc</code> file — keeping your CSV data 100% plain, encoding-safe, and Git-friendly.
         </p>
         <div class="cta-group">
           <a class="btn btn-primary btn-lg" href="./app/" data-i18n="ctaTryWeb">Try Web App (PWA)</a>
@@ -392,9 +392,9 @@
         </p>
         <div class="cards">
           <article class="card">
-            <h3 data-i18n="f1Title">.meta.jsonc Sidecar</h3>
+            <h3 data-i18n="f1Title">.metatext.jsonc Sidecar</h3>
             <p data-i18n="f1Desc">
-              Zero-config auto-fit on first open. Column widths, frozen panes, 5-layer Excel-like styles, and sort order are persisted in <code>*.csv.meta.jsonc</code>.
+              Zero-config auto-fit on first open. Column widths, frozen panes, 5-layer Excel-like styles, and sort order are persisted in <code>*.csv.metatext.jsonc</code>.
             </p>
           </article>
           <article class="card">
@@ -438,7 +438,7 @@
             <span class="status" data-i18n="statusSoon">Coming Soon</span>
             <h3 data-i18n="pVscodeTitle">VS Code / Open VSX Extension</h3>
             <p data-i18n="pVscodeDesc">
-              Custom Editor integration inside VS Code, Antigravity, and Cursor with automatic theme sync and <code>.meta.jsonc</code> schema IntelliSense.
+              Custom Editor integration inside VS Code, Antigravity, and Cursor with automatic theme sync and <code>.metatext.jsonc</code> schema IntelliSense.
             </p>
             <div class="card-footer">
               <a
@@ -456,7 +456,7 @@
             <span class="status" data-i18n="statusSoon">Coming Soon</span>
             <h3 data-i18n="pDesktopTitle">Desktop App (Windows / macOS)</h3>
             <p data-i18n="pDesktopDesc">
-              Lightweight Tauri v2 native app (~9 MB) with instant startup, window state memory, and automatic adjacent <code>.meta.jsonc</code> sync via Microsoft Store &amp; BOOTH.
+              Lightweight Tauri v2 native app (~9 MB) with instant startup, window state memory, and automatic adjacent <code>.metatext.jsonc</code> sync via Microsoft Store &amp; BOOTH.
             </p>
             <div class="card-footer">
               <a
@@ -478,7 +478,7 @@
       <div class="container">
         <div class="footer-links">
           <a href="./app/" data-i18n="footerApp">Web App</a>
-          <a href="./schema/metacsv.schema.json">JSON Schema</a>
+          <a href="./schema/metatext.schema.json">JSON Schema</a>
           <a
             href="https://github.com/mahorobalab/meta-csv/blob/main/docs/SPEC.md"
             target="_blank"
@@ -519,10 +519,10 @@
           navDownload: 'Download',
           navPrivacy: 'Privacy',
           launchApp: 'Launch Web App',
-          heroPill: '1,000,000 Rows @ 60fps · Plain CSV + .meta.jsonc',
+          heroPill: '1,000,000 Rows @ 60fps · Plain CSV + .metatext.jsonc',
           heroTitle: 'Excel-like CSV comfort without corrupting your plain CSV files.',
           heroDesc:
-            'MetaCSV stores column widths, styling, non-destructive view sorts, and filter presets in an adjacent <code>.meta.jsonc</code> file — keeping your CSV data 100% plain, encoding-safe, and Git-friendly.',
+            'MetaCSV stores column widths, styling, non-destructive view sorts, and filter presets in an adjacent <code>.metatext.jsonc</code> file — keeping your CSV data 100% plain, encoding-safe, and Git-friendly.',
           ctaTryWeb: 'Try Web App (PWA)',
           ctaGitHub: 'View on GitHub',
           benchTitle: 'Measured Performance',
@@ -534,9 +534,9 @@
           benchScroll: 'Canvas virtual scrolling',
           featTitle: 'Key Capabilities',
           featSub: 'Designed for developers, data analysts, and log inspection workflows.',
-          f1Title: '.meta.jsonc Sidecar',
+          f1Title: '.metatext.jsonc Sidecar',
           f1Desc:
-            'Zero-config auto-fit on first open. Column widths, frozen panes, 5-layer Excel-like styles, and sort order are persisted in <code>*.csv.meta.jsonc</code>.',
+            'Zero-config auto-fit on first open. Column widths, frozen panes, 5-layer Excel-like styles, and sort order are persisted in <code>*.csv.metatext.jsonc</code>.',
           f2Title: 'Comment-Preserving JSONC',
           f2Desc:
             "Powered by Microsoft's <code>jsonc-parser</code>: GUI edits patch metadata cleanly while preserving your handwritten comments and formatting.",
@@ -556,10 +556,10 @@
             'No installation needed. Open local CSV files directly in your browser with offline PWA support and the 100k-row benchmark.',
           pVscodeTitle: 'VS Code / Open VSX Extension',
           pVscodeDesc:
-            'Custom Editor integration inside VS Code, Antigravity, and Cursor with automatic theme sync and <code>.meta.jsonc</code> schema IntelliSense.',
+            'Custom Editor integration inside VS Code, Antigravity, and Cursor with automatic theme sync and <code>.metatext.jsonc</code> schema IntelliSense.',
           pDesktopTitle: 'Desktop App (Windows / macOS)',
           pDesktopDesc:
-            'Lightweight Tauri v2 native app (~9 MB) with instant startup, window state memory, and automatic adjacent <code>.meta.jsonc</code> sync via Microsoft Store & BOOTH.',
+            'Lightweight Tauri v2 native app (~9 MB) with instant startup, window state memory, and automatic adjacent <code>.metatext.jsonc</code> sync via Microsoft Store & BOOTH.',
           viewSource: 'View Source',
           buildFromSource: 'Build Instructions',
           footerApp: 'Web App',
@@ -576,10 +576,10 @@
           navDownload: '入手方法',
           navPrivacy: 'プライバシー',
           launchApp: 'Web 版を開く',
-          heroPill: '100万行 60fps 対応 · プレーン CSV + .meta.jsonc',
+          heroPill: '100万行 60fps 対応 · プレーン CSV + .metatext.jsonc',
           heroTitle: 'プレーンな CSV を壊さず、Excel ライクな快適さを。',
           heroDesc:
-            'MetaCSV は列幅・装飾・非破壊ビューソート・フィルタプリセットを隣の <code>.meta.jsonc</code> に保存します。CSV 本体は文字コード・改行・先頭ゼロを一切壊さず Git フレンドリーなまま保ちます。',
+            'MetaCSV は列幅・装飾・非破壊ビューソート・フィルタプリセットを隣の <code>.metatext.jsonc</code> に保存します。CSV 本体は文字コード・改行・先頭ゼロを一切壊さず Git フレンドリーなまま保ちます。',
           ctaTryWeb: 'Web 版 (PWA) を試す',
           ctaGitHub: 'GitHub を見る',
           benchTitle: 'パフォーマンス実測値',
@@ -591,9 +591,9 @@
           benchScroll: 'Canvas 仮想スクロール追従',
           featTitle: '主な特長',
           featSub: '開発・データ確認・ログ調査の実務向けに設計しています。',
-          f1Title: '.meta.jsonc サイドカー連携',
+          f1Title: '.metatext.jsonc サイドカー連携',
           f1Desc:
-            '初回オープンは設定不要の自動列幅フィット。列幅・枠固定・5階層スタイル・ソート順を隣の <code>*.csv.meta.jsonc</code> に自動記憶します。',
+            '初回オープンは設定不要の自動列幅フィット。列幅・枠固定・5階層スタイル・ソート順を隣の <code>*.csv.metatext.jsonc</code> に自動記憶します。',
           f2Title: 'コメント保持 JSONC 更新',
           f2Desc:
             'Microsoft 製 <code>jsonc-parser</code> により、手書きコメントや整形を壊さず GUI 操作の差分だけを安全にパッチ適用します。',
@@ -613,10 +613,10 @@
             'インストール不要。ローカル CSV のブラウザ内読み込み・編集、オフライン PWA、10万行ベンチマークをすぐにお試しいただけます。',
           pVscodeTitle: 'VS Code / Open VSX 拡張機能',
           pVscodeDesc:
-            'VS Code・Antigravity・Cursor 内でカスタムエディタとして動作。IDE テーマ同期と <code>.meta.jsonc</code> スキーマ補完に対応します。',
+            'VS Code・Antigravity・Cursor 内でカスタムエディタとして動作。IDE テーマ同期と <code>.metatext.jsonc</code> スキーマ補完に対応します。',
           pDesktopTitle: 'デスクトップアプリ (Windows / macOS)',
           pDesktopDesc:
-            '約 9 MB の軽量 Tauri v2 ネイティブアプリ。爆速起動・ウィンドウ状態復元・隣の <code>.meta.jsonc</code> 自動読み書きに対応。Microsoft Store / BOOTH で配布予定。',
+            '約 9 MB の軽量 Tauri v2 ネイティブアプリ。爆速起動・ウィンドウ状態復元・隣の <code>.metatext.jsonc</code> 自動読み書きに対応。Microsoft Store / BOOTH で配布予定。',
           viewSource: 'ソースを見る',
           buildFromSource: 'ビルド手順を見る',
           footerApp: 'Web アプリ',

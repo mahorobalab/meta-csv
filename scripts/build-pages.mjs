@@ -8,7 +8,7 @@ const rootDir = path.resolve(__dirname, '..');
 
 const siteDir = path.join(rootDir, 'docs', 'site');
 const appDistDir = path.join(rootDir, 'apps', 'playground', 'dist');
-const schemaFile = path.join(rootDir, 'docs', 'schema', 'metacsv.schema.json');
+const schemaFile = path.join(rootDir, 'docs', 'schema', 'metatext.schema.json');
 const outDir = path.join(rootDir, 'dist-pages');
 
 if (!fs.existsSync(path.join(appDistDir, 'index.html'))) {
@@ -32,10 +32,10 @@ const outAppDir = path.join(outDir, 'app');
 fs.mkdirSync(outAppDir, { recursive: true });
 fs.cpSync(appDistDir, outAppDir, { recursive: true });
 
-// 3. Copy official JSON Schema (/schema/metacsv.schema.json)
+// 3. Copy official JSON Schema (/schema/metatext.schema.json)
 const outSchemaDir = path.join(outDir, 'schema');
 fs.mkdirSync(outSchemaDir, { recursive: true });
-fs.copyFileSync(schemaFile, path.join(outSchemaDir, 'metacsv.schema.json'));
+fs.copyFileSync(schemaFile, path.join(outSchemaDir, 'metatext.schema.json'));
 
 // 4. Disable Jekyll processing on GitHub Pages
 fs.writeFileSync(path.join(outDir, '.nojekyll'), '');
@@ -44,4 +44,4 @@ console.log('Assembled GitHub Pages output at:', outDir);
 console.log(' - /                      (LP)');
 console.log(' - /privacy/              (Privacy Policy)');
 console.log(' - /app/                  (Web / PWA App)');
-console.log(' - /schema/metacsv.schema.json');
+console.log(' - /schema/metatext.schema.json');

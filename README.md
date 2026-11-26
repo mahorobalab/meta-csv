@@ -2,7 +2,7 @@
 
 # MetaCSV
 
-**A high-performance CSV editor & viewer powered by JSONC sidecar metadata (`.meta.jsonc`).**  
+**A high-performance CSV editor & viewer powered by JSONC sidecar metadata (`.metatext.jsonc`).**  
 *Keep your CSV files plain and Git-friendly — get Excel-like layout, styling, and memory across VS Code, Windows, and macOS.*
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
@@ -25,8 +25,8 @@ Working with CSV files in engineering and operations usually forces a painful tr
 - **Excel** corrupts leading zeros (`001` → `1`), rewrites dates (`1-2` → `Jan 2`), breaks UTF-8/LF encodings, and freezes on large files.
 - **Plain CSV editors** forget your column widths, hidden columns, and sort order every time you close the tab.
 
-**MetaCSV** solves this by separating **data** (`data.csv`) from **presentation & view metadata** (`data.csv.meta.jsonc`):
-- **Zero-Config & No Amnesia**: Opens any CSV immediately with auto-fitted column widths; the moment you resize a column, sort, or style a cell, `.meta.jsonc` is created and updated automatically.
+**MetaCSV** solves this by separating **data** (`data.csv`) from **presentation & view metadata** (`data.csv.metatext.jsonc`):
+- **Zero-Config & No Amnesia**: Opens any CSV immediately with auto-fitted column widths; the moment you resize a column, sort, or style a cell, `.metatext.jsonc` is created and updated automatically.
 - **Comment-Preserving JSONC**: Uses Microsoft's `jsonc-parser` (`modify` / `applyEdits`) so GUI updates never destroy hand-written comments or formatting.
 - **Git-Friendly**: Preserves original CSV encoding (`UTF-8` / `UTF-8 BOM` / `Shift-JIS`), line endings (`LF` / `CRLF`), and delimiter. View sorting never mutates the underlying CSV rows.
 - **Shared Across Environments**: Resize columns in VS Code, then open the same file in the native desktop app — your exact layout, styles, and sort order follow you automatically.
@@ -87,17 +87,17 @@ Tested on Windows 11 with a **1,000,000 rows × 10 columns (181.27 MB)** UTF-8 C
 ```text
 meta-csv/
 ├── packages/
-│   ├── schema/      # TypeScript types matching metacsv.schema.json
+│   ├── schema/      # TypeScript types matching metatext.schema.json
 │   ├── core/        # CSV parser/serializer, JSONC patcher, style resolver, sort/search, Undo/Redo, FileSystemAdapter
 │   └── ui/          # Shared React + Glide Data Grid editor & Web Worker pipeline
 ├── apps/
 │   ├── playground/  # Vite dev playground & 100k-row benchmark (future Web base)
-│   ├── vscode/      # VS Code / Antigravity Custom Editor extension (+ .meta.jsonc schema)
+│   ├── vscode/      # VS Code / Antigravity Custom Editor extension (+ .metatext.jsonc schema)
 │   └── desktop/     # Tauri v2 desktop app (Windows / macOS)
 └── docs/
     ├── SPEC.md
-    ├── schema/metacsv.schema.json
-    └── examples/spec_setting.csv.meta.jsonc
+    ├── schema/metatext.schema.json
+    └── examples/spec_setting.csv.metatext.jsonc
 ```
 
 ---
@@ -130,8 +130,8 @@ Open this repository in VS Code (or Antigravity IDE) and press **`F5`** to launc
 ## Documentation
 
 - Specification: [docs/SPEC.md](docs/SPEC.md)
-- JSON Schema: [docs/schema/metacsv.schema.json](docs/schema/metacsv.schema.json)
-- Example Metadata: [docs/examples/spec_setting.csv.meta.jsonc](docs/examples/spec_setting.csv.meta.jsonc)
+- JSON Schema: [docs/schema/metatext.schema.json](docs/schema/metatext.schema.json)
+- Example Metadata: [docs/examples/spec_setting.csv.metatext.jsonc](docs/examples/spec_setting.csv.metatext.jsonc)
 - Agent / Contributor Guide: [AGENTS.md](AGENTS.md)
 
 ---
@@ -139,7 +139,7 @@ Open this repository in VS Code (or Antigravity IDE) and press **`F5`** to launc
 ## Download & Official Builds
 
 - **Official signed desktop builds (Windows / macOS)** will be distributed via **Microsoft Store** and **BOOTH** *(Coming Soon)*.
-- **GitHub Releases does not distribute prebuilt binaries.** This repository provides the full open-source code, `.meta.jsonc` specification, and build instructions.
+- **GitHub Releases does not distribute prebuilt binaries.** This repository provides the full open-source code, `.metatext.jsonc` specification, and build instructions.
 - Developers who prefer to build from source can compile the desktop executable locally:
 
 ```powershell

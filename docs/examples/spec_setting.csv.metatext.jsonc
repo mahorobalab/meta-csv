@@ -1,6 +1,7 @@
 {
-  "$schema": "../schema/metacsv.schema.json",
+  "$schema": "../schema/metatext.schema.json",
   "version": "0.1",
+  "format": "csv",
 
   // ヘッダー行が無い仕様一覧 CSV の例
   "csv": {
