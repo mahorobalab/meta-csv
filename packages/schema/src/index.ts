@@ -38,6 +38,7 @@ export interface TableConfig {
   defaultRowHeight?: number;
   headerHeight?: number;
   freezeColumns?: number;
+  zebraStriping?: boolean;
 }
 
 export type SortDirection = 'asc' | 'desc';
@@ -79,6 +80,8 @@ export interface CellStyle {
   fontFamily?: string;
   fontSize?: number;
   wrap?: boolean;
+  align?: ColumnAlign;
+  numberFormat?: string;
 }
 
 export type StyleRef = string | CellStyle;
@@ -95,6 +98,7 @@ export interface ColumnConfig {
   readonly?: boolean;
   type?: ColumnDataType;
   options?: string[];
+  numberFormat?: string;
   style?: StyleRef;
 }
 

@@ -5,4 +5,5 @@ export * from './log';
 export * from './meta';
 export * from './view';
 export * from './filter';
+export * from './format';
 export * from './history';

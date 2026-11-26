@@ -360,6 +360,7 @@ export const App: React.FC = () => {
           defaultMarkerColor: settings.defaultMarkerColor,
           showRowNumbers: settings.showRowNumbers,
           noHeaderColumnStyle: settings.noHeaderColumnStyle,
+          zebraStriping: settings.zebraStriping,
           reopenLastFiles: settings.reopenLastFiles,
         });
       }

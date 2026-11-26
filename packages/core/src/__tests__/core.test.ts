@@ -9,7 +9,9 @@ import {
   detectTargetFormat,
   estimateAutoRowHeight,
   estimateWrappedLineCount,
+  formatCellValue,
   indexToExcelColumn,
+  isValidNumberFormat,
   parseCsvBytes,
   parseJsonlBytes,
   parseLogBytes,
@@ -522,5 +524,36 @@ describe('@meta-csv/core', () => {
       { defaultHeight: 28, fontSize: 13, maxHeight: 160 },
     );
     expect(capped).toBe(160);
+  });
+
+  it('formats numeric cell values with Excel-compatible numfmt patterns', () => {
+    expect(formatCellValue('1234', '#,##0')).toBe('1,234');
+    expect(formatCellValue('42', '0,000')).toBe('0,042');
+    expect(formatCellValue('1234.5', '#,##0.00')).toBe('1,234.50');
+    expect(formatCellValue('0.123', '0.0%')).toBe('12.3%');
+    expect(formatCellValue('96849', '¥#,##0')).toBe('¥96,849');
+    expect(formatCellValue('hello', '#,##0')).toBe('hello');
+    expect(formatCellValue('', '#,##0')).toBe('');
+    expect(isValidNumberFormat('#,##0')).toBe(true);
+    expect(isValidNumberFormat('0,000')).toBe(true);
+
+    // Date & time formatting (English / ISO / Japanese)
+    expect(formatCellValue('2026-06-10', 'yyyy/mm/dd')).toBe('2026/06/10');
+    expect(formatCellValue('2026-06-10', 'mm/dd/yyyy')).toBe('06/10/2026');
+    expect(formatCellValue('2026-06-10', 'mmm d, yyyy')).toBe('Jun 10, 2026');
+    expect(formatCellValue('2026-06-10', 'yyyy年m月d日')).toBe('2026年6月10日');
+    expect(formatCellValue('2026-11-26 14:30:05', 'hh:mm:ss')).toBe('14:30:05');
+    expect(formatCellValue('2026年6月10日', 'yyyy-mm-dd')).toBe('2026-06-10');
+    expect(formatCellValue('06/10/2026', 'yyyy-mm-dd')).toBe('2026-06-10');
+    expect(formatCellValue('not-a-date', 'yyyy/mm/dd')).toBe('not-a-date');
+  });
+
+  it('treats deleting a non-existent nested path in patchMetaJsonc as a safe no-op', () => {
+    const initial = '{\n  "version": "0.1"\n}\n';
+    const afterNoOp = patchMetaJsonc(initial, ['columns', 'amount', 'style'], undefined);
+    expect(afterNoOp).toBe(initial);
+    const afterAlign = patchMetaJsonc(afterNoOp, ['columns', 'amount', 'align'], 'right');
+    const parsed = parseMetaJsonc(afterAlign);
+    expect(parsed.columns?.amount?.align).toBe('right');
   });
 });

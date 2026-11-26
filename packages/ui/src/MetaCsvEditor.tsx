@@ -7,6 +7,9 @@ import React, {
   useState,
 } from 'react';
 import {
+  AlignCenter,
+  AlignLeft,
+  AlignRight,
   Bold,
   ChevronDown,
   ChevronUp,
@@ -52,6 +55,7 @@ import {
   DEFAULT_HEADER_HEIGHT,
   DEFAULT_ROW_HEIGHT,
   type CellStyle,
+  type ColumnAlign,
   type ConditionalRule,
   type FilterPreset,
   type JsonlArrayMode,
@@ -64,6 +68,8 @@ import {
   type SortSpec,
 } from '@meta-csv/schema';
 import {
+  DATE_FORMAT_PRESETS,
+  NUMBER_FORMAT_PRESETS,
   UndoRedoHistory,
   applyViewFilter,
   buildDefaultHighlightRules,
@@ -72,7 +78,9 @@ import {
   detectTargetFormat,
   doesCellMatchFilterTerms,
   estimateAutoRowHeight,
+  formatCellValue,
   indexToExcelColumn,
+  isValidNumberFormat,
   parseMetaJsonc,
   patchMetaJsonc,
   resolveCellStyle,
@@ -103,6 +111,7 @@ import {
   TEXT_SWATCH_COLORS,
 } from './ConditionalRulesModal';
 import { useInputHistory } from './useInputHistory';
+import { ZebraRowsIcon } from './icons/ZebraRowsIcon';
 
 export interface EditorViewSnapshot {
   scrollCol: number;
@@ -210,6 +219,7 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
   const [dataVersion, setDataVersion] = useState(0);
   const [reloadTick, setReloadTick] = useState(0);
   const [openMenu, setOpenMenu] = useState<'none' | 'file' | 'edit' | 'unlock'>('none');
+  const [customNumFmt, setCustomNumFmt] = useState<string>('');
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [showAboutModal, setShowAboutModal] = useState(false);
@@ -217,6 +227,7 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
   const [showCellInspector, setShowCellInspector] = useState<boolean>(
     initialViewSnapshot?.showCellInspector ?? false,
   );
+  const zebraEnabled = meta.table?.zebraStriping ?? (appSettings?.zebraStriping !== false);
   const [fileBytes, setFileBytes] = useState<number>(0);
   const [showPathTooltip, setShowPathTooltip] = useState<boolean>(false);
   const [hoverRowResize, setHoverRowResize] = useState<{
@@ -969,8 +980,11 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
         collapseColKey !== '' && colKey === collapseColKey
           ? filterState.collapsedCounts?.get(dataRow)
           : undefined;
-      const displayVal = collapsedDupes ? `${val} (+${collapsedDupes} dupes)` : val;
+      const activeNumFmt = resolvedStyle?.numberFormat ?? colMeta?.numberFormat;
+      const formattedVal = activeNumFmt ? formatCellValue(val, activeNumFmt) : val;
+      const displayVal = collapsedDupes ? `${formattedVal} (+${collapsedDupes} dupes)` : formattedVal;
 
+      const isZebraRow = zebraEnabled && viewRow % 2 === 1;
       let themeOverride: Partial<Theme> | undefined;
       if (
         resolvedStyle ||
@@ -978,7 +992,8 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
         isSearchHit ||
         isFilterHit ||
         colMeta?.readonly ||
-        isContextOnlyRow
+        isContextOnlyRow ||
+        isZebraRow
       ) {
         const rawStyleFontSize = resolvedStyle?.fontSize ?? effectiveDefaultFontSize;
         const fontSize = Math.max(8, Math.min(40, Math.round(rawStyleFontSize * zoomScale)));
@@ -995,6 +1010,9 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
           : undefined;
 
         themeOverride = {
+          ...(isZebraRow
+            ? { bgCell: themeMode === 'dark' ? '#252529' : '#f4f6f9' }
+            : {}),
           ...(resolvedStyle?.backgroundColor ? { bgCell: resolvedStyle.backgroundColor } : {}),
           ...(resolvedStyle?.color ? { textDark: resolvedStyle.color } : {}),
           ...(resolvedStyle?.fontFamily ? { fontFamily: resolvedStyle.fontFamily } : {}),
@@ -1038,7 +1056,7 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
         displayData: displayVal,
         allowOverlay: !isReadOnly && !colMeta?.readonly,
         allowWrapping: resolvedStyle?.wrap ?? (isColWrap || val.indexOf('\n') !== -1),
-        contentAlign: colMeta?.align,
+        contentAlign: resolvedStyle?.align ?? colMeta?.align,
         themeOverride,
       };
     },
@@ -1060,6 +1078,7 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
       activeFormat,
       effectiveDefaultFontSize,
       zoomScale,
+      zebraEnabled,
       dataVersion,
     ],
   );
@@ -1546,10 +1565,66 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
     return () => el.removeEventListener('wheel', onWheel);
   }, [csvData]);
 
-  // Apply style to selected single cell (cells) OR multi-cell drag selection (ranges)
+  const selectedColumnKeys = useMemo(() => {
+    if (!csvData || selection.columns.length === 0) return [] as string[];
+    const keys: string[] = [];
+    for (const visCol of selection.columns.toArray()) {
+      const actualCol = visibleColIndices[visCol];
+      if (actualCol === undefined) continue;
+      const key = csvData.columnKeys[actualCol] ?? String(actualCol);
+      keys.push(key);
+    }
+    return keys;
+  }, [csvData, selection.columns, visibleColIndices]);
+
+  const isColumnSelectionMode = selectedColumnKeys.length > 0;
+
+  // Apply style to selected columns (when entire column(s) selected), single cell, or multi-cell range
   const applyStyleToSelection = useCallback(
-    (updater: (current: CellStyle) => CellStyle) => {
-      if (!selection.current || !csvData) return;
+    (updater: (current: CellStyle) => CellStyle, isClearAll = false) => {
+      if (!csvData) return;
+
+      if (selectedColumnKeys.length > 0) {
+        let text = metaTextRef.current ?? '';
+        for (const colKey of selectedColumnKeys) {
+          if (isClearAll) {
+            text = patchMetaJsonc(text, ['columns', colKey, 'style'], undefined);
+            text = patchMetaJsonc(text, ['columns', colKey, 'align'], undefined);
+            text = patchMetaJsonc(text, ['columns', colKey, 'wrap'], undefined);
+            text = patchMetaJsonc(text, ['columns', colKey, 'numberFormat'], undefined);
+            continue;
+          }
+          const colCfg = meta.columns?.[colKey];
+          const existingRef = colCfg?.style;
+          const existing: CellStyle = {
+            ...(typeof existingRef === 'string'
+              ? (meta.styles?.[existingRef] ?? {})
+              : (existingRef ?? {})),
+            ...(colCfg?.align ? { align: colCfg.align } : {}),
+            ...(colCfg?.wrap !== undefined ? { wrap: colCfg.wrap } : {}),
+            ...(colCfg?.numberFormat ? { numberFormat: colCfg.numberFormat } : {}),
+          };
+          const next = updater(existing);
+          const { align, wrap, numberFormat, ...restStyle } = next;
+          const hasStyleKeys = Object.values(restStyle).some((v) => v !== undefined);
+          text = patchMetaJsonc(
+            text,
+            ['columns', colKey, 'style'],
+            hasStyleKeys ? restStyle : undefined,
+          );
+          text = patchMetaJsonc(text, ['columns', colKey, 'align'], align);
+          text = patchMetaJsonc(text, ['columns', colKey, 'wrap'], wrap ? true : undefined);
+          text = patchMetaJsonc(
+            text,
+            ['columns', colKey, 'numberFormat'],
+            numberFormat && numberFormat.trim().length > 0 ? numberFormat : undefined,
+          );
+        }
+        scheduleMetaSave(text);
+        return;
+      }
+
+      if (!selection.current) return;
       const { range, cell } = selection.current;
       const isMulti = range.width > 1 || range.height > 1;
 
@@ -1566,7 +1641,8 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
             ? { ...(meta.styles?.[existingRef] ?? {}) }
             : { ...(existingRef ?? {}) };
         const next = updater(existing);
-        patchMeta(['cells', cellKey], next);
+        const hasAny = Object.values(next).some((v) => v !== undefined);
+        patchMeta(['cells', cellKey], hasAny ? next : undefined);
         return;
       }
 
@@ -1595,12 +1671,17 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
             ? { ...(existingRanges[matchIdx]!.style as CellStyle) }
             : {};
         const nextStyle = updater(prevStyle);
+        const hasAny = Object.values(nextStyle).some((v) => v !== undefined);
         if (matchIdx >= 0) {
-          existingRanges[matchIdx] = { ref, style: nextStyle };
-        } else {
+          if (hasAny) {
+            existingRanges[matchIdx] = { ref, style: nextStyle };
+          } else {
+            existingRanges.splice(matchIdx, 1);
+          }
+        } else if (hasAny) {
           existingRanges.push({ ref, style: nextStyle });
         }
-        patchMeta(['ranges'], existingRanges);
+        patchMeta(['ranges'], existingRanges.length > 0 ? existingRanges : undefined);
       } else {
         // Fallback when sorted: write individual cells up to a safe cap
         const nextCells = { ...(meta.cells ?? {}) };
@@ -1617,14 +1698,28 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
             const cur = nextCells[key];
             const base: CellStyle =
               typeof cur === 'string' ? { ...(meta.styles?.[cur] ?? {}) } : { ...(cur ?? {}) };
-            nextCells[key] = updater(base);
+            const updated = updater(base);
+            if (Object.values(updated).some((v) => v !== undefined)) {
+              nextCells[key] = updated;
+            } else {
+              delete nextCells[key];
+            }
             count++;
           }
         }
-        patchMeta(['cells'], nextCells);
+        patchMeta(['cells'], Object.keys(nextCells).length > 0 ? nextCells : undefined);
       }
     },
-    [selection, csvData, visibleColIndices, viewRowIndices, meta, patchMeta],
+    [
+      csvData,
+      selectedColumnKeys,
+      selection,
+      visibleColIndices,
+      viewRowIndices,
+      meta,
+      patchMeta,
+      scheduleMetaSave,
+    ],
   );
 
   const explicitRowHeightMap = useMemo(() => {
@@ -2369,6 +2464,30 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
           )}
           <button
             type="button"
+            aria-label="Alternating Row Colors"
+            title={
+              zebraEnabled
+                ? 'Alternating Row Colors: ON (click to disable)'
+                : 'Alternating Row Colors: OFF (click to enable)'
+            }
+            style={{
+              ...btnStyle,
+              padding: '3px 6px',
+              borderColor: zebraEnabled ? '#3b82f6' : toolbarBorder,
+              background: zebraEnabled
+                ? isDark
+                  ? 'rgba(59, 130, 246, 0.2)'
+                  : 'rgba(59, 130, 246, 0.12)'
+                : btnStyle.background,
+            }}
+            onClick={() => {
+              patchMeta(['table', 'zebraStriping'], !zebraEnabled);
+            }}
+          >
+            <ZebraRowsIcon size={14} active={zebraEnabled} />
+          </button>
+          <button
+            type="button"
             aria-label="Cell Inspector"
             title="Toggle Cell Inspector (view full multiline text / stack trace)"
             style={{
@@ -2630,240 +2749,411 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
           </div>
         )}
 
-        {/* Edit & Style Popover (Row ops + Excel-like formatting) */}
-        {openMenu === 'edit' && (
-          <div
-            style={{
-              position: 'absolute',
-              top: 'calc(100% + 2px)',
-              left: hostMode === 'vscode' ? 10 : 72,
-              zIndex: 60,
-              width: 288,
-              padding: 12,
-              borderRadius: 6,
-              background: isDark ? '#1f1f23' : '#ffffff',
-              border: `1px solid ${toolbarBorder}`,
-              boxShadow: '0 8px 24px rgba(0,0,0,0.32)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 10,
-            }}
-          >
-            <div style={{ fontWeight: 700, fontSize: 12 }}>Rows</div>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <button
-                type="button"
-                style={{ ...btnStyle, flex: 1, opacity: isReadOnly ? 0.45 : 1 }}
-                disabled={isReadOnly}
-                onClick={handleAddRow}
-                title={isReadOnly ? 'Unlock editing to insert rows' : 'Insert empty row below selection'}
-              >
-                <Plus size={13} />
-                <span>Insert Row</span>
-              </button>
-              <button
-                type="button"
-                style={{ ...btnStyle, flex: 1, opacity: !isReadOnly && selection.current ? 1 : 0.45 }}
-                onClick={handleDeleteRow}
-                disabled={isReadOnly || !selection.current}
-                title={isReadOnly ? 'Unlock editing to delete rows' : 'Delete selected row'}
-              >
-                <Minus size={13} />
-                <span>Delete Row</span>
-              </button>
-            </div>
+        {/* Style Popover (Cell Style / Columns Style, Alignment, Colors, Number Format, Conditional Rules) */}
+        {openMenu === 'edit' && (() => {
+          const hasStyleTarget = isColumnSelectionMode || Boolean(selection.current);
+          const firstColKey = selectedColumnKeys[0];
+          const firstColCfg = firstColKey ? meta.columns?.[firstColKey] : undefined;
+          const activeCellColIdx = selection.current
+            ? visibleColIndices[selection.current.cell[0]]
+            : undefined;
+          const activeCellDataRow = selection.current
+            ? viewRowIndices[selection.current.cell[1]]
+            : undefined;
+          const activeCellResolved =
+            !isColumnSelectionMode &&
+            styleCtx &&
+            activeCellColIdx !== undefined &&
+            activeCellDataRow !== undefined &&
+            rowsRef.current[activeCellDataRow]
+              ? resolveCellStyle(
+                  styleCtx,
+                  activeCellDataRow,
+                  activeCellColIdx,
+                  rowsRef.current[activeCellDataRow]!,
+                )
+              : undefined;
+          const activeCellColMeta =
+            activeCellColIdx !== undefined && csvData
+              ? meta.columns?.[csvData.columnKeys[activeCellColIdx] ?? String(activeCellColIdx)]
+              : undefined;
 
-            <hr style={{ border: 'none', borderTop: `1px solid ${toolbarBorder}`, margin: '2px 0' }} />
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontWeight: 700, fontSize: 12 }}>Cell Style (.metatext.jsonc)</div>
-              <button
-                type="button"
-                style={{ ...btnStyle, height: 22, padding: '2px 6px', fontSize: 11 }}
-                title="Clear all style overrides on selection"
-                onClick={() => applyStyleToSelection(() => ({}))}
-              >
-                <X size={11} />
-                <span>Clear</span>
-              </button>
-            </div>
+          const activeWrap = isColumnSelectionMode
+            ? Boolean(firstColCfg?.wrap)
+            : selectedCellWrap;
+          const activeAlign: ColumnAlign | undefined = isColumnSelectionMode
+            ? firstColCfg?.align
+            : (activeCellResolved?.align ?? activeCellColMeta?.align);
+          const activeNumFmt: string = isColumnSelectionMode
+            ? (firstColCfg?.numberFormat ?? '')
+            : (activeCellResolved?.numberFormat ?? activeCellColMeta?.numberFormat ?? '');
+          const isCustomFmtValid = isValidNumberFormat(customNumFmt);
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <button
-                type="button"
-                style={{ ...btnStyle, padding: '3px 8px' }}
-                title="Toggle Bold on selection"
-                onClick={() => applyStyleToSelection((s) => ({ ...s, bold: !s.bold }))}
-              >
-                <Bold size={13} />
-                <span>Bold</span>
-              </button>
-              <button
-                type="button"
-                style={{ ...btnStyle, padding: '3px 8px' }}
-                title="Toggle Italic on selection"
-                onClick={() => applyStyleToSelection((s) => ({ ...s, italic: !s.italic }))}
-              >
-                <Italic size={13} />
-                <span>Italic</span>
-              </button>
-              <button
-                type="button"
-                disabled={!selection.current}
-                style={{
-                  ...btnStyle,
-                  padding: '3px 8px',
-                  borderColor: selectedCellWrap ? '#3b82f6' : toolbarBorder,
-                  background: selectedCellWrap
-                    ? isDark
-                      ? '#1e3a8a'
-                      : '#dbeafe'
-                    : btnStyle.background,
-                  opacity: selection.current ? 1 : 0.45,
-                }}
-                title="Toggle text wrapping for selected cell(s) and auto-fit row height"
-                onClick={() => {
-                  if (!selection.current) return;
-                  const nextWrap = !selectedCellWrap;
-                  applyStyleToSelection((s) => ({ ...s, wrap: nextWrap ? true : undefined }));
-                  const { range, cell } = selection.current;
-                  const startY = range.height > 1 ? range.y : cell[1];
-                  const endY = range.height > 1 ? range.y + range.height - 1 : cell[1];
-                  const startX = range.width > 1 ? range.x : cell[0];
-                  const endX = range.width > 1 ? range.x + range.width - 1 : cell[0];
-                  const targetRows: number[] = [];
-                  for (let vr = startY; vr <= endY && targetRows.length < 50; vr++) {
-                    const dr = viewRowIndices[vr];
-                    if (dr !== undefined) targetRows.push(dr);
-                  }
-                  const targetCols = new Set<number>();
-                  for (let vc = startX; vc <= endX; vc++) {
-                    const ac = visibleColIndices[vc];
-                    if (ac !== undefined) targetCols.add(ac);
-                  }
-                  if (nextWrap) {
-                    autoFitRows(targetRows, targetCols);
-                  } else {
-                    autoFitRows(targetRows, undefined, targetCols);
-                  }
-                }}
-              >
-                <WrapText size={13} />
-                <span>Wrap</span>
-              </button>
-            </div>
+          const applyNumFmt = (pattern: string) => {
+            const trimmed = pattern.trim();
+            if (!isValidNumberFormat(trimmed)) return;
+            applyStyleToSelection((s) => ({
+              ...s,
+              numberFormat: trimmed.length > 0 ? trimmed : undefined,
+            }));
+          };
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={{ fontSize: 11, opacity: 0.75 }}>Background Color</span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-                {BG_SWATCH_COLORS.map((sw) => (
-                  <button
-                    key={sw.label}
-                    type="button"
-                    title={`Background: ${sw.label}`}
-                    style={{
-                      ...btnStyle,
-                      width: 22,
-                      height: 22,
-                      padding: 0,
-                      background: sw.value ?? (isDark ? '#1e1e1e' : '#ffffff'),
-                    }}
-                    onClick={() =>
-                      applyStyleToSelection((s) => ({ ...s, backgroundColor: sw.value }))
-                    }
-                  >
-                    {sw.value === undefined ? <X size={11} /> : ' '}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={{ fontSize: 11, opacity: 0.75 }}>Text Color</span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-                {TEXT_SWATCH_COLORS.map((sw) => (
-                  <button
-                    key={sw.label}
-                    type="button"
-                    title={`Text Color: ${sw.label}`}
-                    style={{
-                      ...btnStyle,
-                      width: 22,
-                      height: 22,
-                      padding: 0,
-                      borderRadius: '50%',
-                      background: sw.value ?? (isDark ? '#1e1e1e' : '#ffffff'),
-                    }}
-                    onClick={() =>
-                      applyStyleToSelection((s) => ({ ...s, color: sw.value }))
-                    }
-                  >
-                    {sw.value === undefined ? <X size={11} /> : ' '}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <button
-              type="button"
-              style={{ ...btnStyle, width: '100%', justifyContent: 'space-between' }}
-              onClick={() => {
-                setOpenMenu('none');
-                setShowRulesModal(true);
+          return (
+            <div
+              style={{
+                position: 'absolute',
+                top: 'calc(100% + 2px)',
+                left: hostMode === 'vscode' ? 10 : 72,
+                zIndex: 60,
+                width: 304,
+                padding: 12,
+                borderRadius: 6,
+                background: isDark ? '#1f1f23' : '#ffffff',
+                border: `1px solid ${toolbarBorder}`,
+                boxShadow: '0 8px 24px rgba(0,0,0,0.32)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 10,
               }}
             >
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                <Sparkles size={13} />
-                <span>Conditional Rules...</span>
-              </span>
-              <span style={{ opacity: 0.7 }}>
-                {meta.rules !== undefined
-                  ? meta.rules.length
-                  : defaultHighlightRules.length > 0
-                    ? `${defaultHighlightRules.length} (auto)`
-                    : 0}
-              </span>
-            </button>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ fontWeight: 700, fontSize: 12 }}>
+                  {isColumnSelectionMode
+                    ? 'Columns Style (.metatext.jsonc)'
+                    : 'Cell Style (.metatext.jsonc)'}
+                </div>
+                <button
+                  type="button"
+                  disabled={!hasStyleTarget}
+                  style={{
+                    ...btnStyle,
+                    height: 22,
+                    padding: '2px 6px',
+                    fontSize: 11,
+                    opacity: hasStyleTarget ? 1 : 0.45,
+                  }}
+                  title="Clear all style overrides on selection"
+                  onClick={() => {
+                    applyStyleToSelection(() => ({}), true);
+                    setCustomNumFmt('');
+                  }}
+                >
+                  <X size={11} />
+                  <span>Clear</span>
+                </button>
+              </div>
 
-            {selectedDataRow !== undefined && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                <span>Row #{selectedDataRow + 1} Height</span>
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                  <input
-                    type="number"
-                    min={20}
-                    max={400}
-                    value={selectedRowHeight}
-                    onChange={(e) =>
-                      patchMeta(
-                        ['rows', String(selectedDataRow), 'height'],
-                        Math.max(20, Math.min(400, Number(e.target.value) || DEFAULT_ROW_HEIGHT)),
-                      )
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <button
+                  type="button"
+                  disabled={!hasStyleTarget}
+                  style={{ ...btnStyle, padding: '3px 8px', opacity: hasStyleTarget ? 1 : 0.45 }}
+                  title="Toggle Bold on selection"
+                  onClick={() => applyStyleToSelection((s) => ({ ...s, bold: !s.bold }))}
+                >
+                  <Bold size={13} />
+                  <span>Bold</span>
+                </button>
+                <button
+                  type="button"
+                  disabled={!hasStyleTarget}
+                  style={{ ...btnStyle, padding: '3px 8px', opacity: hasStyleTarget ? 1 : 0.45 }}
+                  title="Toggle Italic on selection"
+                  onClick={() => applyStyleToSelection((s) => ({ ...s, italic: !s.italic }))}
+                >
+                  <Italic size={13} />
+                  <span>Italic</span>
+                </button>
+                <button
+                  type="button"
+                  disabled={!hasStyleTarget}
+                  style={{
+                    ...btnStyle,
+                    padding: '3px 8px',
+                    borderColor: activeWrap ? '#3b82f6' : toolbarBorder,
+                    background: activeWrap
+                      ? isDark
+                        ? '#1e3a8a'
+                        : '#dbeafe'
+                      : btnStyle.background,
+                    opacity: hasStyleTarget ? 1 : 0.45,
+                  }}
+                  title={
+                    isColumnSelectionMode
+                      ? 'Toggle text wrapping for selected column(s)'
+                      : 'Toggle text wrapping for selected cell(s) and auto-fit row height'
+                  }
+                  onClick={() => {
+                    if (!hasStyleTarget) return;
+                    const nextWrap = !activeWrap;
+                    applyStyleToSelection((s) => ({ ...s, wrap: nextWrap ? true : undefined }));
+                    if (!isColumnSelectionMode && selection.current) {
+                      const { range, cell } = selection.current;
+                      const startY = range.height > 1 ? range.y : cell[1];
+                      const endY = range.height > 1 ? range.y + range.height - 1 : cell[1];
+                      const startX = range.width > 1 ? range.x : cell[0];
+                      const endX = range.width > 1 ? range.x + range.width - 1 : cell[0];
+                      const targetRows: number[] = [];
+                      for (let vr = startY; vr <= endY && targetRows.length < 50; vr++) {
+                        const dr = viewRowIndices[vr];
+                        if (dr !== undefined) targetRows.push(dr);
+                      }
+                      const targetCols = new Set<number>();
+                      for (let vc = startX; vc <= endX; vc++) {
+                        const ac = visibleColIndices[vc];
+                        if (ac !== undefined) targetCols.add(ac);
+                      }
+                      if (nextWrap) {
+                        autoFitRows(targetRows, targetCols);
+                      } else {
+                        autoFitRows(targetRows, undefined, targetCols);
+                      }
                     }
-                    style={{ width: 58 }}
+                  }}
+                >
+                  <WrapText size={13} />
+                  <span>Wrap</span>
+                </button>
+              </div>
+
+              {/* Alignment (Left / Center / Right) */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                <span style={{ fontSize: 11, opacity: 0.75 }}>Alignment</span>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  {(
+                    [
+                      { value: 'left' as const, label: 'Align Left', Icon: AlignLeft },
+                      { value: 'center' as const, label: 'Align Center', Icon: AlignCenter },
+                      { value: 'right' as const, label: 'Align Right', Icon: AlignRight },
+                    ]
+                  ).map(({ value, label, Icon }) => {
+                    const isSelected = activeAlign === value;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        disabled={!hasStyleTarget}
+                        title={label}
+                        aria-label={label}
+                        style={{
+                          ...btnStyle,
+                          width: 28,
+                          height: 24,
+                          padding: 0,
+                          borderColor: isSelected ? '#3b82f6' : toolbarBorder,
+                          background: isSelected
+                            ? isDark
+                              ? '#1e3a8a'
+                              : '#dbeafe'
+                            : btnStyle.background,
+                          opacity: hasStyleTarget ? 1 : 0.45,
+                        }}
+                        onClick={() =>
+                          applyStyleToSelection((s) => ({
+                            ...s,
+                            align: activeAlign === value ? undefined : value,
+                          }))
+                        }
+                      >
+                        <Icon size={13} />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ fontSize: 11, opacity: 0.75 }}>Background Color</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                  {BG_SWATCH_COLORS.map((sw) => (
+                    <button
+                      key={sw.label}
+                      type="button"
+                      disabled={!hasStyleTarget}
+                      title={`Background: ${sw.label}`}
+                      style={{
+                        ...btnStyle,
+                        width: 22,
+                        height: 22,
+                        padding: 0,
+                        opacity: hasStyleTarget ? 1 : 0.45,
+                        background: sw.value ?? (isDark ? '#1e1e1e' : '#ffffff'),
+                      }}
+                      onClick={() =>
+                        applyStyleToSelection((s) => ({ ...s, backgroundColor: sw.value }))
+                      }
+                    >
+                      {sw.value === undefined ? <X size={11} /> : ' '}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span style={{ fontSize: 11, opacity: 0.75 }}>Text Color</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                  {TEXT_SWATCH_COLORS.map((sw) => (
+                    <button
+                      key={sw.label}
+                      type="button"
+                      disabled={!hasStyleTarget}
+                      title={`Text Color: ${sw.label}`}
+                      style={{
+                        ...btnStyle,
+                        width: 22,
+                        height: 22,
+                        padding: 0,
+                        borderRadius: '50%',
+                        opacity: hasStyleTarget ? 1 : 0.45,
+                        background: sw.value ?? (isDark ? '#1e1e1e' : '#ffffff'),
+                      }}
+                      onClick={() =>
+                        applyStyleToSelection((s) => ({ ...s, color: sw.value }))
+                      }
+                    >
+                      {sw.value === undefined ? <X size={11} /> : ' '}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Number & Date Format (Excel / numfmt) */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 11, opacity: 0.75 }}>Format (Number / Date)</span>
+                  {activeNumFmt && (
+                    <code style={{ fontSize: 10.5, opacity: 0.8 }}>{activeNumFmt}</code>
+                  )}
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {NUMBER_FORMAT_PRESETS.map((preset) => {
+                    const isCurrent = activeNumFmt === preset.pattern;
+                    return (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        disabled={!hasStyleTarget}
+                        title={`${preset.description}${preset.pattern ? ` (${preset.pattern})` : ''}`}
+                        style={{
+                          ...btnStyle,
+                          height: 22,
+                          padding: '1px 6px',
+                          fontSize: 11,
+                          borderColor: isCurrent ? '#3b82f6' : toolbarBorder,
+                          background: isCurrent
+                            ? isDark
+                              ? '#1e3a8a'
+                              : '#dbeafe'
+                            : btnStyle.background,
+                          opacity: hasStyleTarget ? 1 : 0.45,
+                        }}
+                        onClick={() => {
+                          setCustomNumFmt(preset.pattern);
+                          applyNumFmt(preset.pattern);
+                        }}
+                      >
+                        {preset.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {DATE_FORMAT_PRESETS.map((preset) => {
+                    const isCurrent = activeNumFmt === preset.pattern;
+                    return (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        disabled={!hasStyleTarget}
+                        title={`${preset.description} (${preset.pattern})`}
+                        style={{
+                          ...btnStyle,
+                          height: 22,
+                          padding: '1px 6px',
+                          fontSize: 11,
+                          borderColor: isCurrent ? '#3b82f6' : toolbarBorder,
+                          background: isCurrent
+                            ? isDark
+                              ? '#1e3a8a'
+                              : '#dbeafe'
+                            : btnStyle.background,
+                          opacity: hasStyleTarget ? 1 : 0.45,
+                        }}
+                        onClick={() => {
+                          setCustomNumFmt(preset.pattern);
+                          applyNumFmt(preset.pattern);
+                        }}
+                      >
+                        {preset.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  <input
+                    type="text"
+                    disabled={!hasStyleTarget}
+                    value={customNumFmt}
+                    placeholder={activeNumFmt || 'Custom e.g. #,##0, yyyy/mm/dd, mmm d, yyyy'}
+                    onChange={(e) => setCustomNumFmt(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && isCustomFmtValid) {
+                        applyNumFmt(customNumFmt);
+                      }
+                    }}
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      height: 24,
+                      padding: '2px 7px',
+                      fontSize: 11.5,
+                      borderRadius: 4,
+                      border: `1px solid ${isCustomFmtValid ? toolbarBorder : '#ef4444'}`,
+                      background: isDark ? '#141416' : '#ffffff',
+                      color: toolbarFg,
+                      outline: 'none',
+                    }}
                   />
                   <button
                     type="button"
-                    title="Auto-fit this row height to wrapped content"
-                    style={{ ...btnStyle, height: 22, padding: '1px 6px', fontSize: 11 }}
-                    onClick={() => autoFitRows([selectedDataRow], new Set(visibleColIndices))}
+                    disabled={!hasStyleTarget || !isCustomFmtValid}
+                    style={{
+                      ...btnStyle,
+                      height: 24,
+                      padding: '2px 8px',
+                      fontSize: 11,
+                      opacity: hasStyleTarget && isCustomFmtValid ? 1 : 0.45,
+                    }}
+                    onClick={() => applyNumFmt(customNumFmt)}
                   >
-                    Fit
+                    Apply
                   </button>
-                  {explicitRowHeightMap.has(selectedDataRow) && (
-                    <button
-                      type="button"
-                      title="Reset row height to default"
-                      style={{ ...btnStyle, height: 22, padding: '1px 6px', fontSize: 11 }}
-                      onClick={() => resetRowHeights([selectedDataRow])}
-                    >
-                      Reset
-                    </button>
-                  )}
                 </div>
               </div>
-            )}
-          </div>
-        )}
+
+              <button
+                type="button"
+                style={{ ...btnStyle, width: '100%', justifyContent: 'space-between' }}
+                onClick={() => {
+                  setOpenMenu('none');
+                  setShowRulesModal(true);
+                }}
+              >
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <Sparkles size={13} />
+                  <span>Conditional Rules...</span>
+                </span>
+                <span style={{ opacity: 0.7 }}>
+                  {meta.rules !== undefined
+                    ? meta.rules.length
+                    : defaultHighlightRules.length > 0
+                      ? `${defaultHighlightRules.length} (auto)`
+                      : 0}
+                </span>
+              </button>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Row 2: Dedicated Filter Bar (Regex / NOT / Numeric Compare / grep -C / Dedupe / Facets / Presets) */}
@@ -2954,13 +3244,13 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
           const showRowNums = appSettings?.showRowNumbers !== false;
           const baseRowMarkerWidth =
             viewRowIndices.length >= 1_000_000
-              ? 64
+              ? 72
               : viewRowIndices.length >= 100_000
-                ? 58
+                ? 64
                 : viewRowIndices.length >= 10_000
-                  ? 52
-                  : 46;
-          const rowMarkerWidth = Math.max(40, Math.round(baseRowMarkerWidth * zoomScale));
+                  ? 56
+                  : 48;
+          const rowMarkerWidth = Math.max(44, Math.round(baseRowMarkerWidth * zoomScale));
           const cornerLabel = appSettings?.noHeaderColumnStyle === 'numbered' ? 'R1C1' : 'A1';
           const isAllSelected =
             viewRowIndices.length > 0 && selection.rows.length === viewRowIndices.length;
@@ -3002,6 +3292,9 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
                         width: rowMarkerWidth,
                         theme: {
                           accentLight: 'transparent',
+                          textLight: gridTheme.textHeader,
+                          textMedium: gridTheme.textHeader,
+                          markerFontStyle: `${Math.max(11, Math.round(scaledFontSize * 0.92))}px`,
                         },
                       }
                     : 'none'

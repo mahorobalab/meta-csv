@@ -18,6 +18,7 @@ export interface EditorAppSettings {
   defaultMarkerColor?: MarkerColor;
   showRowNumbers?: boolean;
   noHeaderColumnStyle?: 'excel' | 'numbered';
+  zebraStriping?: boolean;
   reopenLastFiles?: boolean;
 }
 
@@ -736,6 +737,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 type="checkbox"
                 checked={appSettings.showRowNumbers !== false}
                 onChange={(e) => onAppSettingsChange?.({ showRowNumbers: e.target.checked })}
+              />
+            </label>
+
+            <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
+              <span>Alternating Row Colors (Zebra)</span>
+              <input
+                type="checkbox"
+                checked={appSettings.zebraStriping !== false}
+                onChange={(e) => onAppSettingsChange?.({ zebraStriping: e.target.checked })}
               />
             </label>
 

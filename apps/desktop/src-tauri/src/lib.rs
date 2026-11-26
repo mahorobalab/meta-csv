@@ -36,6 +36,8 @@ struct AppSettings {
     #[serde(default)]
     no_header_column_style: Option<String>,
     #[serde(default)]
+    zebra_striping: Option<bool>,
+    #[serde(default)]
     reopen_last_files: Option<bool>,
     #[serde(default)]
     last_opened_files: Option<Vec<String>>,
@@ -58,6 +60,7 @@ impl Default for AppSettings {
             default_marker_color: None,
             show_row_numbers: None,
             no_header_column_style: None,
+            zebra_striping: None,
             reopen_last_files: None,
             last_opened_files: None,
             last_active_file: None,
@@ -212,6 +215,7 @@ fn update_app_settings(
     default_marker_color: Option<String>,
     show_row_numbers: Option<bool>,
     no_header_column_style: Option<String>,
+    zebra_striping: Option<bool>,
     reopen_last_files: Option<bool>,
     last_opened_files: Option<Vec<String>>,
     last_active_file: Option<String>,
@@ -252,6 +256,9 @@ fn update_app_settings(
             if matches!(ncs.as_str(), "excel" | "numbered") {
                 data.no_header_column_style = Some(ncs);
             }
+        }
+        if let Some(zs) = zebra_striping {
+            data.zebra_striping = Some(zs);
         }
         if let Some(rlf) = reopen_last_files {
             data.reopen_last_files = Some(rlf);

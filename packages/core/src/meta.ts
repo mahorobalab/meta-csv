@@ -40,14 +40,23 @@ export function patchMetaJsonc(
     sourceText && sourceText.trim().length > 0
       ? sourceText
       : createInitialMetaJsonc();
-  const edits = modify(base, path, value, {
-    formattingOptions: {
-      tabSize: 2,
-      insertSpaces: true,
-      eol: '\n',
-    },
-  });
-  return applyEdits(base, edits);
+  try {
+    const edits = modify(base, path, value, {
+      formattingOptions: {
+        tabSize: 2,
+        insertSpaces: true,
+        eol: '\n',
+      },
+    });
+    return applyEdits(base, edits);
+  } catch (err) {
+    // jsonc-parser throws when deleting (value === undefined) a key whose parent object
+    // does not exist yet. Treat deleting a non-existent path as a safe no-op.
+    if (value === undefined) {
+      return base;
+    }
+    throw err;
+  }
 }
 
 export interface ParsedRange {
