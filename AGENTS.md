@@ -29,12 +29,28 @@ docs/
 4. **CSV dialect preservation**: Preserve detected encoding (`utf-8`, `utf-8-bom`, `shift-jis`), line endings (`lf`, `crlf`), and delimiter on save.
 5. **5-layer style cascade**: `table` -> `columns` -> `rules` -> `ranges` -> `rows` / `cells` (supporting named `styles` palette and inline `CellStyle`).
 
+## File & Responsibility Splitting Guidelines (Must Follow)
+Keep source files modular, cohesive, and easy to test. Do not let components or modules grow monolithic as features are added:
+1. **File size thresholds**:
+   - Target **300–400 lines** per file.
+   - Above **500 lines**: consider splitting by responsibility when touching the file.
+   - Above **800 lines** (hard ceiling: **1,000 lines**): MUST split before adding new features.
+2. **Separation of concerns**:
+   - **Pure logic & utilities** (`utils/*.ts`, `packages/core`): Extract React-free data transformations, parsers, clipboard helpers, and index/range calculations into `.ts` modules and cover them with unit tests.
+   - **State & interaction handlers** (`hooks/use*.ts`): Group cohesive state, `useMemo`, `useCallback`, and domain operations (e.g. column ops, row ops, markers, file save/undo) into dedicated custom hooks.
+   - **Presentational UI** (`components/*.tsx`, `dialogs/*.tsx`): Extract toolbars, popovers, context menus, modals, drawers, and status bars into focused components.
+   - **Container / orchestrator components** (`MetaCsvEditor.tsx`, `App.tsx`): Keep them focused on wiring hooks, layout, and child components together.
+3. **Ongoing metrics check**:
+   - Run `pnpm.cmd run metrics` after substantial feature additions or refactors to verify no production file exceeds the size limits.
+
 ## Common Commands (Windows PowerShell)
 Note: On Windows where PowerShell execution policy restricts `.ps1`, use `pnpm.cmd`.
 
 - Install dependencies: `pnpm.cmd install`
 - Typecheck all packages: `pnpm.cmd typecheck`
 - Run unit tests: `pnpm.cmd test`
+- Run unit tests with coverage: `pnpm.cmd run test:coverage`
+- Run codebase metrics report: `pnpm.cmd run metrics`
 - Build all packages (Playground + VS Code + Desktop frontend): `pnpm.cmd build`
 - Run Playground (port 15173): `pnpm.cmd dev`
 - Run Tauri Desktop app (port 15174): `pnpm.cmd dev:desktop`

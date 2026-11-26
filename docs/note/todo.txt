@@ -19,11 +19,14 @@
 ・選択セル内移動、Tab 右 、Enter 下 ※ Excelに合わせる F2でセル内編集
 ・マーカーにテキスト
 
+・Web版は、local strage に .metatext.jsonc 保存 パッケージのときに一緒に
+
+・何も開いてない時の説明の文字がデカくてダサい、もう少し小さめに
 
 ・アンドゥ Ctrl+Z 実装 → metatext-editor\docs\plan\history-gix-plan.md のとき対応
 
 ・LP ダサすぎる問題、いかにもAI
-・meta-csv の記述がまだ結構残ってる → Ctrl+Shift+F
+・meta-csv の記述がまだ結構残ってる → Ctrl+Shift+F → metatext-editor
 
 ・多言語化
 ・アバウトにオープンソースライセンス
