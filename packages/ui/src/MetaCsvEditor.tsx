@@ -13,6 +13,7 @@ import {
   FolderOpen,
   Info,
   Italic,
+  Lock,
   Menu,
   Minus,
   Palette,
@@ -22,6 +23,7 @@ import {
   Search,
   Settings,
   Undo2,
+  Unlock,
   X,
 } from 'lucide-react';
 import {
@@ -44,8 +46,10 @@ import {
   DEFAULT_ROW_HEIGHT,
   type CellStyle,
   type FilterPreset,
+  type JsonlArrayMode,
   type MarkerColor,
   type MetaCsvDocument,
+  type MetaTextFormat,
   type RangeStyleRule,
   type RowMarker,
   type SortSpec,
@@ -55,6 +59,7 @@ import {
   applyViewFilter,
   buildSortedRowIndices,
   createStyleResolverContext,
+  detectTargetFormat,
   doesCellMatchFilterTerms,
   indexToExcelColumn,
   parseMetaJsonc,
@@ -62,6 +67,7 @@ import {
   resolveCellStyle,
   searchVisibleRows,
   serializeCsv,
+  serializeJsonl,
   type FileSystemAdapter,
   type ParseProgress,
   type ParsedCsvData,
@@ -69,7 +75,7 @@ import {
   type SearchMatch,
 } from '@meta-csv/core';
 import { buildGridTheme, type ThemePreference } from './theme';
-import { parseCsvInWorker } from './parseInWorker';
+import { parseTabularInWorker } from './parseInWorker';
 import { FilterBar, type FilterColumnOption } from './FilterBar';
 import { MARKER_COLORS, MARKER_PALETTE, MarkerControls } from './MarkerControls';
 import {
@@ -97,6 +103,8 @@ export interface EditorStatusInfo {
   visibleRows: number;
   cols: number;
   markerCount: number;
+  format?: MetaTextFormat;
+  readOnly?: boolean;
   encoding?: string;
   lineEnding?: string;
 }
@@ -156,12 +164,14 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
   const [fileName, setFileName] = useState<string>('');
   const [csvData, setCsvData] = useState<ParsedCsvData | null>(null);
   const [meta, setMeta] = useState<MetaCsvDocument>({ version: '0.1' });
+  const [activeFormat, setActiveFormat] = useState<MetaTextFormat>('csv');
+  const [isReadOnly, setIsReadOnly] = useState<boolean>(false);
   const [autoWidths, setAutoWidths] = useState<number[]>([]);
   const [dirtyCsv, setDirtyCsv] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string>('');
   const [dataVersion, setDataVersion] = useState(0);
   const [reloadTick, setReloadTick] = useState(0);
-  const [openMenu, setOpenMenu] = useState<'none' | 'file' | 'edit'>('none');
+  const [openMenu, setOpenMenu] = useState<'none' | 'file' | 'edit' | 'unlock'>('none');
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showAboutModal, setShowAboutModal] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState<ParseProgress | null>(null);
@@ -264,7 +274,8 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
       setOnlyMarked(false);
     }
 
-    setStatusMsg('Loading CSV...');
+    setStatusMsg('Loading file...');
+    setOpenMenu('none');
     setLoadingProgress({ phase: 'decoding', percent: 0, rowsParsed: 0 });
     setShowProgressOverlay(false);
     historyRef.current.clear();
@@ -281,17 +292,27 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
         if (cancelled) return;
         const parsedMeta = parseMetaJsonc(payload.metaText);
         const normalizedMetaText = payload.metaText ?? '';
+        const resolvedFormat = detectTargetFormat(payload.fileName, parsedMeta.format);
+        const initialReadOnly =
+          parsedMeta.readOnly ?? (resolvedFormat === 'jsonl' || resolvedFormat === 'log');
+
         setFileName(payload.fileName);
         setMeta(parsedMeta);
+        setActiveFormat(resolvedFormat);
+        setIsReadOnly(initialReadOnly);
         metaTextRef.current = normalizedMetaText;
         onMetaTextChange?.(normalizedMetaText);
         setFilterQuery(parsedMeta.view?.activeFilter ?? '');
         setDebouncedFilterQuery(parsedMeta.view?.activeFilter ?? '');
         setFilterContextRows(parsedMeta.view?.filterContextRows ?? 0);
 
-        const { parsed, autoWidths: widths, elapsedMs } = await parseCsvInWorker(
+        const { parsed, autoWidths: widths, elapsedMs } = await parseTabularInWorker(
           payload.csvBytes,
-          parsedMeta.csv,
+          {
+            format: resolvedFormat,
+            csv: parsedMeta.csv,
+            jsonl: parsedMeta.jsonl,
+          },
           (prog) => {
             if (!cancelled) setLoadingProgress(prog);
           },
@@ -305,7 +326,7 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
         setDataVersion((v) => v + 1);
         setStatusMsg('');
         console.info(
-          `[MetaCSV] Loaded ${payload.fileName}: ${parsed.rows.length.toLocaleString()} rows × ${parsed.headers.length} cols in ${elapsedMs} ms`,
+          `[MetaCSV] Loaded ${payload.fileName} (${resolvedFormat}): ${parsed.rows.length.toLocaleString()} rows × ${parsed.headers.length} cols in ${elapsedMs} ms`,
         );
       })
       .catch((err) => {
@@ -335,12 +356,25 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
       const nextMeta = parseMetaJsonc(nextText);
       metaTextRef.current = nextText ?? '';
       setMeta(nextMeta);
+      if (nextMeta.readOnly !== undefined) {
+        setIsReadOnly(nextMeta.readOnly);
+      }
 
       if (csvData) {
-        const prevHasHeader = csvData.dialect.hasHeader;
-        const nextHasHeader = nextMeta.csv?.hasHeader ?? true;
-        if (prevHasHeader !== nextHasHeader) {
-          setReloadTick((t) => t + 1);
+        if (csvData.format === 'jsonl') {
+          const prevDepth = csvData.jsonlOptions?.flattenDepth ?? 2;
+          const nextDepth = nextMeta.jsonl?.flattenDepth ?? 2;
+          const prevArr = csvData.jsonlOptions?.arrayMode ?? 'json';
+          const nextArr = nextMeta.jsonl?.arrayMode ?? 'json';
+          if (prevDepth !== nextDepth || prevArr !== nextArr) {
+            setReloadTick((t) => t + 1);
+          }
+        } else {
+          const prevHasHeader = csvData.dialect.hasHeader;
+          const nextHasHeader = nextMeta.csv?.hasHeader ?? true;
+          if (prevHasHeader !== nextHasHeader) {
+            setReloadTick((t) => t + 1);
+          }
         }
       }
     },
@@ -866,7 +900,7 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
         kind: GridCellKind.Text,
         data: val,
         displayData: displayVal,
-        allowOverlay: !colMeta?.readonly,
+        allowOverlay: !isReadOnly && !colMeta?.readonly,
         allowWrapping: colMeta?.wrap ?? false,
         contentAlign: colMeta?.align,
         themeOverride,
@@ -886,6 +920,7 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
       filterState.collapsedCounts,
       filterState.positiveTerms,
       collapseColKey,
+      isReadOnly,
       dataVersion,
     ],
   );
@@ -912,6 +947,7 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
   // Cell edit handler
   const onCellEdited = useCallback(
     ([visibleCol, viewRow]: Item, newValue: EditableGridCell) => {
+      if (isReadOnly) return;
       if (newValue.kind !== GridCellKind.Text) return;
       const actualCol = visibleColIndices[visibleCol];
       const dataRow = viewRowIndices[viewRow];
@@ -933,12 +969,13 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
       setDataVersion((v) => v + 1);
       onDocumentEdit?.('Edit cell');
     },
-    [visibleColIndices, viewRowIndices, onDocumentEdit],
+    [isReadOnly, visibleColIndices, viewRowIndices, onDocumentEdit],
   );
 
   // Move to and open the adjacent cell editor when finishing a cell edit via Tab / Shift+Tab
   const onFinishedEditing = useCallback(
     (_newValue: GridCell | undefined, movement: Item) => {
+      if (isReadOnly) return;
       const [movX] = movement;
       if (movX === 0 || !csvData || columns.length === 0) return;
 
@@ -998,7 +1035,7 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
         }, 0);
       });
     },
-    [csvData, columns.length, selection, viewRowIndices.length, visibleColIndices, meta.columns],
+    [isReadOnly, csvData, columns.length, selection, viewRowIndices.length, visibleColIndices, meta.columns],
   );
 
   // Column resize -> persist to .metatext.jsonc
@@ -1032,10 +1069,17 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
 
   const serializeCurrentCsv = useCallback((): Uint8Array | null => {
     if (!csvData) return null;
+    if (csvData.format === 'jsonl' && csvData.jsonlOptions) {
+      return serializeJsonl(csvData.columnKeys, rowsRef.current, csvData.jsonlOptions);
+    }
     return serializeCsv(csvData.headers, rowsRef.current, csvData.dialect);
   }, [csvData]);
 
   const handleSaveCsv = useCallback(async () => {
+    if (isReadOnly) {
+      setStatusMsg('Read-Only mode — unlock to save changes');
+      return;
+    }
     const bytes = serializeCurrentCsv();
     if (!bytes) return;
     await adapter.saveCsv(bytes);
@@ -1043,9 +1087,10 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
     setStatusMsg(
       `Saved ${fileName} (${rowsRef.current.length.toLocaleString()} rows)`,
     );
-  }, [adapter, serializeCurrentCsv, fileName]);
+  }, [isReadOnly, adapter, serializeCurrentCsv, fileName]);
 
   const applyUndoLocal = useCallback(() => {
+    if (isReadOnly) return false;
     const cmd = historyRef.current.undo(rowsRef.current);
     if (cmd) {
       setDirtyCsv(true);
@@ -1053,9 +1098,10 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
       return true;
     }
     return false;
-  }, []);
+  }, [isReadOnly]);
 
   const applyRedoLocal = useCallback(() => {
+    if (isReadOnly) return false;
     const cmd = historyRef.current.redo(rowsRef.current);
     if (cmd) {
       setDirtyCsv(true);
@@ -1063,7 +1109,7 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
       return true;
     }
     return false;
-  }, []);
+  }, [isReadOnly]);
 
   const handleUndo = useCallback(() => {
     if (applyUndoLocal()) {
@@ -1099,7 +1145,7 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
   );
 
   const handleAddRow = useCallback(() => {
-    if (!csvData) return;
+    if (!csvData || isReadOnly) return;
     const colCount = csvData.headers.length;
     const newRow = Array.from({ length: colCount }, () => '');
     let insertIdx = rowsRef.current.length;
@@ -1117,10 +1163,10 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
     setDirtyCsv(true);
     setDataVersion((v) => v + 1);
     onDocumentEdit?.('Insert row');
-  }, [csvData, selection, viewRowIndices, markers, persistMarkers, onDocumentEdit]);
+  }, [csvData, isReadOnly, selection, viewRowIndices, markers, persistMarkers, onDocumentEdit]);
 
   const handleDeleteRow = useCallback(() => {
-    if (!csvData || !selection.current) return;
+    if (!csvData || isReadOnly || !selection.current) return;
     const dataRow = viewRowIndices[selection.current.cell[1]];
     if (dataRow === undefined) return;
     const removed = rowsRef.current.splice(dataRow, 1)[0];
@@ -1136,7 +1182,7 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
     setDirtyCsv(true);
     setDataVersion((v) => v + 1);
     onDocumentEdit?.('Delete row');
-  }, [csvData, selection, viewRowIndices, markers, persistMarkers, onDocumentEdit]);
+  }, [csvData, isReadOnly, selection, viewRowIndices, markers, persistMarkers, onDocumentEdit]);
 
   // Keyboard shortcuts (F2 / Shift+F2 / Ctrl+M for Markers; Ctrl+S/Z/Y handled when not in VS Code)
   useEffect(() => {
@@ -1293,6 +1339,8 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
       visibleRows: csvData ? viewRowIndices.length : 0,
       cols: csvData ? csvData.headers.length : 0,
       markerCount: markers.length,
+      format: activeFormat,
+      readOnly: isReadOnly,
       encoding: csvData?.dialect.encoding,
       lineEnding: csvData?.dialect.lineEnding,
     });
@@ -1303,6 +1351,8 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
     csvData,
     viewRowIndices.length,
     markers.length,
+    activeFormat,
+    isReadOnly,
     dataVersion,
   ]);
   const toolbarBg = isDark ? '#252526' : '#f8fafc';
@@ -1633,7 +1683,7 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
           />
         )}
 
-        {/* Right section: Settings + About */}
+        {/* Right section: Read-Only Lock/Unlock + Settings + About */}
         <div
           style={{
             marginLeft: 'auto',
@@ -1641,8 +1691,57 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
             alignItems: 'center',
             gap: 6,
             flexShrink: 0,
+            position: 'relative',
           }}
         >
+          {(isReadOnly || activeFormat === 'jsonl' || activeFormat === 'log') && (
+            <button
+              type="button"
+              title={
+                isReadOnly
+                  ? 'Read-Only mode (click to unlock editing)'
+                  : 'Editing unlocked (click to re-lock as Read-Only)'
+              }
+              aria-label={isReadOnly ? 'Read-Only mode' : 'Editing unlocked'}
+              style={{
+                ...btnStyle,
+                padding: '3px 8px',
+                borderColor: isReadOnly
+                  ? '#f59e0b'
+                  : openMenu === 'unlock'
+                    ? '#3b82f6'
+                    : '#10b981',
+                background: isReadOnly
+                  ? isDark
+                    ? 'rgba(245, 158, 11, 0.16)'
+                    : 'rgba(245, 158, 11, 0.14)'
+                  : isDark
+                    ? 'rgba(16, 185, 129, 0.14)'
+                    : 'rgba(16, 185, 129, 0.12)',
+                color: isReadOnly
+                  ? isDark
+                    ? '#fcd34d'
+                    : '#b45309'
+                  : isDark
+                    ? '#6ee7b7'
+                    : '#047857',
+                fontWeight: 600,
+              }}
+              onClick={() => {
+                if (isReadOnly) {
+                  setOpenMenu((m) => (m === 'unlock' ? 'none' : 'unlock'));
+                } else {
+                  setOpenMenu('none');
+                  setIsReadOnly(true);
+                  patchMeta(['readOnly'], true);
+                  setStatusMsg('Locked as Read-Only');
+                }
+              }}
+            >
+              {isReadOnly ? <Lock size={12} /> : <Unlock size={12} />}
+              <span>{isReadOnly ? 'Read-Only' : 'Unlocked'}</span>
+            </button>
+          )}
           <button
             type="button"
             aria-label="Settings"
@@ -1667,6 +1766,63 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
           >
             <Info size={14} />
           </button>
+
+          {openMenu === 'unlock' && isReadOnly && (
+            <div
+              style={{
+                position: 'absolute',
+                top: 'calc(100% + 4px)',
+                right: 0,
+                zIndex: 65,
+                width: 270,
+                padding: 12,
+                borderRadius: 6,
+                background: isDark ? '#1f1f23' : '#ffffff',
+                border: `1px solid ${toolbarBorder}`,
+                boxShadow: '0 8px 24px rgba(0,0,0,0.34)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 8,
+                fontSize: 12,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
+                <Lock size={13} />
+                <span>Unlock Source Editing?</span>
+              </div>
+              <div style={{ opacity: 0.8, lineHeight: 1.45, fontSize: 11.5 }}>
+                This file is currently protected as Read-Only. Sidecar metadata (filters, markers, styles) can still be saved without unlocking.
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, marginTop: 2 }}>
+                <button
+                  type="button"
+                  style={btnStyle}
+                  onClick={() => setOpenMenu('none')}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  style={{
+                    ...btnStyle,
+                    background: '#d97706',
+                    borderColor: '#f59e0b',
+                    color: '#ffffff',
+                    fontWeight: 600,
+                  }}
+                  onClick={() => {
+                    setIsReadOnly(false);
+                    patchMeta(['readOnly'], false);
+                    setOpenMenu('none');
+                    setStatusMsg('Editing unlocked (saved to .metatext.jsonc)');
+                  }}
+                >
+                  <Unlock size={12} />
+                  <span>Unlock Editing</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Hamburger File / Edit Menu Popover (Desktop & Web) */}
@@ -1707,9 +1863,9 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
               type="button"
               style={{
                 ...menuItemStyle,
-                opacity: !dirtyCsv && hostMode === 'desktop' ? 0.45 : 1,
+                opacity: isReadOnly || (!dirtyCsv && hostMode === 'desktop') ? 0.45 : 1,
               }}
-              disabled={!dirtyCsv && hostMode === 'desktop'}
+              disabled={isReadOnly || (!dirtyCsv && hostMode === 'desktop')}
               onClick={() => {
                 setOpenMenu('none');
                 void handleSaveCsv();
@@ -1717,7 +1873,15 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
             >
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
                 <Save size={14} />
-                <span>{hostMode === 'web' ? 'Save / Download CSV' : 'Save CSV'}</span>
+                <span>
+                  {activeFormat === 'jsonl'
+                    ? hostMode === 'web'
+                      ? 'Save / Download JSONL'
+                      : 'Save JSONL'
+                    : hostMode === 'web'
+                      ? 'Save / Download CSV'
+                      : 'Save CSV'}
+                </span>
               </span>
               <span style={{ fontSize: 10.5, opacity: 0.6 }}>Ctrl+S</span>
             </button>
@@ -1726,9 +1890,9 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
               type="button"
               style={{
                 ...menuItemStyle,
-                opacity: historyRef.current.canUndo() ? 1 : 0.45,
+                opacity: !isReadOnly && historyRef.current.canUndo() ? 1 : 0.45,
               }}
-              disabled={!historyRef.current.canUndo()}
+              disabled={isReadOnly || !historyRef.current.canUndo()}
               onClick={() => {
                 setOpenMenu('none');
                 handleUndo();
@@ -1744,9 +1908,9 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
               type="button"
               style={{
                 ...menuItemStyle,
-                opacity: historyRef.current.canRedo() ? 1 : 0.45,
+                opacity: !isReadOnly && historyRef.current.canRedo() ? 1 : 0.45,
               }}
-              disabled={!historyRef.current.canRedo()}
+              disabled={isReadOnly || !historyRef.current.canRedo()}
               onClick={() => {
                 setOpenMenu('none');
                 handleRedo();
@@ -1790,19 +1954,20 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
             <div style={{ display: 'flex', gap: 6 }}>
               <button
                 type="button"
-                style={{ ...btnStyle, flex: 1 }}
+                style={{ ...btnStyle, flex: 1, opacity: isReadOnly ? 0.45 : 1 }}
+                disabled={isReadOnly}
                 onClick={handleAddRow}
-                title="Insert empty row below selection"
+                title={isReadOnly ? 'Unlock editing to insert rows' : 'Insert empty row below selection'}
               >
                 <Plus size={13} />
                 <span>Insert Row</span>
               </button>
               <button
                 type="button"
-                style={{ ...btnStyle, flex: 1, opacity: selection.current ? 1 : 0.45 }}
+                style={{ ...btnStyle, flex: 1, opacity: !isReadOnly && selection.current ? 1 : 0.45 }}
                 onClick={handleDeleteRow}
-                disabled={!selection.current}
-                title="Delete selected row"
+                disabled={isReadOnly || !selection.current}
+                title={isReadOnly ? 'Unlock editing to delete rows' : 'Delete selected row'}
               >
                 <Minus size={13} />
                 <span>Delete Row</span>
@@ -1929,9 +2094,9 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
           >
             <div style={{ fontSize: 14, fontWeight: 600 }}>
               {loadingProgress.phase === 'decoding'
-                ? 'Reading CSV file...'
+                ? 'Reading file...'
                 : loadingProgress.phase === 'parsing'
-                  ? `Parsing CSV... (${loadingProgress.rowsParsed.toLocaleString()} rows)`
+                  ? `Parsing ${activeFormat.toUpperCase()}... (${loadingProgress.rowsParsed.toLocaleString()} rows)`
                   : 'Finalizing grid...'}
             </div>
             <div
@@ -2017,7 +2182,9 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
             </span>
             {csvData && (
               <span style={{ opacity: 0.65, whiteSpace: 'nowrap' }}>
-                {csvData.dialect.encoding.toUpperCase()} · {csvData.dialect.lineEnding.toUpperCase()}
+                {activeFormat.toUpperCase()} · {csvData.dialect.encoding.toUpperCase()} · {csvData.dialect.lineEnding.toUpperCase()}
+                {isReadOnly ? ' · RO' : ''}
+                {csvData.invalidLineCount ? ` · ${csvData.invalidLineCount} raw` : ''}
               </span>
             )}
             {statusMsg && (
@@ -2052,8 +2219,18 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
         fileSettings={
           csvData
             ? ({
+                format: activeFormat,
+                readOnly: isReadOnly,
+                onReadOnlyChange: (next) => {
+                  setIsReadOnly(next);
+                  patchMeta(['readOnly'], next);
+                },
                 hasHeader: meta.csv?.hasHeader ?? true,
                 onHasHeaderChange: (next) => patchMeta(['csv', 'hasHeader'], next),
+                jsonlFlattenDepth: meta.jsonl?.flattenDepth ?? 2,
+                onJsonlFlattenDepthChange: (next) => patchMeta(['jsonl', 'flattenDepth'], next),
+                jsonlArrayMode: meta.jsonl?.arrayMode ?? ('json' satisfies JsonlArrayMode),
+                onJsonlArrayModeChange: (next) => patchMeta(['jsonl', 'arrayMode'], next),
                 freezeColumns: meta.table?.freezeColumns ?? 0,
                 maxFreezeColumns: Math.max(0, visibleColIndices.length - 1),
                 onFreezeColumnsChange: (next) => patchMeta(['table', 'freezeColumns'], next),

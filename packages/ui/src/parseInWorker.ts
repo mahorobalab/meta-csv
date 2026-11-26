@@ -1,8 +1,13 @@
 /// <reference path="./vite-env.d.ts" />
-import type { CsvDialectConfig } from '@meta-csv/schema';
+import type {
+  CsvDialectConfig,
+  JsonlParserConfig,
+  MetaTextFormat,
+} from '@meta-csv/schema';
 import {
   estimateColumnWidths,
   parseCsvBytes,
+  parseJsonlBytes,
   type ParseProgress,
   type ParsedCsvData,
 } from '@meta-csv/core';
@@ -15,32 +20,45 @@ export interface WorkerParseResult {
   elapsedMs: number;
 }
 
+export interface TabularParseOptions {
+  format?: MetaTextFormat;
+  csv?: CsvDialectConfig;
+  jsonl?: JsonlParserConfig;
+}
+
 let nextReqId = 1;
 
+function parseSync(bytes: Uint8Array, options: TabularParseOptions, onProgress?: (progress: ParseProgress) => void): WorkerParseResult {
+  const t0 = performance.now();
+  const parsed =
+    options.format === 'jsonl'
+      ? parseJsonlBytes(bytes, options.jsonl, onProgress)
+      : parseCsvBytes(bytes, options.csv, onProgress);
+  const autoWidths = estimateColumnWidths(parsed.headers, parsed.rows);
+  return {
+    parsed,
+    autoWidths,
+    elapsedMs: Math.round(performance.now() - t0),
+  };
+}
+
 /**
- * Parse CSV bytes inside an inline Web Worker (with zero-copy ArrayBuffer transfer),
+ * Parse CSV/TSV/JSONL bytes inside an inline Web Worker (with zero-copy ArrayBuffer transfer),
  * falling back to main-thread parsing if Worker creation is unavailable.
  */
-export function parseCsvInWorker(
+export function parseTabularInWorker(
   bytes: Uint8Array,
-  override?: CsvDialectConfig,
+  options: TabularParseOptions = {},
   onProgress?: (progress: ParseProgress) => void,
   signal?: AbortSignal,
 ): Promise<WorkerParseResult> {
   if (signal?.aborted) {
-    return Promise.reject(new DOMException('CSV parse aborted', 'AbortError'));
+    return Promise.reject(new DOMException('File parse aborted', 'AbortError'));
   }
 
   // Small files (< 512 KB) finish in < 5ms synchronously without worker overhead
   if (bytes.byteLength < 512 * 1024 || typeof Worker === 'undefined') {
-    const t0 = performance.now();
-    const parsed = parseCsvBytes(bytes, override);
-    const autoWidths = estimateColumnWidths(parsed.headers, parsed.rows);
-    return Promise.resolve({
-      parsed,
-      autoWidths,
-      elapsedMs: Math.round(performance.now() - t0),
-    });
+    return Promise.resolve(parseSync(bytes, options));
   }
 
   return new Promise<WorkerParseResult>((resolve, reject) => {
@@ -48,21 +66,14 @@ export function parseCsvInWorker(
     try {
       worker = new CsvWorker();
     } catch {
-      const t0 = performance.now();
-      const parsed = parseCsvBytes(bytes, override, onProgress);
-      const autoWidths = estimateColumnWidths(parsed.headers, parsed.rows);
-      resolve({
-        parsed,
-        autoWidths,
-        elapsedMs: Math.round(performance.now() - t0),
-      });
+      resolve(parseSync(bytes, options, onProgress));
       return;
     }
 
     const id = nextReqId++;
     const onAbort = () => {
       worker.terminate();
-      reject(new DOMException('CSV parse aborted', 'AbortError'));
+      reject(new DOMException('File parse aborted', 'AbortError'));
     };
     const cleanup = () => {
       signal?.removeEventListener('abort', onAbort);
@@ -100,7 +111,22 @@ export function parseCsvInWorker(
       bytes.byteOffset === 0 && bytes.byteLength === bytes.buffer.byteLength
         ? [bytes.buffer]
         : [];
-    const req: ParseWorkerRequest = { id, bytes, override };
+    const req: ParseWorkerRequest = {
+      id,
+      bytes,
+      format: options.format,
+      override: options.csv,
+      jsonlOverride: options.jsonl,
+    };
     worker.postMessage(req, transferable);
   });
+}
+
+export function parseCsvInWorker(
+  bytes: Uint8Array,
+  override?: CsvDialectConfig,
+  onProgress?: (progress: ParseProgress) => void,
+  signal?: AbortSignal,
+): Promise<WorkerParseResult> {
+  return parseTabularInWorker(bytes, { format: 'csv', csv: override }, onProgress, signal);
 }

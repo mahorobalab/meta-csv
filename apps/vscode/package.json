@@ -24,7 +24,9 @@
         "displayName": "MetaCSV Editor",
         "selector": [
           { "filenamePattern": "*.csv" },
-          { "filenamePattern": "*.tsv" }
+          { "filenamePattern": "*.tsv" },
+          { "filenamePattern": "*.jsonl" },
+          { "filenamePattern": "*.ndjson" }
         ],
         "priority": "option"
       }
@@ -39,7 +41,7 @@
       "editor/title": [
         {
           "command": "metaCsv.openWithEditor",
-          "when": "resourceExtname == .csv || resourceExtname == .tsv",
+          "when": "resourceExtname == .csv || resourceExtname == .tsv || resourceExtname == .jsonl || resourceExtname == .ndjson",
           "group": "navigation"
         }
       ]

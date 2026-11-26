@@ -154,7 +154,12 @@ function triggerBrowserDownload(fileName: string, bytes: Uint8Array): void {
   if (typeof document === 'undefined' || typeof URL === 'undefined') return;
   const copy = new Uint8Array(bytes.byteLength);
   copy.set(bytes);
-  const blob = new Blob([copy], { type: 'text/csv;charset=utf-8' });
+  const lower = fileName.toLowerCase();
+  const mimeType =
+    lower.endsWith('.jsonl') || lower.endsWith('.ndjson')
+      ? 'application/x-ndjson;charset=utf-8'
+      : 'text/csv;charset=utf-8';
+  const blob = new Blob([copy], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -165,6 +170,130 @@ function triggerBrowserDownload(fileName: string, bytes: Uint8Array): void {
   document.body.removeChild(a);
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+export const EVENTS_JSONL = [
+  JSON.stringify({
+    timestamp: '2026-11-26T05:00:01.120Z',
+    level: 'INFO',
+    service: 'auth-api',
+    user: { id: 'usr_001', plan: 'pro' },
+    metrics: { latency_ms: 42, status: 200 },
+    tags: ['login', 'oauth'],
+    message: 'User session issued',
+  }),
+  JSON.stringify({
+    timestamp: '2026-11-26T05:00:04.580Z',
+    level: 'WARN',
+    service: 'billing-worker',
+    user: { id: 'usr_014', plan: 'team' },
+    metrics: { latency_ms: 615, status: 200 },
+    tags: ['stripe', 'slow'],
+    message: 'Payment webhook slower than SLA (615ms)',
+  }),
+  JSON.stringify({
+    timestamp: '2026-11-26T05:00:07.902Z',
+    level: 'ERROR',
+    service: 'search-proxy',
+    user: { id: 'usr_022', plan: 'enterprise' },
+    metrics: { latency_ms: 2014, status: 504 },
+    tags: ['timeout', 'upstream'],
+    error: { code: 'UPSTREAM_TIMEOUT', retryable: true },
+    message: 'Vector search upstream timed out after 2000ms',
+  }),
+  JSON.stringify({
+    timestamp: '2026-11-26T05:00:09.044Z',
+    level: 'INFO',
+    service: 'search-proxy',
+    user: { id: 'usr_022', plan: 'enterprise' },
+    metrics: { latency_ms: 118, status: 200 },
+    tags: ['retry', 'recovered'],
+    message: 'Retry succeeded on replica node #2',
+  }),
+  JSON.stringify({
+    timestamp: '2026-11-26T05:00:12.310Z',
+    level: 'ERROR',
+    service: 'ingest-pipeline',
+    user: { id: 'usr_007', plan: 'pro' },
+    metrics: { latency_ms: 88, status: 422 },
+    tags: ['validation'],
+    error: { code: 'INVALID_PAYLOAD', retryable: false },
+    message: 'Missing required field "schema_version" in batch event',
+  }),
+  JSON.stringify({
+    timestamp: '2026-11-26T05:00:15.775Z',
+    level: 'INFO',
+    service: 'ingest-pipeline',
+    user: { id: 'usr_099', plan: 'free' },
+    metrics: { latency_ms: 19, status: 202 },
+    tags: ['accepted'],
+    message: 'Enqueued 250 telemetry records',
+  }),
+].join('\n');
+
+export const EVENTS_JSONL_META = `{
+  "$schema": "./metatext.schema.json",
+  "version": "0.1",
+  "format": "jsonl",
+  "readOnly": true,
+
+  // Flatten nested keys up to depth 2; protect raw logs with Read-Only mode
+  "jsonl": {
+    "flattenDepth": 2,
+    "arrayMode": "json",
+    "encoding": "utf-8",
+    "lineEnding": "lf"
+  },
+
+  "table": {
+    "fontFamily": "'Consolas', 'Courier New', monospace",
+    "fontSize": 12,
+    "defaultRowHeight": 26,
+    "freezeColumns": 2
+  },
+
+  "view": {
+    "filterPresets": [
+      { "name": "Errors Only", "query": "level:ERROR", "contextRows": 1 },
+      { "name": "Slow (>= 500ms)", "query": "metrics.latency_ms:>=500" }
+    ],
+    "markers": [
+      { "row": 2, "color": "rose", "note": "Upstream timeout spike" }
+    ]
+  },
+
+  "styles": {
+    "errorRow": { "backgroundColor": "rgba(244, 63, 94, 0.18)" },
+    "warnRow": { "backgroundColor": "rgba(245, 158, 11, 0.18)" }
+  },
+
+  "columns": {
+    "timestamp": { "label": "Time", "width": 195 },
+    "level": { "label": "Level", "width": 75, "align": "center" },
+    "service": { "label": "Service", "width": 135 },
+    "user.id": { "label": "User ID", "width": 95 },
+    "user.plan": { "label": "Plan", "width": 95 },
+    "metrics.latency_ms": { "label": "Latency(ms)", "width": 100, "align": "right" },
+    "metrics.status": { "label": "HTTP", "width": 70, "align": "center" },
+    "error.code": { "label": "Error Code", "width": 165 },
+    "message": { "label": "Message", "width": 340 }
+  },
+
+  "rules": [
+    {
+      "name": "ERROR row highlight",
+      "target": "row",
+      "when": { "column": "level", "operator": "equals", "value": "ERROR" },
+      "style": "errorRow"
+    },
+    {
+      "name": "WARN row highlight",
+      "target": "row",
+      "when": { "column": "level", "operator": "equals", "value": "WARN" },
+      "style": "warnRow"
+    }
+  ]
+}
+`;
 
 export function createMemoryAdapter(initial: CsvFilePayload): FileSystemAdapter {
   let csvBytes = initial.csvBytes;

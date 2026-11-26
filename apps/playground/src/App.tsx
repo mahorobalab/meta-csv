@@ -9,6 +9,8 @@ import {
   type ThemePreference,
 } from '@meta-csv/ui';
 import {
+  EVENTS_JSONL,
+  EVENTS_JSONL_META,
   LARGE_CSV_META,
   SPEC_SETTING_CSV,
   SPEC_SETTING_META,
@@ -17,7 +19,7 @@ import {
   generateLargeCsvBytes,
 } from './datasets';
 
-type PresetKey = 'spec' | 'large100k' | 'custom';
+type PresetKey = 'spec' | 'jsonl' | 'large100k' | 'custom';
 
 const STORAGE_KEY = 'metacsv:playground-settings:v1';
 
@@ -91,6 +93,13 @@ export const App: React.FC = () => {
         metaText: SPEC_SETTING_META,
       });
     }
+    if (preset === 'jsonl') {
+      return createMemoryAdapter({
+        fileName: 'events.jsonl',
+        csvBytes: new TextEncoder().encode(EVENTS_JSONL),
+        metaText: EVENTS_JSONL_META,
+      });
+    }
     if (preset === 'large100k') {
       return createMemoryAdapter({
         fileName: 'benchmark_100k.csv',
@@ -155,6 +164,20 @@ export const App: React.FC = () => {
           <span>spec_setting.csv</span>
         </span>
         {preset === 'spec' && <Check size={13} />}
+      </button>
+      <button
+        type="button"
+        style={menuRowStyle}
+        onClick={() => {
+          setMetaText(EVENTS_JSONL_META);
+          setPreset('jsonl');
+        }}
+      >
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+          <Code2 size={13} />
+          <span>events.jsonl (JSONL Log)</span>
+        </span>
+        {preset === 'jsonl' && <Check size={13} />}
       </button>
       <button
         type="button"
@@ -228,7 +251,7 @@ export const App: React.FC = () => {
       <input
         ref={fileInputRef}
         type="file"
-        accept=".csv,.tsv,.txt"
+        accept=".csv,.tsv,.jsonl,.ndjson,.txt"
         onChange={handleOpenLocalCsv}
         style={{ display: 'none' }}
       />

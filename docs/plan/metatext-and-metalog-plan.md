@@ -131,11 +131,11 @@ flowchart LR
 - [x] `@meta-csv/schema` の `MetaTextDocument`（`format`, `readOnly`, `log`, `extensions`, `x-*`）拡張
 - [x] Desktop / VS Code / Web / UI / ドキュメント・LP の `.metatext.jsonc` 完全移行と全テスト・ビルド通過
 
-### Phase B1: JSONL 自動列展開 ＆ Read-Only 制御（次のステップ）
-- [ ] `metatext-spec` と `@meta-csv/schema` に `jsonl` 設定ブロック（`flattenDepth`, `arrayMode`, `encoding` 等）と JSONL サンプルを追加・同期
-- [ ] `packages/core` に `parseJsonlBytes()`（全行キースキャン＋ドット連結フラット化＋非破壊シリアライズ）を実装し単体テストを追加
-- [ ] `packages/ui` に `Read-Only` デフォルトロック表示／`Unlock Editing` 解除トグルを実装
-- [ ] Web Worker・Desktop（ファイル選択 `*.jsonl`）・VS Code (`customEditors`)・Web Playground（サンプル JSONL 追加）へ組み込み
+### Phase B1: JSONL 自動列展開 ＆ Read-Only 制御（実装・検証完了）
+- [x] `metatext-spec` と `@meta-csv/schema` に `jsonl` 設定ブロック（`flattenDepth`, `arrayMode`, `encoding`, `lineEnding`）と JSONL サンプルを追加・同期
+- [x] `packages/core` に `parseJsonlBytes()`（全行キースキャン＋ドット連結フラット化＋非破壊シリアライズ）を実装し単体テストを追加
+- [x] `packages/ui` に `Read-Only` デフォルトロック表示／`Unlock Editing` 解除トグルを実装
+- [x] Web Worker・Desktop（ファイル選択 `*.jsonl`）・VS Code (`customEditors`)・Web Playground（サンプル JSONL 追加）へ組み込み
 
 ### Phase B2: `.log` 正規表現パーサ ＆ CSV スタイル拡充
 - [ ] `parseLogLines()`（`log.linePattern` / `multilinePattern` / 組み込みプリセット）と設定 UI を実装

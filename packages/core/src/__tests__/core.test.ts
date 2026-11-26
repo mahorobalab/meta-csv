@@ -5,12 +5,15 @@ import {
   buildSortedRowIndices,
   computeColumnFacets,
   createStyleResolverContext,
+  detectTargetFormat,
   indexToExcelColumn,
   parseCsvBytes,
+  parseJsonlBytes,
   parseMetaJsonc,
   patchMetaJsonc,
   resolveCellStyle,
   serializeCsv,
+  serializeJsonl,
 } from '../index';
 
 describe('@meta-csv/core', () => {
@@ -242,5 +245,68 @@ describe('@meta-csv/core', () => {
     expect(parsed.extensions).toEqual({ metalog: { tailFollow: true } });
     expect(parsed['x-customTool']).toEqual({ enabled: true });
     expect(parsed.view?.filterContextRows).toBe(3);
+  });
+
+  it('detects target formats and parses/serializes JSONL with dot-flattening and sparse keys', () => {
+    expect(detectTargetFormat('events.jsonl')).toBe('jsonl');
+    expect(detectTargetFormat('stream.NDJSON')).toBe('jsonl');
+    expect(detectTargetFormat('metrics.tsv')).toBe('tsv');
+    expect(detectTargetFormat('app.log')).toBe('log');
+    expect(detectTargetFormat('data.txt', 'jsonl')).toBe('jsonl');
+
+    const jsonlText = [
+      '{"id":"001","level":"INFO","user":{"id":"u1","meta":{"tier":"pro"}},"tags":["a","b"]}',
+      '{"id":"002","level":"ERROR","user":{"id":"u2"},"error":{"code":"E500","retry":true},"latency":42}',
+      'not valid json line',
+    ].join('\r\n');
+    const bytes = new TextEncoder().encode(jsonlText);
+
+    const parsedDepth2 = parseJsonlBytes(bytes, { flattenDepth: 2, arrayMode: 'json' });
+    expect(parsedDepth2.format).toBe('jsonl');
+    expect(parsedDepth2.invalidLineCount).toBe(1);
+    expect(parsedDepth2.dialect.lineEnding).toBe('crlf');
+    expect(parsedDepth2.columnKeys).toEqual([
+      'id',
+      'level',
+      'user.id',
+      'user.meta.tier',
+      'tags',
+      'error.code',
+      'error.retry',
+      'latency',
+      '_raw',
+    ]);
+    expect(parsedDepth2.rows[0]!.length).toBe(9);
+    expect(parsedDepth2.rows[0]![0]).toBe('001');
+    expect(parsedDepth2.rows[0]![3]).toBe('pro');
+    expect(parsedDepth2.rows[0]![4]).toBe('["a","b"]');
+    expect(parsedDepth2.rows[1]![5]).toBe('E500');
+    expect(parsedDepth2.rows[2]![8]).toBe('not valid json line');
+
+    const parsedDepth0 = parseJsonlBytes(bytes, { flattenDepth: 0, arrayMode: 'join' });
+    expect(parsedDepth0.columnKeys).toContain('user');
+    expect(parsedDepth0.columnKeys).not.toContain('user.id');
+    expect(parsedDepth0.rows[0]![parsedDepth0.columnKeys.indexOf('tags')]).toBe('a, b');
+
+    const reencoded = serializeJsonl(
+      parsedDepth2.columnKeys,
+      parsedDepth2.rows,
+      parsedDepth2.jsonlOptions!,
+    );
+    const outLines = new TextDecoder().decode(reencoded).trimEnd().split('\r\n');
+    expect(JSON.parse(outLines[0]!)).toEqual({
+      id: '001',
+      level: 'INFO',
+      user: { id: 'u1', meta: { tier: 'pro' } },
+      tags: ['a', 'b'],
+    });
+    expect(JSON.parse(outLines[1]!)).toEqual({
+      id: '002',
+      level: 'ERROR',
+      user: { id: 'u2' },
+      error: { code: 'E500', retry: true },
+      latency: 42,
+    });
+    expect(outLines[2]).toBe('not valid json line');
   });
 });

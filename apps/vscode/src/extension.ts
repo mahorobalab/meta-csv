@@ -14,6 +14,8 @@ interface EditorStatusPayload {
   totalRows?: number;
   visibleRows?: number;
   cols?: number;
+  format?: string;
+  readOnly?: boolean;
 }
 
 class MetaCsvDocument implements vscode.CustomDocument {
@@ -227,10 +229,14 @@ class MetaCsvEditorProvider implements vscode.CustomEditorProvider<MetaCsvDocume
           const visibleRows = Number(st.visibleRows ?? totalRows);
           const cols = Number(st.cols ?? 0);
           if (cols > 0) {
+            const tags: string[] = [];
+            if (st.format && st.format !== 'csv') tags.push(st.format.toUpperCase());
+            if (st.readOnly) tags.push('RO');
+            const prefix = tags.length > 0 ? `MetaCSV [${tags.join(' · ')}]` : 'MetaCSV';
             const text =
               visibleRows !== totalRows
-                ? `MetaCSV: Rows=${visibleRows.toLocaleString()}/${totalRows.toLocaleString()}, Cols=${cols}`
-                : `MetaCSV: Rows=${totalRows.toLocaleString()}, Cols=${cols}`;
+                ? `${prefix}: Rows=${visibleRows.toLocaleString()}/${totalRows.toLocaleString()}, Cols=${cols}`
+                : `${prefix}: Rows=${totalRows.toLocaleString()}, Cols=${cols}`;
             this.statusByDoc.set(docKey, text);
             if (webviewPanel.active) {
               this.statusBarItem.text = text;

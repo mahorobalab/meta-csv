@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { X, Settings, Info, ExternalLink } from 'lucide-react';
-import type { MarkerColor } from '@meta-csv/schema';
+import type { JsonlArrayMode, MarkerColor, MetaTextFormat } from '@meta-csv/schema';
 import { MARKER_COLORS, MARKER_PALETTE } from './MarkerControls';
 import type { ThemePreference } from './theme';
 
@@ -15,8 +15,15 @@ export interface EditorAppSettings {
 }
 
 export interface FileLayoutSettingsProps {
+  format?: MetaTextFormat;
+  readOnly: boolean;
+  onReadOnlyChange: (next: boolean) => void;
   hasHeader: boolean;
   onHasHeaderChange: (next: boolean) => void;
+  jsonlFlattenDepth?: number;
+  onJsonlFlattenDepthChange?: (next: number) => void;
+  jsonlArrayMode?: JsonlArrayMode;
+  onJsonlArrayModeChange?: (next: JsonlArrayMode) => void;
   freezeColumns: number;
   maxFreezeColumns: number;
   onFreezeColumnsChange: (next: number) => void;
@@ -192,30 +199,75 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         {effectiveTab === 'file' && fileSettings && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
             <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
-              <span>First Row is Header</span>
+              <span>Read-Only Mode (Protect Source Data)</span>
               <input
                 type="checkbox"
-                checked={fileSettings.hasHeader}
-                onChange={(e) => fileSettings.onHasHeaderChange(e.target.checked)}
+                checked={fileSettings.readOnly}
+                onChange={(e) => fileSettings.onReadOnlyChange(e.target.checked)}
               />
             </label>
 
-            {!fileSettings.hasHeader && onAppSettingsChange && (
-              <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-                <span>Column Names (No Header)</span>
-                <select
-                  value={appSettings.noHeaderColumnStyle ?? 'excel'}
-                  onChange={(e) =>
-                    onAppSettingsChange({
-                      noHeaderColumnStyle: e.target.value as 'excel' | 'numbered',
-                    })
-                  }
-                  style={inputStyle}
-                >
-                  <option value="excel">A, B, C... (Excel)</option>
-                  <option value="numbered">column 1, 2, 3...</option>
-                </select>
-              </label>
+            {fileSettings.format === 'jsonl' ? (
+              <>
+                <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                  <span>JSONL Flatten Depth (0-8)</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={8}
+                    value={fileSettings.jsonlFlattenDepth ?? 2}
+                    onChange={(e) =>
+                      fileSettings.onJsonlFlattenDepthChange?.(
+                        Math.max(0, Math.min(8, Math.floor(Number(e.target.value) || 0))),
+                      )
+                    }
+                    style={{ ...inputStyle, width: 76 }}
+                  />
+                </label>
+
+                <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                  <span>JSONL Array Display</span>
+                  <select
+                    value={fileSettings.jsonlArrayMode ?? 'json'}
+                    onChange={(e) =>
+                      fileSettings.onJsonlArrayModeChange?.(e.target.value as JsonlArrayMode)
+                    }
+                    style={inputStyle}
+                  >
+                    <option value="json">Compact JSON ([...])</option>
+                    <option value="join">Comma-joined (a, b)</option>
+                  </select>
+                </label>
+              </>
+            ) : (
+              <>
+                <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
+                  <span>First Row is Header</span>
+                  <input
+                    type="checkbox"
+                    checked={fileSettings.hasHeader}
+                    onChange={(e) => fileSettings.onHasHeaderChange(e.target.checked)}
+                  />
+                </label>
+
+                {!fileSettings.hasHeader && onAppSettingsChange && (
+                  <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                    <span>Column Names (No Header)</span>
+                    <select
+                      value={appSettings.noHeaderColumnStyle ?? 'excel'}
+                      onChange={(e) =>
+                        onAppSettingsChange({
+                          noHeaderColumnStyle: e.target.value as 'excel' | 'numbered',
+                        })
+                      }
+                      style={inputStyle}
+                    >
+                      <option value="excel">A, B, C... (Excel)</option>
+                      <option value="numbered">column 1, 2, 3...</option>
+                    </select>
+                  </label>
+                )}
+              </>
             )}
 
             <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>

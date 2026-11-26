@@ -56,6 +56,36 @@
         }
       }
     },
+    "jsonl": {
+      "type": "object",
+      "description": "JSON Lines (.jsonl / .ndjson) flattening and parsing settings.",
+      "additionalProperties": false,
+      "properties": {
+        "flattenDepth": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 8,
+          "default": 2,
+          "description": "Maximum nesting depth for dot-notation flattening (e.g. 'user.name'). Deeper objects stay as compact JSON strings."
+        },
+        "arrayMode": {
+          "type": "string",
+          "enum": ["json", "join"],
+          "default": "json",
+          "description": "How array values are rendered in cells ('json' for compact JSON string, 'join' for comma-separated primitives)."
+        },
+        "encoding": {
+          "type": "string",
+          "enum": ["utf-8", "utf-8-bom", "shift-jis"],
+          "description": "Character encoding preserved on save."
+        },
+        "lineEnding": {
+          "type": "string",
+          "enum": ["lf", "crlf"],
+          "description": "Line ending preserved on save."
+        }
+      }
+    },
     "log": {
       "type": "object",
       "description": "Log parsing and viewing settings for .log and unstructured text files.",

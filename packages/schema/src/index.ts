@@ -13,6 +13,15 @@ export interface CsvDialectConfig {
   lineEnding?: CsvLineEnding;
 }
 
+export type JsonlArrayMode = 'json' | 'join';
+
+export interface JsonlParserConfig {
+  flattenDepth?: number;
+  arrayMode?: JsonlArrayMode;
+  encoding?: CsvEncoding;
+  lineEnding?: CsvLineEnding;
+}
+
 export interface LogParserConfig {
   linePattern?: string;
   columnNames?: string[];
@@ -125,6 +134,7 @@ export interface MetaTextDocument {
   format?: MetaTextFormat;
   readOnly?: boolean;
   csv?: CsvDialectConfig;
+  jsonl?: JsonlParserConfig;
   log?: LogParserConfig;
   table?: TableConfig;
   view?: ViewConfig;

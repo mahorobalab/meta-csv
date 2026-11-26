@@ -4,7 +4,16 @@ import type {
   CsvDialectConfig,
   CsvEncoding,
   CsvLineEnding,
+  JsonlArrayMode,
+  MetaTextFormat,
 } from '@meta-csv/schema';
+
+export interface ResolvedJsonlOptions {
+  flattenDepth: number;
+  arrayMode: JsonlArrayMode;
+  encoding: CsvEncoding;
+  lineEnding: CsvLineEnding;
+}
 
 export interface ResolvedCsvDialect {
   hasHeader: boolean;
@@ -18,6 +27,9 @@ export interface ParsedCsvData {
   rows: string[][];
   columnKeys: string[];
   dialect: ResolvedCsvDialect;
+  format?: MetaTextFormat;
+  jsonlOptions?: ResolvedJsonlOptions;
+  invalidLineCount?: number;
 }
 
 /** Convert 0-based column index to Excel-style column label (0 -> A, 25 -> Z, 26 -> AA). */
