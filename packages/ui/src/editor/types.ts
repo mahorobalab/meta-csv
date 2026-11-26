@@ -91,6 +91,19 @@ export interface RowContextMenuState {
   y: number;
 }
 
+export interface CellRangeRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface CellContextMenuState {
+  range: CellRangeRect;
+  x: number;
+  y: number;
+}
+
 export interface EditingHeaderColState {
   actualCol: number;
   colKey: string;

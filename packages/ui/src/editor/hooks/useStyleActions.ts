@@ -1,7 +1,13 @@
 import { useCallback, useMemo } from 'react';
 import type { GridSelection } from '@glideapps/glide-data-grid';
 import type { CellStyle, MetaCsvDocument, RangeStyleRule } from '@meta-csv/schema';
-import { patchMetaJsonc, type ParsedCsvData } from '@meta-csv/core';
+import { parseRangeRef, patchMetaJsonc, resolveStyleRef, type ParsedCsvData } from '@meta-csv/core';
+import {
+  didUpdaterClearAnyProperty,
+  getOverlappingRangeStyle,
+  rangesOverlap,
+  subtractRectFromRanges,
+} from '../utils/styleRangeUtils';
 
 export interface UseStyleActionsParams {
   csvData: ParsedCsvData | null;
@@ -127,11 +133,70 @@ export function useStyleActions({
         if (actualCol === undefined || dataRow === undefined) return;
         const colKey = csvData.columnKeys[actualCol] ?? String(actualCol);
         const cellKey = `${dataRow}:${colKey}`;
-        const existingRef = meta.cells?.[cellKey];
+        const idxKey = colKey !== String(actualCol) ? `${dataRow}:${actualCol}` : null;
+        const existingRef = meta.cells?.[cellKey] ?? (idxKey ? meta.cells?.[idxKey] : undefined);
         const existing: CellStyle =
           typeof existingRef === 'string'
             ? { ...(meta.styles?.[existingRef] ?? {}) }
             : { ...(existingRef ?? {}) };
+        const cellRect = {
+          startRow: dataRow,
+          endRow: dataRow,
+          startCol: actualCol,
+          endCol: actualCol,
+        };
+
+        if (isClearAll) {
+          let text = metaTextRef.current ?? '';
+          let changed = false;
+          if (meta.cells && (cellKey in meta.cells || (idxKey && idxKey in meta.cells))) {
+            text = patchMetaJsonc(text, ['cells', cellKey], undefined);
+            if (idxKey && idxKey in meta.cells) {
+              text = patchMetaJsonc(text, ['cells', idxKey], undefined);
+            }
+            changed = true;
+          }
+          if (meta.ranges && meta.ranges.length > 0) {
+            const { nextRanges, changed: rangesChanged } = subtractRectFromRanges(
+              meta.ranges,
+              cellRect,
+            );
+            if (rangesChanged) {
+              text = patchMetaJsonc(
+                text,
+                ['ranges'],
+                nextRanges.length > 0 ? nextRanges : undefined,
+              );
+              changed = true;
+            }
+          }
+          if (changed) {
+            scheduleMetaSave(text);
+          }
+          return;
+        }
+
+        const rangeStyle = getOverlappingRangeStyle(meta.ranges, meta.styles, dataRow, actualCol);
+        if (rangeStyle && didUpdaterClearAnyProperty(rangeStyle, updater)) {
+          // Carve this cell out of overlapping ranges so clearing a property (e.g. backgroundColor=none) takes effect
+          const combined: CellStyle = { ...rangeStyle, ...existing };
+          const next = updater(combined);
+          const hasAny = Object.values(next).some((v) => v !== undefined);
+          let text = metaTextRef.current ?? '';
+          const { nextRanges } = subtractRectFromRanges(meta.ranges ?? [], cellRect);
+          text = patchMetaJsonc(
+            text,
+            ['ranges'],
+            nextRanges.length > 0 ? nextRanges : undefined,
+          );
+          text = patchMetaJsonc(text, ['cells', cellKey], hasAny ? next : undefined);
+          if (idxKey && meta.cells && idxKey in meta.cells) {
+            text = patchMetaJsonc(text, ['cells', idxKey], undefined);
+          }
+          scheduleMetaSave(text);
+          return;
+        }
+
         const next = updater(existing);
         const hasAny = Object.values(next).some((v) => v !== undefined);
         patchMeta(['cells', cellKey], hasAny ? next : undefined);
@@ -152,13 +217,97 @@ export function useStyleActions({
       }
 
       const isSorted = (meta.view?.sort?.length ?? 0) > 0;
+      const minR = Math.min(startDataRow, endDataRow);
+      const maxR = Math.max(startDataRow, endDataRow);
+      const minC = Math.min(startCol, endCol);
+      const maxC = Math.max(startCol, endCol);
+      const selectionRect = { startRow: minR, endRow: maxR, startCol: minC, endCol: maxC };
+
+      if (isClearAll) {
+        let text = metaTextRef.current ?? '';
+        let changed = false;
+
+        // 1. Remove any per-cell style overrides inside the selected range
+        if (meta.cells) {
+          const nextCells = { ...meta.cells };
+          let cellsChanged = false;
+          const maxCells = 1000;
+          let count = 0;
+          for (let r = range.y; r < range.y + range.height && count < maxCells; r++) {
+            const dataRow = viewRowIndices[r];
+            if (dataRow === undefined) continue;
+            for (let c = range.x; c < range.x + range.width && count < maxCells; c++) {
+              const actualCol = visibleColIndices[c];
+              if (actualCol === undefined) continue;
+              const colKey = csvData.columnKeys[actualCol] ?? String(actualCol);
+              const key = `${dataRow}:${colKey}`;
+              const idxKey = colKey !== String(actualCol) ? `${dataRow}:${actualCol}` : null;
+              if (key in nextCells) {
+                delete nextCells[key];
+                cellsChanged = true;
+              }
+              if (idxKey && idxKey in nextCells) {
+                delete nextCells[idxKey];
+                cellsChanged = true;
+              }
+              count++;
+            }
+          }
+          if (cellsChanged) {
+            text = patchMetaJsonc(
+              text,
+              ['cells'],
+              Object.keys(nextCells).length > 0 ? nextCells : undefined,
+            );
+            changed = true;
+          }
+        }
+
+        // 2. Subtract selected rect from any overlapping range style rules
+        if (meta.ranges && meta.ranges.length > 0 && !isSorted) {
+          const { nextRanges, changed: rangesChanged } = subtractRectFromRanges(
+            meta.ranges,
+            selectionRect,
+          );
+          if (rangesChanged) {
+            text = patchMetaJsonc(
+              text,
+              ['ranges'],
+              nextRanges.length > 0 ? nextRanges : undefined,
+            );
+            changed = true;
+          }
+        }
+
+        if (changed) {
+          scheduleMetaSave(text);
+        }
+        return;
+      }
+
       if (!isSorted) {
-        const ref = `${Math.min(startDataRow, endDataRow)}:${Math.min(startCol, endCol)}..${Math.max(startDataRow, endDataRow)}:${Math.max(startCol, endCol)}`;
-        const existingRanges: RangeStyleRule[] = meta.ranges ? [...meta.ranges] : [];
-        const matchIdx = existingRanges.findIndex((r) => r.ref === ref);
+        const ref = `${minR}:${minC}..${maxR}:${maxC}`;
+        let existingRanges: RangeStyleRule[] = meta.ranges ? [...meta.ranges] : [];
+        let matchIdx = existingRanges.findIndex((r) => r.ref === ref);
+
+        // If clearing a property (e.g. backgroundColor=none) over a partial overlap with an existing range,
+        // carve out selectionRect from overlapping ranges so the cleared property isn't inherited.
+        if (matchIdx < 0 && existingRanges.length > 0) {
+          const hasClearedOverlap = existingRanges.some((rule) => {
+            const parsed = parseRangeRef(rule.ref);
+            if (!parsed || !rangesOverlap(parsed, selectionRect)) return false;
+            const st = resolveStyleRef(rule.style, meta.styles);
+            return st ? didUpdaterClearAnyProperty(st, updater) : false;
+          });
+          if (hasClearedOverlap) {
+            existingRanges = subtractRectFromRanges(existingRanges, selectionRect).nextRanges;
+            matchIdx = existingRanges.findIndex((r) => r.ref === ref);
+          }
+        }
+
         const prevStyle: CellStyle =
-          matchIdx >= 0 && typeof existingRanges[matchIdx]!.style !== 'string'
-            ? { ...(existingRanges[matchIdx]!.style as CellStyle) }
+          matchIdx >= 0
+            ? { ...(resolveStyleRef(existingRanges[matchIdx]!.style, meta.styles) ?? {}) }
             : {};
         const nextStyle = updater(prevStyle);
         const hasAny = Object.values(nextStyle).some((v) => v !== undefined);
@@ -171,7 +320,58 @@ export function useStyleActions({
         } else if (hasAny) {
           existingRanges.push({ ref, style: nextStyle });
         }
-        patchMeta(['ranges'], existingRanges.length > 0 ? existingRanges : undefined);
+
+        // Also update any pre-existing per-cell overrides inside the range so they don't shadow the new range style
+        let text = metaTextRef.current ?? '';
+        text = patchMetaJsonc(
+          text,
+          ['ranges'],
+          existingRanges.length > 0 ? existingRanges : undefined,
+        );
+        if (meta.cells) {
+          const nextCells = { ...meta.cells };
+          let cellsChanged = false;
+          const maxCells = 500;
+          let count = 0;
+          for (let r = range.y; r < range.y + range.height && count < maxCells; r++) {
+            const dataRow = viewRowIndices[r];
+            if (dataRow === undefined) continue;
+            for (let c = range.x; c < range.x + range.width && count < maxCells; c++) {
+              const actualCol = visibleColIndices[c];
+              if (actualCol === undefined) continue;
+              const colKey = csvData.columnKeys[actualCol] ?? String(actualCol);
+              const keysToUpdate =
+                colKey !== String(actualCol)
+                  ? [`${dataRow}:${colKey}`, `${dataRow}:${actualCol}`]
+                  : [`${dataRow}:${colKey}`];
+              for (const key of keysToUpdate) {
+                if (key in nextCells) {
+                  const cur = nextCells[key];
+                  const base: CellStyle =
+                    typeof cur === 'string'
+                      ? { ...(meta.styles?.[cur] ?? {}) }
+                      : { ...(cur ?? {}) };
+                  const updated = updater(base);
+                  if (Object.values(updated).some((v) => v !== undefined)) {
+                    nextCells[key] = updated;
+                  } else {
+                    delete nextCells[key];
+                  }
+                  cellsChanged = true;
+                }
+              }
+              count++;
+            }
+          }
+          if (cellsChanged) {
+            text = patchMetaJsonc(
+              text,
+              ['cells'],
+              Object.keys(nextCells).length > 0 ? nextCells : undefined,
+            );
+          }
+        }
+        scheduleMetaSave(text);
       } else {
         const nextCells = { ...(meta.cells ?? {}) };
         const maxCells = 200;

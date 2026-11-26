@@ -23,6 +23,7 @@ import {
 } from '@meta-csv/core';
 import { buildGridTheme } from '../../theme';
 import { MARKER_PALETTE } from '../../MarkerControls';
+import { computeNextCellPosition, type CellMoveDirection } from '../utils/cellNavigationUtils';
 
 export interface UseGridRenderingParams {
   csvData: ParsedCsvData | null;
@@ -333,82 +334,44 @@ export function useGridRendering({
 
   const onFinishedEditing = useCallback(
     (_newValue: GridCell | undefined, movement: Item) => {
-      if (isReadOnly) return;
-      const [movX] = movement;
-      if (movX === 0 || !csvData || columns.length === 0) return;
+      if (!csvData || columns.length === 0 || viewRowIndices.length === 0) return;
+      const [movX, movY] = movement;
+      if (movX === 0 && movY === 0) return;
 
-      const prevCell = selection.current?.cell;
-      let targetCol = prevCell ? prevCell[0] + movX : 0;
-      let targetRow = prevCell ? prevCell[1] : 0;
-      let wrapped = false;
+      let direction: CellMoveDirection | null = null;
+      if (movX > 0) direction = 'tab';
+      else if (movX < 0) direction = 'shift-tab';
+      else if (movY > 0) direction = 'enter';
+      else if (movY < 0) direction = 'shift-enter';
+      if (!direction) return;
 
-      if (prevCell) {
-        if (
-          movX > 0 &&
-          prevCell[0] === columns.length - 1 &&
-          prevCell[1] + 1 < viewRowIndices.length
-        ) {
-          targetCol = 0;
-          targetRow = prevCell[1] + 1;
-          wrapped = true;
-        } else if (movX < 0 && prevCell[0] === 0 && prevCell[1] > 0) {
-          targetCol = columns.length - 1;
-          targetRow = prevCell[1] - 1;
-          wrapped = true;
-        }
-      }
+      const cur = selection.current;
+      if (!cur) return;
 
-      targetCol = Math.max(0, Math.min(columns.length - 1, targetCol));
-      targetRow = Math.max(0, Math.min(viewRowIndices.length - 1, targetRow));
+      const { nextCell, nextRange } = computeNextCellPosition(
+        cur.cell,
+        cur.range,
+        direction,
+        columns.length,
+        viewRowIndices.length,
+      );
 
-      if (wrapped) {
+      // Apply Excel-like post-edit navigation (preserving multi-cell selection if active)
+      window.requestAnimationFrame(() => {
         setSelection({
           columns: CompactSelection.empty(),
           rows: CompactSelection.empty(),
           current: {
-            cell: [targetCol, targetRow],
-            range: { x: targetCol, y: targetRow, width: 1, height: 1 },
+            cell: nextCell,
+            range: nextRange,
             rangeStack: [],
           },
         });
-        gridRef.current?.scrollTo(targetCol, targetRow, 'both');
-      }
-
-      const actualCol = visibleColIndices[targetCol];
-      const colKey = actualCol !== undefined ? csvData.columnKeys[actualCol] : undefined;
-      if (colKey && meta.columns?.[colKey]?.readonly) return;
-
-      window.requestAnimationFrame(() => {
-        window.setTimeout(() => {
-          gridRef.current?.focus();
-          const canvas = gridContainerRef.current?.querySelector<HTMLCanvasElement>(
-            'canvas[data-testid="data-grid-canvas"]',
-          );
-          if (!canvas) return;
-          canvas.dispatchEvent(
-            new KeyboardEvent('keydown', {
-              key: 'Enter',
-              code: 'Enter',
-              keyCode: 13,
-              bubbles: true,
-              cancelable: true,
-            }),
-          );
-        }, 0);
+        gridRef.current?.scrollTo(nextCell[0], nextCell[1], 'both');
+        gridRef.current?.focus();
       });
     },
-    [
-      isReadOnly,
-      csvData,
-      columns.length,
-      selection,
-      viewRowIndices.length,
-      visibleColIndices,
-      meta.columns,
-      setSelection,
-      gridRef,
-      gridContainerRef,
-    ],
+    [csvData, columns.length, viewRowIndices.length, selection.current, setSelection, gridRef],
   );
 
   return {

@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import type { GridSelection } from '@glideapps/glide-data-grid';
 import type { ParsedCsvData } from '@meta-csv/core';
 import type { EditorHostMode } from '../../SettingsAboutDialogs';
+import type { CellRangeRect } from '../types';
+import type { CellMoveDirection } from '../utils/cellNavigationUtils';
 import { isContiguousIndices } from '../utils/rowOrderUtils';
 
 export interface UseEditorShortcutsParams {
@@ -15,6 +17,7 @@ export interface UseEditorShortcutsParams {
   zoomScale: number;
   setZoomScale: React.Dispatch<React.SetStateAction<number>>;
   gridContainerRef: React.RefObject<HTMLDivElement | null>;
+  isF2EditTriggerRef: React.MutableRefObject<boolean>;
   hasSaveAs: boolean;
   hasNewFile: boolean;
   hasCloseFile: boolean;
@@ -31,6 +34,10 @@ export interface UseEditorShortcutsParams {
   handlePasteColumns: (startActualCol: number, withStyle: boolean) => Promise<void>;
   handleCopyRows: (dataRows: number[]) => Promise<void>;
   handlePasteRows: (startViewRow: number, withStyle: boolean) => Promise<void>;
+  handleCopyCells: (range: CellRangeRect) => Promise<void>;
+  handlePasteCells: (range: CellRangeRect, withStyle: boolean) => Promise<void>;
+  startF2CellEdit: () => void;
+  moveSelectionInRange: (direction: CellMoveDirection) => void;
 }
 
 export function useEditorShortcuts({
@@ -44,6 +51,7 @@ export function useEditorShortcuts({
   zoomScale,
   setZoomScale,
   gridContainerRef,
+  isF2EditTriggerRef,
   hasSaveAs,
   hasNewFile,
   hasCloseFile,
@@ -60,6 +68,10 @@ export function useEditorShortcuts({
   handlePasteColumns,
   handleCopyRows,
   handlePasteRows,
+  handleCopyCells,
+  handlePasteCells,
+  startF2CellEdit,
+  moveSelectionInRange,
 }: UseEditorShortcutsParams) {
   useEffect(() => {
     if (!isActive) return;
@@ -77,7 +89,8 @@ export function useEditorShortcuts({
         return;
       }
 
-      if (!inTextInput && e.key === 'F2' && !mod && !e.altKey) {
+      // Alt+F2 / Alt+Shift+F2 -> Jump to next / previous row marker
+      if (!inTextInput && e.key === 'F2' && e.altKey && !mod) {
         e.preventDefault();
         if (e.shiftKey) jumpPrevMarker();
         else jumpNextMarker();
@@ -133,11 +146,14 @@ export function useEditorShortcuts({
     setZoomScale,
   ]);
 
+  // Capture-phase keyboard shortcuts for Excel-like cell navigation (Tab/Enter), F2 inline edit,
+  // and Column / Row / Cell clipboard (Ctrl+C, Ctrl+V, Ctrl+Shift+V)
   useEffect(() => {
     if (!isActive || !csvData) return;
     const hasColSel = selection.columns.length > 0;
     const hasRowSel = selection.rows.length > 0 && !hasColSel;
-    if (!hasColSel && !hasRowSel) return;
+    const hasCellSel = !hasColSel && !hasRowSel && Boolean(selection.current);
+    if (!hasColSel && !hasRowSel && !hasCellSel) return;
 
     const onKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
@@ -146,7 +162,33 @@ export function useEditorShortcuts({
         target?.tagName === 'TEXTAREA' ||
         target?.isContentEditable === true;
       if (inTextInput) return;
+
       const mod = e.ctrlKey || e.metaKey;
+
+      // Excel-like F2 -> enter cell edit mode with caret at end (not select-all)
+      if (hasCellSel && e.key === 'F2' && !mod && !e.altKey && !e.shiftKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        startF2CellEdit();
+        return;
+      }
+
+      // Excel-like Tab / Shift+Tab / Enter / Shift+Enter cell navigation
+      if (hasCellSel && !mod && !e.altKey) {
+        if (e.key === 'Tab') {
+          e.preventDefault();
+          e.stopPropagation();
+          moveSelectionInRange(e.shiftKey ? 'shift-tab' : 'tab');
+          return;
+        }
+        if (e.key === 'Enter' && !isF2EditTriggerRef.current) {
+          e.preventDefault();
+          e.stopPropagation();
+          moveSelectionInRange(e.shiftKey ? 'shift-enter' : 'enter');
+          return;
+        }
+      }
+
       if (!mod || e.altKey) return;
       const key = e.key.toLowerCase();
       if (key !== 'c' && key !== 'v') return;
@@ -205,6 +247,30 @@ export function useEditorShortcuts({
           e.stopPropagation();
           void handlePasteRows(targetViewRows[0]!, false);
         }
+        return;
+      }
+
+      if (hasCellSel && selection.current) {
+        const range = selection.current.range;
+        const rect: CellRangeRect = {
+          x: range.x,
+          y: range.y,
+          width: range.width,
+          height: range.height,
+        };
+        if (key === 'c' && !e.shiftKey) {
+          e.preventDefault();
+          e.stopPropagation();
+          void handleCopyCells(rect);
+        } else if (key === 'v' && !e.shiftKey && !isReadOnly) {
+          e.preventDefault();
+          e.stopPropagation();
+          void handlePasteCells(rect, true);
+        } else if (key === 'v' && e.shiftKey && !isReadOnly) {
+          e.preventDefault();
+          e.stopPropagation();
+          void handlePasteCells(rect, false);
+        }
       }
     };
     window.addEventListener('keydown', onKeyDown, true);
@@ -214,13 +280,19 @@ export function useEditorShortcuts({
     csvData,
     selection.columns,
     selection.rows,
+    selection.current,
     visibleColIndices,
     viewRowIndices,
     isReadOnly,
+    isF2EditTriggerRef,
     handleCopyColumns,
     handlePasteColumns,
     handleCopyRows,
     handlePasteRows,
+    handleCopyCells,
+    handlePasteCells,
+    startF2CellEdit,
+    moveSelectionInRange,
   ]);
 
   useEffect(() => {

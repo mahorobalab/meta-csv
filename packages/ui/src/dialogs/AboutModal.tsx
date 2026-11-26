@@ -33,8 +33,10 @@ export const AboutModal: React.FC<AboutModalProps> = ({
         : 'Web / PWA Edition';
 
   const shortcuts: Array<[string, string]> = [
+    ['F2', 'Edit active cell (caret at end)'],
+    ['Tab / Enter', 'Move inside selection (Excel-style)'],
     ['Ctrl+M / Ctrl+F2', 'Toggle row marker'],
-    ['F2 / Shift+F2', 'Jump to next / previous marker'],
+    ['Alt+F2 / Alt+Shift+F2', 'Jump to next / previous marker'],
     ['Ctrl+Wheel / Ctrl+0', 'Zoom grid in/out / reset 100%'],
     ['Ctrl+S', 'Save file'],
     ['Ctrl+Z / Ctrl+Y', 'Undo / Redo'],

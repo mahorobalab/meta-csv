@@ -34,6 +34,7 @@ import { ConditionalRulesModal } from './ConditionalRulesModal';
 import { useInputHistory } from './useInputHistory';
 import type { CopiedColumnPayload, CopiedRowsPayload } from './columnClipboard';
 import type {
+  CellContextMenuState,
   EditingHeaderColState,
   EditorViewSnapshot,
   HeaderContextMenuState,
@@ -44,6 +45,7 @@ import type {
   PendingHideColState,
   RowContextMenuState,
 } from './editor/types';
+import type { CopiedCellsPayload } from './editor/utils/cellClipboard';
 import { buildFileLayoutSettings } from './editor/utils/buildFileLayoutSettings';
 import { useDocumentLoader } from './editor/hooks/useDocumentLoader';
 import { useEditorViewPipeline } from './editor/hooks/useEditorViewPipeline';
@@ -52,6 +54,7 @@ import { useEditorSearchAndStatus } from './editor/hooks/useEditorSearchAndStatu
 import { useGridRendering } from './editor/hooks/useGridRendering';
 import { useColumnOperations } from './editor/hooks/useColumnOperations';
 import { useRowOperations } from './editor/hooks/useRowOperations';
+import { useCellOperations } from './editor/hooks/useCellOperations';
 import { useFileSaveAndUndo } from './editor/hooks/useFileSaveAndUndo';
 import { useViewSnapshotRestore } from './editor/hooks/useViewSnapshotRestore';
 import { useStyleActions } from './editor/hooks/useStyleActions';
@@ -64,6 +67,7 @@ import { useEditorShortcuts } from './editor/hooks/useEditorShortcuts';
 import { EditorToolbar } from './editor/components/EditorToolbar';
 import { ColumnContextMenu } from './editor/components/ColumnContextMenu';
 import { RowContextMenu } from './editor/components/RowContextMenu';
+import { CellContextMenu } from './editor/components/CellContextMenu';
 import { RowResizeOverlay } from './editor/components/RowResizeOverlay';
 import { LoadingProgressOverlay } from './editor/components/LoadingProgressOverlay';
 import { GridCornerAndHeaderInput } from './editor/components/GridCornerAndHeaderInput';
@@ -148,16 +152,9 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
     colKeys: string[];
     label: string;
   } | null>(null);
-  const [rowContextMenu, setRowContextMenu] = useState<{
-    viewRows: number[];
-    dataRows: number[];
-    x: number;
-    y: number;
-  } | null>(null);
-  const [pendingDeleteRows, setPendingDeleteRows] = useState<{
-    dataRows: number[];
-    label: string;
-  } | null>(null);
+  const [rowContextMenu, setRowContextMenu] = useState<RowContextMenuState | null>(null);
+  const [cellContextMenu, setCellContextMenu] = useState<CellContextMenuState | null>(null);
+  const [pendingDeleteRows, setPendingDeleteRows] = useState<PendingDeleteRowsState | null>(null);
   const [localConfirmHideCol, setLocalConfirmHideCol] = useState<boolean | null>(null);
   const shouldConfirmHideColumn =
     localConfirmHideCol ?? (appSettings?.confirmHideColumn !== false);
@@ -166,8 +163,11 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
   }, [appSettings?.confirmHideColumn]);
   const copiedColumnRef = useRef<CopiedColumnPayload | null>(null);
   const copiedRowsRef = useRef<CopiedRowsPayload | null>(null);
+  const copiedCellsRef = useRef<CopiedCellsPayload | null>(null);
+  const isF2EditTriggerRef = useRef<boolean>(false);
   const headerMenuRef = useRef<HTMLDivElement | null>(null);
   const rowMenuRef = useRef<HTMLDivElement | null>(null);
+  const cellMenuRef = useRef<HTMLDivElement | null>(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [showAboutModal, setShowAboutModal] = useState(false);
@@ -209,7 +209,7 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
   }, [openMenu]);
 
   useEffect(() => {
-    if (!headerContextMenu && !rowContextMenu) return;
+    if (!headerContextMenu && !rowContextMenu && !cellContextMenu) return;
     const onDocDown = (e: MouseEvent) => {
       const target = e.target as Node;
       if (headerContextMenu && headerMenuRef.current && !headerMenuRef.current.contains(target)) {
@@ -218,11 +218,15 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
       if (rowContextMenu && rowMenuRef.current && !rowMenuRef.current.contains(target)) {
         setRowContextMenu(null);
       }
+      if (cellContextMenu && cellMenuRef.current && !cellMenuRef.current.contains(target)) {
+        setCellContextMenu(null);
+      }
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setHeaderContextMenu(null);
         setRowContextMenu(null);
+        setCellContextMenu(null);
       }
     };
     document.addEventListener('mousedown', onDocDown);
@@ -231,7 +235,7 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
       document.removeEventListener('mousedown', onDocDown);
       window.removeEventListener('keydown', onKey);
     };
-  }, [headerContextMenu, rowContextMenu]);
+  }, [headerContextMenu, rowContextMenu, cellContextMenu]);
 
   useEffect(() => {
     onDirtyChange?.(dirtyCsv);
@@ -585,6 +589,63 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
     nativeClipboard,
   });
 
+  // Cell operations (cell context menu, cell range copy/paste, Excel F2 edit, Tab/Enter in-range move)
+  const {
+    openCellContextMenu,
+    handleCopyCells,
+    handlePasteCells,
+    startF2CellEdit,
+    moveSelectionInRange,
+  } = useCellOperations({
+    csvData,
+    setCsvData,
+    meta,
+    metaTextRef,
+    rowsRef,
+    copiedCellsRef,
+    isF2EditTriggerRef,
+    gridRef,
+    gridContainerRef,
+    isReadOnly,
+    autoWidths,
+    setAutoWidths,
+    visibleColIndices,
+    viewRowIndices,
+    styleCtx,
+    selection,
+    setSelection,
+    setOpenMenu,
+    setHeaderContextMenu,
+    setRowContextMenu,
+    setCellContextMenu,
+    setEditingHeaderCol,
+    appendRowsToOrder,
+    scheduleMetaSave,
+    setDirtyCsv,
+    setDataVersion,
+    setStatusMsg,
+    onDocumentEdit,
+    nativeClipboard,
+  });
+
+  const handleGridCellContextMenu = useCallback(
+    (
+      cell: readonly [number, number],
+      event: {
+        preventDefault: () => void;
+        bounds: { x: number; y: number; width: number; height: number };
+      },
+    ) => {
+      if (cell[0] === -1) {
+        setCellContextMenu(null);
+        onCellContextMenu(cell, event);
+      } else {
+        openCellContextMenu(cell, event);
+      }
+    },
+    [onCellContextMenu, openCellContextMenu],
+  );
+
   // File save / Save As / New / Close / Undo / Redo
   const {
     serializeCurrentCsv,
@@ -652,6 +713,7 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
     zoomScale,
     setZoomScale,
     gridContainerRef,
+    isF2EditTriggerRef,
     hasSaveAs: Boolean(onSaveAs),
     hasNewFile: Boolean(onNewFile),
     hasCloseFile: Boolean(onCloseFile),
@@ -668,6 +730,10 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
     handlePasteColumns,
     handleCopyRows,
     handlePasteRows,
+    handleCopyCells,
+    handlePasteCells,
+    startF2CellEdit,
+    moveSelectionInRange,
   });
 
   const {
@@ -927,8 +993,11 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
                 onCellEdited={onCellEdited}
                 onFinishedEditing={onFinishedEditing}
                 onColumnResize={onColumnResize}
-                onHeaderContextMenu={onHeaderContextMenu}
-                onCellContextMenu={onCellContextMenu}
+                onHeaderContextMenu={(col, ev) => {
+                  setCellContextMenu(null);
+                  onHeaderContextMenu(col, ev);
+                }}
+                onCellContextMenu={handleGridCellContextMenu}
                 onMouseMove={onGridMouseMove}
                 onVisibleRegionChanged={(range) => {
                   if (range.width <= 0 || range.height <= 0) return;
@@ -1080,6 +1149,34 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
                   onDelete={handleDeleteRows}
                   onDuplicate={handleDuplicateRows}
                   onInsertBlank={handleInsertBlankRows}
+                />
+              )}
+
+              {/* Cell Right-Click Context Menu (single & multi-cell selection) */}
+              {cellContextMenu && (
+                <CellContextMenu
+                  menuRef={cellMenuRef}
+                  menu={cellContextMenu}
+                  isDark={isDark}
+                  toolbarBorder={toolbarBorder}
+                  toolbarFg={toolbarFg}
+                  menuItemStyle={menuItemStyle}
+                  isReadOnly={isReadOnly}
+                  onClose={() => setCellContextMenu(null)}
+                  onOpenStyle={(range) => {
+                    setSelection({
+                      columns: CompactSelection.empty(),
+                      rows: CompactSelection.empty(),
+                      current: {
+                        cell: [range.x, range.y],
+                        range,
+                        rangeStack: [],
+                      },
+                    });
+                    setOpenMenu('edit');
+                  }}
+                  onCopy={(range) => void handleCopyCells(range)}
+                  onPaste={(range, withStyle) => void handlePasteCells(range, withStyle)}
                 />
               )}
             </>

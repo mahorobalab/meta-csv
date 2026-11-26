@@ -202,7 +202,7 @@ export const MarkerControls: React.FC<MarkerControlsProps> = ({
         style={{ ...iconBtnStyle, padding: '3px 4px', opacity: visibleMarkerCount === 0 ? 0.45 : 1 }}
         disabled={visibleMarkerCount === 0}
         onClick={onJumpPrev}
-        title="Previous marker (Shift+F2)"
+        title="Previous marker (Alt+Shift+F2)"
         aria-label="Previous marker"
       >
         <ChevronUp size={14} />
@@ -212,7 +212,7 @@ export const MarkerControls: React.FC<MarkerControlsProps> = ({
         style={{ ...iconBtnStyle, padding: '3px 4px', opacity: visibleMarkerCount === 0 ? 0.45 : 1 }}
         disabled={visibleMarkerCount === 0}
         onClick={onJumpNext}
-        title="Next marker (F2)"
+        title="Next marker (Alt+F2)"
         aria-label="Next marker"
       >
         <ChevronDown size={14} />
