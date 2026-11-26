@@ -213,7 +213,7 @@ export const App: React.FC = () => {
       >
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
           <ExternalLink size={13} />
-          <span>Back to MetaCSV Home</span>
+          <span>Back to MetaText Editor Home</span>
         </span>
       </a>
     </div>
@@ -273,8 +273,8 @@ export const App: React.FC = () => {
           settingsExtraSection={settingsExtraSection}
           onStatusChange={(info: EditorStatusInfo) => {
             document.title = info.fileName
-              ? `${info.fileName}${info.dirty ? ' *' : ''} — MetaCSV`
-              : 'MetaCSV Web';
+              ? `${info.fileName}${info.dirty ? ' *' : ''} — MetaText Editor`
+              : 'MetaText Editor Web';
           }}
           externalMetaText={metaText}
           onMetaTextChange={setMetaText}

@@ -1756,8 +1756,8 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
           </button>
           <button
             type="button"
-            aria-label="About MetaCSV"
-            title="About MetaCSV"
+            aria-label="About MetaText Editor"
+            title="About MetaText Editor"
             style={{ ...btnStyle, padding: '3px 6px' }}
             onClick={() => {
               setOpenMenu('none');
@@ -2177,7 +2177,7 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
               }}
               title={fileName}
             >
-              {fileName || 'MetaCSV'}
+              {fileName || 'MetaText Editor'}
               {dirtyCsv ? ' *' : ''}
             </span>
             {csvData && (

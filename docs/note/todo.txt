@@ -2,6 +2,8 @@
 
 ・最後のファイルを自動で開く
 
+・タブ表示
+
 ・ README.mdに追記
     • Installation / Download セクション:
 	• 公式の実行版（Windows / macOS 用インストーラー・ストア版）は Microsoft Store / BOOTH で配布（販売）している旨を記載（将来リンクを貼る場所を用意）。

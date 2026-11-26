@@ -1,7 +1,7 @@
 {
   "name": "meta-csv",
-  "displayName": "MetaCSV",
-  "description": "High-performance CSV editor & viewer with JSONC sidecar metadata (.metatext.jsonc)",
+  "displayName": "MetaText Editor",
+  "description": "High-performance CSV, TSV & JSONL editor and viewer with JSONC sidecar metadata (.metatext.jsonc)",
   "version": "0.1.0",
   "publisher": "meta-csv",
   "private": true,
@@ -21,7 +21,7 @@
     "customEditors": [
       {
         "viewType": "metaCsv.editor",
-        "displayName": "MetaCSV Editor",
+        "displayName": "MetaText Editor",
         "selector": [
           { "filenamePattern": "*.csv" },
           { "filenamePattern": "*.tsv" },
@@ -34,7 +34,7 @@
     "commands": [
       {
         "command": "metaCsv.openWithEditor",
-        "title": "MetaCSV: Open with MetaCSV Editor"
+        "title": "MetaText Editor: Open with MetaText Editor"
       }
     ],
     "menus": {
@@ -59,7 +59,7 @@
       }
     ],
     "configuration": {
-      "title": "MetaCSV",
+      "title": "MetaText Editor",
       "properties": {
         "metaCsv.defaultFontSize": {
           "type": "number",

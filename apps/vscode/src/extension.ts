@@ -232,7 +232,7 @@ class MetaCsvEditorProvider implements vscode.CustomEditorProvider<MetaCsvDocume
             const tags: string[] = [];
             if (st.format && st.format !== 'csv') tags.push(st.format.toUpperCase());
             if (st.readOnly) tags.push('RO');
-            const prefix = tags.length > 0 ? `MetaCSV [${tags.join(' · ')}]` : 'MetaCSV';
+            const prefix = tags.length > 0 ? `MetaText Editor [${tags.join(' · ')}]` : 'MetaText Editor';
             const text =
               visibleRows !== totalRows
                 ? `${prefix}: Rows=${visibleRows.toLocaleString()}/${totalRows.toLocaleString()}, Cols=${cols}`
@@ -279,7 +279,7 @@ class MetaCsvEditorProvider implements vscode.CustomEditorProvider<MetaCsvDocume
             await fs.writeFile(csvPath, buf);
             await webview.postMessage({ type: 'saved', target: 'csv', requestId: message.requestId });
           } catch (err) {
-            void vscode.window.showErrorMessage(`MetaCSV: Failed to save CSV: ${String(err)}`);
+            void vscode.window.showErrorMessage(`MetaText Editor: Failed to save CSV: ${String(err)}`);
             await webview.postMessage({
               type: 'saveError',
               requestId: message.requestId,
@@ -294,7 +294,7 @@ class MetaCsvEditorProvider implements vscode.CustomEditorProvider<MetaCsvDocume
             await fs.writeFile(metaPath, String(message.metaText ?? ''), 'utf-8');
             await webview.postMessage({ type: 'saved', target: 'meta', requestId: message.requestId });
           } catch (err) {
-            void vscode.window.showErrorMessage(`MetaCSV: Failed to save .metatext.jsonc: ${String(err)}`);
+            void vscode.window.showErrorMessage(`MetaText Editor: Failed to save .metatext.jsonc: ${String(err)}`);
             await webview.postMessage({
               type: 'saveError',
               requestId: message.requestId,
@@ -352,7 +352,7 @@ class MetaCsvEditorProvider implements vscode.CustomEditorProvider<MetaCsvDocume
       content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}' ${webview.cspSource} blob:; worker-src blob:; font-src ${webview.cspSource} data:; img-src ${webview.cspSource} data:;"
     />
     <link rel="stylesheet" href="${styleUri}" />
-    <title>MetaCSV</title>
+    <title>MetaText Editor</title>
   </head>
   <body style="margin:0;padding:0;overflow:hidden;width:100vw;height:100vh;">
     <div id="root" style="width:100%;height:100%;"></div>
@@ -403,7 +403,7 @@ function getNonce(): string {
 
 export function activate(context: vscode.ExtensionContext): void {
   const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
-  statusBarItem.tooltip = 'MetaCSV active table dimensions';
+  statusBarItem.tooltip = 'MetaText Editor active table dimensions';
   context.subscriptions.push(statusBarItem);
 
   const provider = new MetaCsvEditorProvider(context, statusBarItem);
@@ -420,7 +420,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('metaCsv.openWithEditor', async (uri?: vscode.Uri) => {
       const targetUri = uri ?? vscode.window.activeTextEditor?.document.uri;
       if (!targetUri) {
-        void vscode.window.showWarningMessage('MetaCSV: No CSV file selected.');
+        void vscode.window.showWarningMessage('MetaText Editor: No file selected.');
         return;
       }
       await vscode.commands.executeCommand('vscode.openWith', targetUri, MetaCsvEditorProvider.viewType);

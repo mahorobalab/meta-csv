@@ -148,8 +148,8 @@ export const App: React.FC = () => {
           onOpenFile={() => void handleOpenFile()}
           onStatusChange={(info: EditorStatusInfo) => {
             const title = info.fileName
-              ? `MetaCSV - ${info.fileName}${info.dirty ? ' *' : ''}`
-              : 'MetaCSV';
+              ? `MetaText Editor - ${info.fileName}${info.dirty ? ' *' : ''}`
+              : 'MetaText Editor';
             invoke('set_window_title', { title }).catch(() => {
               // Ignore when running outside Tauri
             });
@@ -190,7 +190,7 @@ export const App: React.FC = () => {
         <button
           type="button"
           style={{ ...btnStyle, padding: '5px 8px' }}
-          title="About MetaCSV"
+          title="About MetaText Editor"
           onClick={() => setShowEmptyAbout(true)}
         >
           <Info size={14} />
@@ -208,7 +208,7 @@ export const App: React.FC = () => {
           opacity: 0.9,
         }}
       >
-        <div style={{ fontSize: 20, fontWeight: 700 }}>MetaCSV Desktop</div>
+        <div style={{ fontSize: 20, fontWeight: 700 }}>MetaText Editor</div>
         <div style={{ fontSize: 13, opacity: 0.75 }}>
           CSV / TSV / JSONL を開くと、隣の .metatext.jsonc を自動で読み書きします
         </div>

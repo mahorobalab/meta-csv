@@ -127,7 +127,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="MetaCSV Settings"
+        aria-label="MetaText Editor Settings"
         style={{
           width: '100%',
           maxWidth: 460,
@@ -562,7 +562,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="About MetaCSV"
+        aria-label="About MetaText Editor"
         style={{
           width: '100%',
           maxWidth: 440,
@@ -581,7 +581,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontWeight: 700 }}>
             <Info size={16} />
-            <span>About MetaCSV</span>
+            <span>About MetaText Editor</span>
           </div>
           <button
             type="button"
@@ -603,7 +603,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({
 
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <strong style={{ fontSize: 16 }}>MetaCSV</strong>
+            <strong style={{ fontSize: 16 }}>MetaText Editor</strong>
             <span
               style={{
                 fontSize: 11,
@@ -617,7 +617,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({
             </span>
           </div>
           <div style={{ fontSize: 12, opacity: 0.78, marginTop: 4 }}>
-            High-performance CSV editor &amp; viewer powered by <code>.metatext.jsonc</code> sidecar metadata.
+            High-performance CSV, TSV &amp; JSONL editor &amp; viewer powered by <code>.metatext.jsonc</code> sidecar metadata.
           </div>
         </div>
 

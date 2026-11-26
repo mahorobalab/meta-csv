@@ -1,8 +1,8 @@
 [package]
-name = "meta-csv-desktop"
+name = "metatext-editor"
 version = "0.1.0"
-description = "MetaCSV Desktop App"
-authors = ["MetaCSV"]
+description = "MetaText Editor Desktop App"
+authors = ["MahorobaLab"]
 edition = "2021"
 
 [lib]

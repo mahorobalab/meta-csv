@@ -1892,7 +1892,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "meta-csv-desktop"
+name = "metatext-editor"
 version = "0.1.0"
 dependencies = [
  "serde",

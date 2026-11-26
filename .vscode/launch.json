@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Run MetaCSV Extension",
+      "name": "Run MetaText Editor Extension",
       "type": "extensionHost",
       "request": "launch",
       "args": [
@@ -13,20 +13,20 @@
       "preLaunchTask": "build-vscode-extension"
     },
     {
-      "name": "Run MetaCSV Desktop (.exe)",
+      "name": "Run MetaText Editor Desktop (.exe)",
       "type": "node-terminal",
       "request": "launch",
-      "command": "& \"${workspaceFolder}/apps/desktop/src-tauri/target/release/meta-csv-desktop.exe\""
+      "command": "& \"${workspaceFolder}/apps/desktop/src-tauri/target/release/metatext-editor.exe\""
     },
     {
-      "name": "Build & Run MetaCSV Desktop (.exe)",
+      "name": "Build & Run MetaText Editor Desktop (.exe)",
       "type": "node-terminal",
       "request": "launch",
       "preLaunchTask": "build-desktop-exe",
-      "command": "& \"${workspaceFolder}/apps/desktop/src-tauri/target/release/meta-csv-desktop.exe\""
+      "command": "& \"${workspaceFolder}/apps/desktop/src-tauri/target/release/metatext-editor.exe\""
     },
     {
-      "name": "Run MetaCSV Desktop (Tauri Dev)",
+      "name": "Run MetaText Editor Desktop (Tauri Dev)",
       "type": "node-terminal",
       "request": "launch",
       "command": "pnpm.cmd dev:desktop"
