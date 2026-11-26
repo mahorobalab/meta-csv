@@ -118,10 +118,21 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
   const historyRef = useRef(new UndoRedoHistory());
   const metaSaveTimerRef = useRef<number | null>(null);
   const metaTextRef = useRef<string | null>(null);
+  const isLoadingRef = useRef(false);
+  const prevAdapterRef = useRef<FileSystemAdapter | null>(null);
 
   // Load from adapter & parse in Web Worker (releasing raw CSV bytes right after parse)
   useEffect(() => {
     let cancelled = false;
+    const abortController = new AbortController();
+    isLoadingRef.current = true;
+
+    if (prevAdapterRef.current !== adapter) {
+      prevAdapterRef.current = adapter;
+      rowsRef.current = [];
+      setCsvData(null);
+    }
+
     setStatusMsg('Loading CSV...');
     setLoadingProgress({ phase: 'decoding', percent: 0, rowsParsed: 0 });
     setShowProgressOverlay(false);
@@ -138,10 +149,11 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
       .then(async (payload) => {
         if (cancelled) return;
         const parsedMeta = parseMetaJsonc(payload.metaText);
+        const normalizedMetaText = payload.metaText ?? '';
         setFileName(payload.fileName);
         setMeta(parsedMeta);
-        metaTextRef.current = payload.metaText;
-        onMetaTextChange?.(payload.metaText ?? '');
+        metaTextRef.current = normalizedMetaText;
+        onMetaTextChange?.(normalizedMetaText);
         setFilterQuery(parsedMeta.view?.activeFilter ?? '');
         setDebouncedFilterQuery(parsedMeta.view?.activeFilter ?? '');
         setFilterContextRows(parsedMeta.view?.filterContextRows ?? 0);
@@ -152,6 +164,7 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
           (prog) => {
             if (!cancelled) setLoadingProgress(prog);
           },
+          abortController.signal,
         );
         if (cancelled) return;
 
@@ -171,6 +184,7 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
       .finally(() => {
         window.clearTimeout(overlayTimer);
         if (!cancelled) {
+          isLoadingRef.current = false;
           setLoadingProgress(null);
           setShowProgressOverlay(false);
         }
@@ -178,6 +192,8 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
 
     return () => {
       cancelled = true;
+      isLoadingRef.current = false;
+      abortController.abort();
       window.clearTimeout(overlayTimer);
     };
   }, [adapter, reloadTick]);
@@ -185,7 +201,7 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
   const applyParsedMetaAndReparseIfNeeded = useCallback(
     (nextText: string | null) => {
       const nextMeta = parseMetaJsonc(nextText);
-      metaTextRef.current = nextText;
+      metaTextRef.current = nextText ?? '';
       setMeta(nextMeta);
 
       if (csvData) {
@@ -201,7 +217,9 @@ export const MetaCsvEditor: React.FC<MetaCsvEditorProps> = ({
 
   // Apply external JSONC edits (used by Playground side panel)
   useEffect(() => {
-    if (externalMetaText === undefined || externalMetaText === metaTextRef.current) {
+    if (isLoadingRef.current) return;
+    if (externalMetaText === undefined) return;
+    if ((externalMetaText ?? '') === (metaTextRef.current ?? '')) {
       return;
     }
     try {

@@ -25,7 +25,12 @@ export function parseCsvInWorker(
   bytes: Uint8Array,
   override?: CsvDialectConfig,
   onProgress?: (progress: ParseProgress) => void,
+  signal?: AbortSignal,
 ): Promise<WorkerParseResult> {
+  if (signal?.aborted) {
+    return Promise.reject(new DOMException('CSV parse aborted', 'AbortError'));
+  }
+
   // Small files (< 512 KB) finish in < 5ms synchronously without worker overhead
   if (bytes.byteLength < 512 * 1024 || typeof Worker === 'undefined') {
     const t0 = performance.now();
@@ -55,12 +60,22 @@ export function parseCsvInWorker(
     }
 
     const id = nextReqId++;
+    const onAbort = () => {
+      worker.terminate();
+      reject(new DOMException('CSV parse aborted', 'AbortError'));
+    };
+    const cleanup = () => {
+      signal?.removeEventListener('abort', onAbort);
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
+
     worker.onmessage = (event: MessageEvent<ParseWorkerResponse>) => {
       const msg = event.data;
       if (msg.id !== id) return;
       if (msg.type === 'progress') {
         onProgress?.(msg.progress);
       } else if (msg.type === 'done') {
+        cleanup();
         worker.terminate();
         resolve({
           parsed: msg.parsed,
@@ -68,12 +83,14 @@ export function parseCsvInWorker(
           elapsedMs: msg.elapsedMs,
         });
       } else if (msg.type === 'error') {
+        cleanup();
         worker.terminate();
         reject(new Error(msg.message));
       }
     };
 
     worker.onerror = (err) => {
+      cleanup();
       worker.terminate();
       reject(err instanceof ErrorEvent ? new Error(err.message) : new Error(String(err)));
     };

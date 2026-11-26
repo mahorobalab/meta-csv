@@ -9,6 +9,7 @@ import {
   LARGE_CSV_META,
   SPEC_SETTING_CSV,
   SPEC_SETTING_META,
+  createFileAdapter,
   createMemoryAdapter,
   generateLargeCsvBytes,
 } from './datasets';
@@ -45,11 +46,7 @@ export const App: React.FC = () => {
   const [themePref, setThemePref] = useState<ThemePreference>(initial.theme);
   const [showMetaPanel, setShowMetaPanel] = useState<boolean>(initial.showMetaPanel);
   const [metaText, setMetaText] = useState<string>(SPEC_SETTING_META);
-  const [customFile, setCustomFile] = useState<{
-    fileName: string;
-    csvBytes: Uint8Array;
-    metaText: string | null;
-  } | null>(null);
+  const [customFile, setCustomFile] = useState<File | null>(null);
 
   const systemTheme = useSystemTheme();
   const resolvedTheme = resolveThemeMode(themePref, systemTheme);
@@ -79,7 +76,7 @@ export const App: React.FC = () => {
       });
     }
     if (customFile) {
-      return createMemoryAdapter(customFile);
+      return createFileAdapter(customFile, null);
     }
     return createMemoryAdapter({
       fileName: 'spec_setting.csv',
@@ -88,15 +85,12 @@ export const App: React.FC = () => {
     });
   }, [preset, customFile]);
 
-  const handleOpenLocalCsv = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleOpenLocalCsv = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
-    const buf = await file.arrayBuffer();
-    setCustomFile({
-      fileName: file.name,
-      csvBytes: new Uint8Array(buf),
-      metaText: null,
-    });
+    setCustomFile(file);
+    setMetaText('');
     setPreset('custom');
   };
 
@@ -154,10 +148,22 @@ export const App: React.FC = () => {
           <span>MetaCSV</span>
         </a>
 
-        <button style={tabBtn(preset === 'spec')} onClick={() => setPreset('spec')}>
+        <button
+          style={tabBtn(preset === 'spec')}
+          onClick={() => {
+            setMetaText(SPEC_SETTING_META);
+            setPreset('spec');
+          }}
+        >
           spec_setting.csv
         </button>
-        <button style={tabBtn(preset === 'large100k')} onClick={() => setPreset('large100k')}>
+        <button
+          style={tabBtn(preset === 'large100k')}
+          onClick={() => {
+            setMetaText(LARGE_CSV_META);
+            setPreset('large100k');
+          }}
+        >
           100,000 Rows Benchmark
         </button>
         <label style={{ ...tabBtn(preset === 'custom'), display: 'inline-block' }}>
@@ -165,7 +171,7 @@ export const App: React.FC = () => {
           <input
             type="file"
             accept=".csv,.tsv,.txt"
-            onChange={(e) => void handleOpenLocalCsv(e)}
+            onChange={handleOpenLocalCsv}
             style={{ display: 'none' }}
           />
         </label>

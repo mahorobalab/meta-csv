@@ -1,4 +1,4 @@
-const CACHE_NAME = 'metacsv-web-v1';
+const CACHE_NAME = 'metacsv-web-v2';
 const APP_SHELL = [
   './',
   './index.html',

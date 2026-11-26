@@ -155,10 +155,34 @@ export function createMemoryAdapter(initial: CsvFilePayload): FileSystemAdapter 
 
   return {
     async load() {
-      return { fileName, csvBytes, metaText };
+      // Return a copy so zero-copy Worker ArrayBuffer transfer never detaches stored bytes
+      return { fileName, csvBytes: csvBytes.slice(), metaText };
     },
     async saveCsv(bytes: Uint8Array) {
-      csvBytes = bytes;
+      csvBytes = bytes.slice();
+    },
+    async saveMeta(text: string) {
+      metaText = text;
+    },
+  };
+}
+
+export function createFileAdapter(
+  file: File,
+  initialMetaText: string | null = null,
+): FileSystemAdapter {
+  let savedBytes: Uint8Array | null = null;
+  let metaText = initialMetaText;
+
+  return {
+    async load() {
+      const csvBytes = savedBytes
+        ? savedBytes.slice()
+        : new Uint8Array(await file.arrayBuffer());
+      return { fileName: file.name, csvBytes, metaText };
+    },
+    async saveCsv(bytes: Uint8Array) {
+      savedBytes = bytes.slice();
     },
     async saveMeta(text: string) {
       metaText = text;
