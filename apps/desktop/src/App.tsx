@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { open, save } from '@tauri-apps/plugin-dialog';
-import { FileSpreadsheet, Info, Moon, Plus, Settings, X } from 'lucide-react';
+import { Check, Code2, Copy, FileSpreadsheet, Info, Moon, Plus, Settings, X } from 'lucide-react';
 import type { FileSystemAdapter } from '@meta-csv/core';
 import {
   AboutModal,
@@ -20,6 +20,8 @@ import { createTauriAdapter, createUntitledDesktopAdapter } from './tauriAdapter
 interface DesktopAppSettings extends EditorAppSettings {
   theme: ThemePreference;
   lastDirectory?: string | null;
+  lastOpenedFiles?: string[] | null;
+  lastActiveFile?: string | null;
 }
 
 interface DesktopTab {
@@ -31,6 +33,7 @@ interface DesktopTab {
   sleeping: boolean;
   lastAccessedAt: number;
   fileBytes: number;
+  metaText?: string;
   viewSnapshot?: EditorViewSnapshot;
 }
 
@@ -72,6 +75,11 @@ export const App: React.FC = () => {
   const [appSettings, setAppSettings] = useState<EditorAppSettings>({});
   const [showEmptySettings, setShowEmptySettings] = useState(false);
   const [showEmptyAbout, setShowEmptyAbout] = useState(false);
+  const [showMetaPanel, setShowMetaPanel] = useState(false);
+  const [metaCopied, setMetaCopied] = useState(false);
+  const metaPanelSaveTimerRef = useRef<number | null>(null);
+  const sessionReadyRef = useRef(false);
+  const lastPersistedSessionKeyRef = useRef<string>('');
   const nextTabIdRef = useRef(1);
   const lastDirRef = useRef<string | undefined>(undefined);
   const tabsRef = useRef<DesktopTab[]>([]);
@@ -222,41 +230,53 @@ export const App: React.FC = () => {
   );
 
   const openFilePathsInTabs = useCallback(
-    (paths: string[]) => {
+    (paths: string[], preferredActivePath?: string | null) => {
       if (paths.length === 0) return;
       let targetActiveId: string | null = null;
       const existing = tabsRef.current;
       const toAdd: DesktopTab[] = [];
       const now = Date.now();
+      const normPreferred = preferredActivePath ? normalizePathKey(preferredActivePath) : null;
+
+      // Determine which path in `paths` should be active & initially awake
+      let activeIndex = paths.length - 1;
+      if (normPreferred) {
+        const idx = paths.findIndex((p) => normalizePathKey(p) === normPreferred);
+        if (idx !== -1) activeIndex = idx;
+      }
 
       for (let i = 0; i < paths.length; i++) {
         const p = paths[i]!;
         const norm = normalizePathKey(p);
         const found = existing.find((t) => t.filePath && normalizePathKey(t.filePath) === norm);
         if (found) {
-          targetActiveId = found.id;
+          if (i === activeIndex || targetActiveId === null) {
+            targetActiveId = found.id;
+          }
         } else {
           const alreadyAdded = toAdd.find(
             (t) => t.filePath && normalizePathKey(t.filePath) === norm,
           );
           if (alreadyAdded) {
-            targetActiveId = alreadyAdded.id;
+            if (i === activeIndex || targetActiveId === null) {
+              targetActiveId = alreadyAdded.id;
+            }
           } else {
             const id = `tab-${nextTabIdRef.current++}`;
-            // When opening multiple files at once, mount only the last (active) one initially
-            // and keep the rest sleeping until clicked, preventing memory spikes on bulk open.
-            const isLast = i === paths.length - 1;
+            const isTargetActive = i === activeIndex;
             toAdd.push({
               id,
               filePath: p,
               fileName: extractFileName(p),
               dirty: false,
               adapter: createTauriAdapter(p),
-              sleeping: !isLast,
-              lastAccessedAt: now + i,
+              sleeping: !isTargetActive,
+              lastAccessedAt: isTargetActive ? now + paths.length : now + i,
               fileBytes: 0,
             });
-            targetActiveId = id;
+            if (isTargetActive || targetActiveId === null) {
+              targetActiveId = id;
+            }
           }
         }
       }
@@ -267,7 +287,7 @@ export const App: React.FC = () => {
       if (targetActiveId) {
         setActiveTabId(targetActiveId);
       }
-      updateLastDirectory(paths[paths.length - 1]!);
+      updateLastDirectory(paths[activeIndex] ?? paths[paths.length - 1]!);
     },
     [updateLastDirectory, applyMemoryBudget],
   );
@@ -317,8 +337,13 @@ export const App: React.FC = () => {
   }, [activeTabId, applyMemoryBudget]);
 
   useEffect(() => {
-    invoke<DesktopAppSettings>('get_app_settings')
-      .then((settings) => {
+    let cancelled = false;
+    Promise.all([
+      invoke<DesktopAppSettings>('get_app_settings').catch(() => null),
+      invoke<string | null>('get_initial_file').catch(() => null),
+    ]).then(([settings, initial]) => {
+      if (cancelled) return;
+      if (settings) {
         if (
           settings.theme === 'system' ||
           settings.theme === 'light' ||
@@ -335,19 +360,25 @@ export const App: React.FC = () => {
           defaultMarkerColor: settings.defaultMarkerColor,
           showRowNumbers: settings.showRowNumbers,
           noHeaderColumnStyle: settings.noHeaderColumnStyle,
+          reopenLastFiles: settings.reopenLastFiles,
         });
-      })
-      .catch(() => {
-        // Ignore when running outside Tauri
-      });
+      }
 
-    invoke<string | null>('get_initial_file')
-      .then((initial) => {
-        if (initial) openFilePathsInTabs([initial]);
-      })
-      .catch(() => {
-        // Ignore when running outside Tauri
-      });
+      if (initial) {
+        openFilePathsInTabs([initial]);
+      } else if (
+        settings &&
+        settings.reopenLastFiles !== false &&
+        Array.isArray(settings.lastOpenedFiles) &&
+        settings.lastOpenedFiles.length > 0
+      ) {
+        openFilePathsInTabs(settings.lastOpenedFiles, settings.lastActiveFile);
+      }
+      sessionReadyRef.current = true;
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [openFilePathsInTabs]);
 
   // Update native window title whenever active tab or its dirty state changes
@@ -360,6 +391,24 @@ export const App: React.FC = () => {
       // Ignore when running outside Tauri
     });
   }, [activeTab?.id, activeTab?.fileName, activeTab?.dirty]);
+
+  // Persist open file list & active file for startup restore (Desktop-only)
+  useEffect(() => {
+    if (!sessionReadyRef.current) return;
+    const openedPaths = tabs
+      .map((t) => t.filePath)
+      .filter((p): p is string => typeof p === 'string' && p.length > 0);
+    const activePath = activeTab?.filePath ?? '';
+    const key = `${activePath}||${openedPaths.join('|')}`;
+    if (key === lastPersistedSessionKeyRef.current) return;
+    lastPersistedSessionKeyRef.current = key;
+    invoke('update_app_settings', {
+      lastOpenedFiles: openedPaths,
+      lastActiveFile: activePath,
+    }).catch(() => {
+      // Ignore when running outside Tauri
+    });
+  }, [tabs, activeTab?.filePath]);
 
   // Ctrl+Tab / Ctrl+Shift+Tab tab switching
   useEffect(() => {
@@ -409,6 +458,29 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleMetaPanelEdit = useCallback((tab: DesktopTab, nextText: string) => {
+    setTabs((prev) =>
+      prev.map((t) => (t.id === tab.id ? { ...t, metaText: nextText } : t)),
+    );
+    if (metaPanelSaveTimerRef.current !== null) {
+      window.clearTimeout(metaPanelSaveTimerRef.current);
+    }
+    metaPanelSaveTimerRef.current = window.setTimeout(() => {
+      metaPanelSaveTimerRef.current = null;
+      tab.adapter.saveMeta(nextText).catch((err) => {
+        console.error('[MetaText Desktop] Failed to save sidecar .metatext.jsonc:', err);
+      });
+    }, 400);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (metaPanelSaveTimerRef.current !== null) {
+        window.clearTimeout(metaPanelSaveTimerRef.current);
+      }
+    };
+  }, []);
+
   const isDark = resolvedTheme === 'dark';
   const barFg = isDark ? '#f8fafc' : '#0f172a';
   const border = isDark ? '#333338' : '#cbd5e1';
@@ -428,6 +500,57 @@ export const App: React.FC = () => {
     color: barFg,
     cursor: 'pointer',
   };
+
+  const menuRowStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    width: '100%',
+    padding: '6px 8px',
+    borderRadius: 4,
+    border: 'none',
+    background: 'transparent',
+    color: barFg,
+    fontSize: 12,
+    cursor: 'pointer',
+    textAlign: 'left',
+  };
+
+  const fileMenuItems = (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <button
+        type="button"
+        style={menuRowStyle}
+        onClick={() => setShowMetaPanel((s) => !s)}
+      >
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+          <Code2 size={13} />
+          <span>{showMetaPanel ? 'Hide .metatext.jsonc Panel' : 'Show .metatext.jsonc Panel'}</span>
+        </span>
+        {showMetaPanel && <Check size={13} />}
+      </button>
+    </div>
+  );
+
+  const settingsExtraSection = (
+    <label
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        gap: 12,
+        cursor: 'pointer',
+      }}
+    >
+      <span>Show live .metatext.jsonc panel</span>
+      <input
+        type="checkbox"
+        checked={showMetaPanel}
+        onChange={(e) => setShowMetaPanel(e.target.checked)}
+      />
+    </label>
+  );
 
   if (tabs.length > 0) {
     return (
@@ -580,72 +703,190 @@ export const App: React.FC = () => {
           </button>
         </div>
 
-        {/* Keep awake tabs mounted; sleeping tabs are unmounted to free JS heap memory */}
-        <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
-          {tabs.map((tab) => {
-            if (tab.sleeping) return null;
-            const isTabActive = tab.id === activeTabId;
-            return (
+        {/* Main content: awake editors + optional live .metatext.jsonc side panel */}
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden' }}>
+          <div style={{ flex: 1, minWidth: 0, minHeight: 0, position: 'relative' }}>
+            {tabs.map((tab) => {
+              if (tab.sleeping) return null;
+              const isTabActive = tab.id === activeTabId;
+              return (
+                <div
+                  key={tab.id}
+                  style={{
+                    display: isTabActive ? 'block' : 'none',
+                    width: '100%',
+                    height: '100%',
+                  }}
+                >
+                  <MetaCsvEditor
+                    ref={(handle) => {
+                      if (handle) {
+                        editorRefs.current.set(tab.id, handle);
+                      } else {
+                        editorRefs.current.delete(tab.id);
+                      }
+                    }}
+                    adapter={tab.adapter}
+                    hostMode="desktop"
+                    isActive={isTabActive}
+                    initialViewSnapshot={tab.viewSnapshot}
+                    filePath={tab.filePath ?? undefined}
+                    themeMode={resolvedTheme}
+                    themePreference={themePref}
+                    systemTheme={systemTheme}
+                    onThemePreferenceChange={handleThemeChange}
+                    appSettings={appSettings}
+                    onAppSettingsChange={handleAppSettingsChange}
+                    onNewFile={handleNewTab}
+                    onOpenFile={() => void handleOpenFile()}
+                    onSaveAs={(bytes, metaText) => saveTabAs(tab.id, bytes, metaText)}
+                    onCloseFile={() => closeTab(tab.id, true)}
+                    fileMenuItems={fileMenuItems}
+                    settingsExtraSection={settingsExtraSection}
+                    externalMetaText={tab.metaText}
+                    onMetaTextChange={(nextMeta) => {
+                      setTabs((prev) =>
+                        prev.map((t) =>
+                          t.id === tab.id && t.metaText !== nextMeta
+                            ? { ...t, metaText: nextMeta }
+                            : t,
+                        ),
+                      );
+                    }}
+                    onStatusChange={(info: EditorStatusInfo) => {
+                      const nextBytes = info.fileBytes ?? 0;
+                      setTabs((prev) => {
+                        const cur = prev.find((t) => t.id === tab.id);
+                        if (!cur) return prev;
+                        const changed =
+                          cur.dirty !== info.dirty ||
+                          (info.fileName && cur.fileName !== info.fileName) ||
+                          (nextBytes > 0 && cur.fileBytes !== nextBytes);
+                        if (!changed) return prev;
+                        const updated = prev.map((t) =>
+                          t.id === tab.id
+                            ? {
+                                ...t,
+                                dirty: info.dirty,
+                                fileName: info.fileName || t.fileName,
+                                fileBytes: nextBytes > 0 ? nextBytes : t.fileBytes,
+                              }
+                            : t,
+                        );
+                        return nextBytes > 0 && cur.fileBytes !== nextBytes
+                          ? applyMemoryBudget(updated, activeTabId)
+                          : updated;
+                      });
+                    }}
+                  />
+                </div>
+              );
+            })}
+          </div>
+
+          {showMetaPanel && activeTab && (
+            <aside
+              style={{
+                width: 340,
+                display: 'flex',
+                flexDirection: 'column',
+                borderLeft: `1px solid ${border}`,
+                background: isDark ? '#18181b' : '#f8fafc',
+                color: barFg,
+                flexShrink: 0,
+              }}
+            >
               <div
-                key={tab.id}
                 style={{
-                  display: isTabActive ? 'block' : 'none',
-                  width: '100%',
-                  height: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 6,
+                  padding: '6px 10px',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  borderBottom: `1px solid ${border}`,
+                  background: isDark ? '#252526' : '#f1f5f9',
                 }}
               >
-                <MetaCsvEditor
-                  ref={(handle) => {
-                    if (handle) {
-                      editorRefs.current.set(tab.id, handle);
-                    } else {
-                      editorRefs.current.delete(tab.id);
-                    }
+                <span
+                  title={`${activeTab.fileName}.metatext.jsonc`}
+                  style={{
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    flex: 1,
                   }}
-                  adapter={tab.adapter}
-                  hostMode="desktop"
-                  isActive={isTabActive}
-                  initialViewSnapshot={tab.viewSnapshot}
-                  filePath={tab.filePath ?? undefined}
-                  themeMode={resolvedTheme}
-                  themePreference={themePref}
-                  systemTheme={systemTheme}
-                  onThemePreferenceChange={handleThemeChange}
-                  appSettings={appSettings}
-                  onAppSettingsChange={handleAppSettingsChange}
-                  onNewFile={handleNewTab}
-                  onOpenFile={() => void handleOpenFile()}
-                  onSaveAs={(bytes, metaText) => saveTabAs(tab.id, bytes, metaText)}
-                  onCloseFile={() => closeTab(tab.id, true)}
-                  onStatusChange={(info: EditorStatusInfo) => {
-                    const nextBytes = info.fileBytes ?? 0;
-                    setTabs((prev) => {
-                      const cur = prev.find((t) => t.id === tab.id);
-                      if (!cur) return prev;
-                      const changed =
-                        cur.dirty !== info.dirty ||
-                        (info.fileName && cur.fileName !== info.fileName) ||
-                        (nextBytes > 0 && cur.fileBytes !== nextBytes);
-                      if (!changed) return prev;
-                      const updated = prev.map((t) =>
-                        t.id === tab.id
-                          ? {
-                              ...t,
-                              dirty: info.dirty,
-                              fileName: info.fileName || t.fileName,
-                              fileBytes: nextBytes > 0 ? nextBytes : t.fileBytes,
-                            }
-                          : t,
-                      );
-                      return nextBytes > 0 && cur.fileBytes !== nextBytes
-                        ? applyMemoryBudget(updated, activeTabId)
-                        : updated;
-                    });
+                >
+                  {activeTab.fileName}.metatext.jsonc
+                </span>
+                <button
+                  type="button"
+                  title="Copy JSONC"
+                  onClick={() => {
+                    void navigator.clipboard?.writeText(activeTab.metaText ?? '');
+                    setMetaCopied(true);
+                    window.setTimeout(() => setMetaCopied(false), 1200);
                   }}
-                />
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    padding: '2px 6px',
+                    fontSize: 11,
+                    borderRadius: 4,
+                    border: `1px solid ${border}`,
+                    background: 'transparent',
+                    color: barFg,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {metaCopied ? <Check size={11} /> : <Copy size={11} />}
+                  <span>{metaCopied ? 'Copied' : 'Copy'}</span>
+                </button>
+                <button
+                  type="button"
+                  aria-label="Close .metatext.jsonc panel"
+                  title="Close panel"
+                  onClick={() => setShowMetaPanel(false)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: 22,
+                    height: 22,
+                    padding: 0,
+                    border: 'none',
+                    borderRadius: 4,
+                    background: 'transparent',
+                    color: barFg,
+                    opacity: 0.75,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <X size={13} />
+                </button>
               </div>
-            );
-          })}
+              <textarea
+                value={activeTab.metaText ?? ''}
+                onChange={(e) => handleMetaPanelEdit(activeTab, e.target.value)}
+                spellCheck={false}
+                placeholder="// Sidecar .metatext.jsonc (live synced with grid & disk)"
+                style={{
+                  flex: 1,
+                  resize: 'none',
+                  border: 'none',
+                  outline: 'none',
+                  padding: 10,
+                  background: isDark ? '#141416' : '#ffffff',
+                  color: barFg,
+                  fontFamily: "'Consolas', 'Courier New', monospace",
+                  fontSize: 12,
+                  lineHeight: 1.5,
+                }}
+              />
+            </aside>
+          )}
         </div>
       </div>
     );
@@ -738,6 +979,7 @@ export const App: React.FC = () => {
       <SettingsModal
         open={showEmptySettings}
         onClose={() => setShowEmptySettings(false)}
+        hostMode="desktop"
         themeMode={resolvedTheme}
         themePreference={themePref}
         systemTheme={systemTheme}

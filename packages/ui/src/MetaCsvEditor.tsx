@@ -1064,23 +1064,33 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
     ],
   );
 
-  // Draw crisp 4px marker stripe on column 0 for bookmarked rows
+  // Draw crisp 4px marker stripe on column 0 + subtle grid lines on selected rows/columns
   const drawCell: DrawCellCallback = useCallback(
     (args, drawContent) => {
       drawContent();
+      const { ctx, rect } = args;
+      const isRowOrColSelected =
+        selection.rows.hasIndex(args.row) || selection.columns.hasIndex(args.col);
+      if (isRowOrColSelected) {
+        ctx.save();
+        ctx.fillStyle =
+          themeMode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(15, 23, 42, 0.14)';
+        ctx.fillRect(rect.x, rect.y + rect.height - 1, rect.width, 1);
+        ctx.fillRect(rect.x + rect.width - 1, rect.y, 1, rect.height);
+        ctx.restore();
+      }
       if (args.col !== 0) return;
       const dataRow = viewRowIndices[args.row];
       if (dataRow === undefined) return;
       const marker = markerMap.get(dataRow);
       if (!marker) return;
       const pal = MARKER_PALETTE[marker.color ?? 'amber'];
-      const { ctx, rect } = args;
       ctx.save();
       ctx.fillStyle = pal.bar;
       ctx.fillRect(rect.x, rect.y + 1, 4, Math.max(0, rect.height - 2));
       ctx.restore();
     },
-    [viewRowIndices, markerMap],
+    [viewRowIndices, markerMap, selection.rows, selection.columns, themeMode],
   );
 
   // Cell edit handler
@@ -1188,9 +1198,18 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
     [patchMeta, zoomScale],
   );
 
-  // Header click -> cycle view sort (asc -> desc -> none) & persist to .metatext.jsonc
+  // Header double-click -> cycle view sort (asc -> desc -> none) & persist to .metatext.jsonc
+  const lastHeaderClickRef = useRef<{ colIndex: number; time: number } | null>(null);
   const onHeaderClicked = useCallback(
     (colIndex: number) => {
+      const now = Date.now();
+      const prev = lastHeaderClickRef.current;
+      if (!prev || prev.colIndex !== colIndex || now - prev.time > 400) {
+        lastHeaderClickRef.current = { colIndex, time: now };
+        return;
+      }
+      lastHeaderClickRef.current = null;
+
       const col = columns[colIndex];
       if (!col?.id) return;
       const current = meta.view?.sort?.[0];
@@ -2931,44 +2950,138 @@ export const MetaCsvEditor = React.forwardRef<MetaCsvEditorHandle, MetaCsvEditor
           </div>
         )}
 
-        {csvData && (
-          <DataEditor
-            ref={gridRef}
-            width="100%"
-            height="100%"
-            columns={columns}
-            rows={viewRowIndices.length}
-            getCellContent={getCellContent}
-            drawCell={drawCell}
-            onCellEdited={onCellEdited}
-            onFinishedEditing={onFinishedEditing}
-            onColumnResize={onColumnResize}
-            onHeaderClicked={onHeaderClicked}
-            onMouseMove={onGridMouseMove}
-            onVisibleRegionChanged={(range) => {
-              if (range.width <= 0 || range.height <= 0) return;
-              if (pendingRestoreSnapshotRef.current) {
-                applyPendingViewRestore();
-                return;
-              }
-              if (isActiveRef.current) {
-                visibleRegionRef.current = { x: range.x, y: range.y };
-              }
-            }}
-            gridSelection={selection}
-            onGridSelectionChange={setSelection}
-            rowHeight={rowHeightProp}
-            headerHeight={scaledHeaderHeight}
-            freezeColumns={meta.table?.freezeColumns ?? 0}
-            rowMarkers={appSettings?.showRowNumbers === false ? 'none' : 'number'}
-            trapFocus={true}
-            smoothScrollX
-            smoothScrollY
-            theme={gridTheme}
-            getCellsForSelection={true}
-            keybindings={{ search: false }}
-          />
-        )}
+        {csvData && (() => {
+          const showRowNums = appSettings?.showRowNumbers !== false;
+          const baseRowMarkerWidth =
+            viewRowIndices.length >= 1_000_000
+              ? 64
+              : viewRowIndices.length >= 100_000
+                ? 58
+                : viewRowIndices.length >= 10_000
+                  ? 52
+                  : 46;
+          const rowMarkerWidth = Math.max(40, Math.round(baseRowMarkerWidth * zoomScale));
+          const cornerLabel = appSettings?.noHeaderColumnStyle === 'numbered' ? 'R1C1' : 'A1';
+          const isAllSelected =
+            viewRowIndices.length > 0 && selection.rows.length === viewRowIndices.length;
+
+          return (
+            <>
+              <DataEditor
+                ref={gridRef}
+                width="100%"
+                height="100%"
+                columns={columns}
+                rows={viewRowIndices.length}
+                getCellContent={getCellContent}
+                drawCell={drawCell}
+                onCellEdited={onCellEdited}
+                onFinishedEditing={onFinishedEditing}
+                onColumnResize={onColumnResize}
+                onHeaderClicked={onHeaderClicked}
+                onMouseMove={onGridMouseMove}
+                onVisibleRegionChanged={(range) => {
+                  if (range.width <= 0 || range.height <= 0) return;
+                  if (pendingRestoreSnapshotRef.current) {
+                    applyPendingViewRestore();
+                    return;
+                  }
+                  if (isActiveRef.current) {
+                    visibleRegionRef.current = { x: range.x, y: range.y };
+                  }
+                }}
+                gridSelection={selection}
+                onGridSelectionChange={setSelection}
+                rowHeight={rowHeightProp}
+                headerHeight={scaledHeaderHeight}
+                freezeColumns={meta.table?.freezeColumns ?? 0}
+                rowMarkers={
+                  showRowNums
+                    ? {
+                        kind: 'clickable-number',
+                        width: rowMarkerWidth,
+                        theme: {
+                          accentLight: 'transparent',
+                        },
+                      }
+                    : 'none'
+                }
+                trapFocus={true}
+                smoothScrollX
+                smoothScrollY
+                theme={gridTheme}
+                getCellsForSelection={true}
+                keybindings={{ search: false }}
+              />
+              {/* Excel-style top-left corner cell (A1 / R1C1 matching app setting, click to select all) */}
+              {showRowNums && (
+                <button
+                  type="button"
+                  aria-label={`Select all (${cornerLabel})`}
+                  title={`Select all (${cornerLabel} reference style)`}
+                  onClick={() => {
+                    if (viewRowIndices.length === 0) return;
+                    if (isAllSelected) {
+                      setSelection({
+                        columns: CompactSelection.empty(),
+                        rows: CompactSelection.empty(),
+                      });
+                    } else {
+                      setSelection({
+                        columns: CompactSelection.empty(),
+                        rows: CompactSelection.fromSingleSelection([0, viewRowIndices.length]),
+                      });
+                    }
+                  }}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: rowMarkerWidth,
+                    height: scaledHeaderHeight,
+                    zIndex: 15,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: 0,
+                    border: 'none',
+                    borderRight: `1px solid ${gridTheme.borderColor ?? toolbarBorder}`,
+                    borderBottom: `1px solid ${gridTheme.borderColor ?? toolbarBorder}`,
+                    background: gridTheme.bgHeader ?? toolbarBg,
+                    color: gridTheme.textHeader ?? toolbarFg,
+                    fontSize: Math.max(10, Math.round(11 * zoomScale)),
+                    fontWeight: 600,
+                    fontFamily: 'inherit',
+                    cursor: 'pointer',
+                    userSelect: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  <span style={{ opacity: 0.78 }}>{cornerLabel}</span>
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      position: 'absolute',
+                      right: 3,
+                      bottom: 3,
+                      width: 0,
+                      height: 0,
+                      borderLeft: '6px solid transparent',
+                      borderBottom: `6px solid ${
+                        isAllSelected
+                          ? '#3b82f6'
+                          : isDark
+                            ? 'rgba(148, 163, 184, 0.55)'
+                            : 'rgba(100, 116, 139, 0.55)'
+                      }`,
+                      pointerEvents: 'none',
+                    }}
+                  />
+                </button>
+              )}
+            </>
+          );
+        })()}
 
         {/* Excel-like row height resize hit strip over row-number border (drag or double-click to auto-fit) */}
         {hoverRowResize && !rowResizeDrag && (

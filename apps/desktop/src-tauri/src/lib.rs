@@ -35,6 +35,12 @@ struct AppSettings {
     show_row_numbers: Option<bool>,
     #[serde(default)]
     no_header_column_style: Option<String>,
+    #[serde(default)]
+    reopen_last_files: Option<bool>,
+    #[serde(default)]
+    last_opened_files: Option<Vec<String>>,
+    #[serde(default)]
+    last_active_file: Option<String>,
 }
 
 fn default_theme() -> String {
@@ -52,6 +58,9 @@ impl Default for AppSettings {
             default_marker_color: None,
             show_row_numbers: None,
             no_header_column_style: None,
+            reopen_last_files: None,
+            last_opened_files: None,
+            last_active_file: None,
         }
     }
 }
@@ -176,11 +185,20 @@ fn capture_window_state(window: &WebviewWindow, store: &SettingsStore) {
 
 #[tauri::command]
 fn get_app_settings(state: tauri::State<'_, SettingsStore>) -> AppSettings {
-    state
+    let mut settings = state
         .data
         .lock()
         .map(|guard| guard.clone())
-        .unwrap_or_default()
+        .unwrap_or_default();
+    if let Some(files) = settings.last_opened_files.as_mut() {
+        files.retain(|p| Path::new(p).is_file());
+    }
+    if let Some(active) = settings.last_active_file.as_ref() {
+        if !Path::new(active).is_file() {
+            settings.last_active_file = None;
+        }
+    }
+    settings
 }
 
 #[tauri::command]
@@ -194,6 +212,9 @@ fn update_app_settings(
     default_marker_color: Option<String>,
     show_row_numbers: Option<bool>,
     no_header_column_style: Option<String>,
+    reopen_last_files: Option<bool>,
+    last_opened_files: Option<Vec<String>>,
+    last_active_file: Option<String>,
 ) -> Result<AppSettings, String> {
     let updated = {
         let mut data = state
@@ -231,6 +252,15 @@ fn update_app_settings(
             if matches!(ncs.as_str(), "excel" | "numbered") {
                 data.no_header_column_style = Some(ncs);
             }
+        }
+        if let Some(rlf) = reopen_last_files {
+            data.reopen_last_files = Some(rlf);
+        }
+        if let Some(files) = last_opened_files {
+            data.last_opened_files = Some(files);
+        }
+        if let Some(active) = last_active_file {
+            data.last_active_file = if active.is_empty() { None } else { Some(active) };
         }
         data.clone()
     };

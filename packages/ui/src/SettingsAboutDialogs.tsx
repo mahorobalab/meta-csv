@@ -18,6 +18,7 @@ export interface EditorAppSettings {
   defaultMarkerColor?: MarkerColor;
   showRowNumbers?: boolean;
   noHeaderColumnStyle?: 'excel' | 'numbered';
+  reopenLastFiles?: boolean;
 }
 
 export interface FileLayoutSettingsProps {
@@ -737,6 +738,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 onChange={(e) => onAppSettingsChange?.({ showRowNumbers: e.target.checked })}
               />
             </label>
+
+            {hostMode === 'desktop' && (
+              <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
+                <span>Reopen Last Files on Startup</span>
+                <input
+                  type="checkbox"
+                  checked={appSettings.reopenLastFiles !== false}
+                  onChange={(e) => onAppSettingsChange?.({ reopenLastFiles: e.target.checked })}
+                />
+              </label>
+            )}
 
             {extraSection && (
               <>
