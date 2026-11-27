@@ -1,7 +1,6 @@
 import { applyEdits, modify, parse as parseJsonc, type JSONPath } from 'jsonc-parser';
 import {
   DEFAULT_META_SCHEMA_URL,
-  DEFAULT_META_SCHEMA_URL,
   DEFAULT_META_VERSION,
   type CellStyle,
   type ConditionalRule,
