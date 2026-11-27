@@ -14,8 +14,6 @@ export interface FloatingInfoCardsProps {
 
 interface FloatingCardProps {
   isDark: boolean;
-  accentColor: string;
-  accentSoftBg: string;
   icon: React.ReactNode;
   title: string;
   children: React.ReactNode;
@@ -23,8 +21,6 @@ interface FloatingCardProps {
 
 const FloatingCard: React.FC<FloatingCardProps> = ({
   isDark,
-  accentColor,
-  accentSoftBg,
   icon,
   title,
   children,
@@ -39,23 +35,25 @@ const FloatingCard: React.FC<FloatingCardProps> = ({
         width: 210,
         padding: '11px 13px',
         borderRadius: 12,
-        background: isDark ? 'rgba(24, 24, 27, 0.84)' : 'rgba(255, 255, 255, 0.88)',
+        background: isDark ? 'rgba(24, 24, 27, 0.86)' : 'rgba(255, 255, 255, 0.9)',
         backdropFilter: 'blur(14px)',
         WebkitBackdropFilter: 'blur(14px)',
         border: `1px solid ${
           hovered
-            ? accentColor
+            ? isDark
+              ? 'rgba(255, 255, 255, 0.34)'
+              : 'rgba(15, 23, 42, 0.32)'
             : isDark
               ? 'rgba(255, 255, 255, 0.12)'
               : 'rgba(15, 23, 42, 0.12)'
         }`,
         boxShadow: hovered
           ? isDark
-            ? '0 16px 36px rgba(0, 0, 0, 0.52), 0 0 0 1px rgba(255,255,255,0.06)'
-            : '0 16px 34px rgba(15, 23, 42, 0.16), 0 4px 12px rgba(15, 23, 42, 0.08)'
+            ? '0 16px 36px rgba(0, 0, 0, 0.52)'
+            : '0 16px 34px rgba(15, 23, 42, 0.15), 0 4px 12px rgba(15, 23, 42, 0.08)'
           : isDark
             ? '0 10px 26px rgba(0, 0, 0, 0.42)'
-            : '0 10px 24px rgba(15, 23, 42, 0.11), 0 2px 6px rgba(15, 23, 42, 0.06)',
+            : '0 10px 24px rgba(15, 23, 42, 0.1), 0 2px 6px rgba(15, 23, 42, 0.06)',
         transform: hovered ? 'translateY(-4px)' : 'translateY(0)',
         transition: 'transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease',
         color: isDark ? '#f4f4f5' : '#0f172a',
@@ -73,8 +71,8 @@ const FloatingCard: React.FC<FloatingCardProps> = ({
             width: 24,
             height: 24,
             borderRadius: 7,
-            background: accentSoftBg,
-            color: accentColor,
+            background: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.06)',
+            color: isDark ? '#e4e4e7' : '#334155',
             flexShrink: 0,
           }}
         >
@@ -112,18 +110,18 @@ const CardLink: React.FC<CardLinkProps> = ({ href, isDark, children }) => {
         gap: 4,
         color: hovered
           ? isDark
-            ? '#93c5fd'
-            : '#1d4ed8'
+            ? '#ffffff'
+            : '#0f172a'
           : isDark
-            ? '#60a5fa'
-            : '#2563eb',
+            ? '#d4d4d8'
+            : '#334155',
         textDecoration: hovered ? 'underline' : 'none',
         fontWeight: 500,
         lineHeight: 1.35,
       }}
     >
       <span>{children}</span>
-      <ExternalLink size={10.5} style={{ opacity: 0.7, flexShrink: 0 }} />
+      <ExternalLink size={10.5} style={{ opacity: hovered ? 0.9 : 0.55, flexShrink: 0 }} />
     </a>
   );
 };
@@ -242,8 +240,6 @@ export const FloatingInfoCards: React.FC<FloatingInfoCardsProps> = ({ isDark }) 
         {/* Card 1: MetaText Spec */}
         <FloatingCard
           isDark={isDark}
-          accentColor={isDark ? '#60a5fa' : '#2563eb'}
-          accentSoftBg={isDark ? 'rgba(59, 130, 246, 0.18)' : 'rgba(37, 99, 235, 0.1)'}
           icon={<FileCode2 size={14} />}
           title="MetaText Spec"
         >
@@ -258,8 +254,6 @@ export const FloatingInfoCards: React.FC<FloatingInfoCardsProps> = ({ isDark }) 
         {/* Card 2: Development */}
         <FloatingCard
           isDark={isDark}
-          accentColor={isDark ? '#c084fc' : '#7c3aed'}
-          accentSoftBg={isDark ? 'rgba(168, 85, 247, 0.18)' : 'rgba(124, 58, 237, 0.1)'}
           icon={<Code2 size={14} />}
           title="Development"
         >
@@ -271,8 +265,6 @@ export const FloatingInfoCards: React.FC<FloatingInfoCardsProps> = ({ isDark }) 
         {/* Card 3: Desktop App */}
         <FloatingCard
           isDark={isDark}
-          accentColor={isDark ? '#fb923c' : '#ea580c'}
-          accentSoftBg={isDark ? 'rgba(249, 115, 22, 0.18)' : 'rgba(234, 88, 12, 0.1)'}
           icon={<Monitor size={14} />}
           title="Desktop App"
         >

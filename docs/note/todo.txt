@@ -1,22 +1,7 @@
 
-
-・履歴はやメタデータサイドパネルは、最後に開いてたら開いたまま新しいファイルを開く
-
 ・Largeアイコン 1.6倍は大きすぎ？ 1.4倍で確認
 
-・Web版は、VS Code Addon と デスクトップ版のリンク 表示する
-
-    ・MetaText Spec 
-        Schema https://mahorobalab.github.io/metatext-spec/
-        manifest.json
-
-    ・Development 
-        Visual Studio Code Extension
-
-    ・Desktop App
-        Windows Microsoft Store BOOTH
-        Mac Coming soon...
-
+・Web版のカードのURL 確定
     ・アマゾンアソシエイトも？
 
 ・デスクトップ版のメリット洗い出す
@@ -227,6 +212,16 @@ PLAN
 ・Web版で、Ctrl+S 押すとSnapshotとともにDLが始まる → 抑止
 ・新規作成に ndjson がない 開くにはある → JSONL / NDJSON 表示で調整
 ・ファイルを変更してないとスナップショットが撮られない
+・履歴はやメタデータサイドパネルは、最後に開いてたら開いたまま新しいファイルを開く
+・Web版は、VS Code Addon と デスクトップ版のリンク 表示する
+    ・MetaText Spec 
+        Schema https://mahorobalab.github.io/metatext-spec/
+        manifest.json
+    ・Development 
+        Visual Studio Code Extension
+    ・Desktop App
+        Windows Microsoft Store BOOTH
+        Mac Coming soon...
 
 ----------------------------------------
 Gemin talk
