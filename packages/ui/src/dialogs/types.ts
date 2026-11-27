@@ -9,9 +9,11 @@ import type { ThemePreference } from '../theme';
 import type { LanguagePreference } from '../i18n';
 
 export type EditorHostMode = 'vscode' | 'desktop' | 'web';
+export type ToolbarIconSize = 'small' | 'large';
 
 export interface EditorAppSettings {
   language?: LanguagePreference;
+  toolbarIconSize?: ToolbarIconSize;
   defaultFontSize?: number;
   defaultRowHeight?: number;
   defaultMarkerColor?: MarkerColor;

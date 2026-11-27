@@ -938,6 +938,7 @@ export const MetaTextEditor = React.forwardRef<MetaTextEditorHandle, MetaTextEdi
       <EditorToolbar
         toolbarRef={toolbarRef}
         hostMode={hostMode}
+        iconSize={appSettings?.toolbarIconSize ?? (hostMode === 'desktop' ? 'large' : 'small')}
         themeMode={themeMode}
         isDark={isDark}
         toolbarBg={toolbarBg}

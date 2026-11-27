@@ -80,6 +80,22 @@ export const AppSettingsTab: React.FC<AppSettingsTabProps> = ({
       )}
 
       <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+        <span>Icon Size</span>
+        <select
+          value={appSettings.toolbarIconSize ?? (hostMode === 'desktop' ? 'large' : 'small')}
+          onChange={(e) =>
+            onAppSettingsChange?.({
+              toolbarIconSize: e.target.value as 'small' | 'large',
+            })
+          }
+          style={inputStyle}
+        >
+          <option value="small">Small</option>
+          <option value="large">Large</option>
+        </select>
+      </label>
+
+      <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
         <span>{t('appSettings.defaultFontSize')}</span>
         <input
           type="number"

@@ -44,6 +44,8 @@ struct AppSettings {
     #[serde(default)]
     default_marker_color: Option<String>,
     #[serde(default)]
+    toolbar_icon_size: Option<String>,
+    #[serde(default)]
     show_row_numbers: Option<bool>,
     #[serde(default)]
     no_header_column_style: Option<String>,
@@ -83,6 +85,7 @@ impl Default for AppSettings {
             default_font_size: None,
             default_row_height: None,
             default_marker_color: None,
+            toolbar_icon_size: None,
             show_row_numbers: None,
             no_header_column_style: None,
             zebra_striping: None,
@@ -245,6 +248,7 @@ fn update_app_settings(
     default_font_size: Option<u32>,
     default_row_height: Option<u32>,
     default_marker_color: Option<String>,
+    toolbar_icon_size: Option<String>,
     show_row_numbers: Option<bool>,
     no_header_column_style: Option<String>,
     zebra_striping: Option<bool>,
@@ -293,6 +297,11 @@ fn update_app_settings(
         if let Some(mc) = default_marker_color {
             if matches!(mc.as_str(), "amber" | "rose" | "emerald" | "sky" | "violet") {
                 data.default_marker_color = Some(mc);
+            }
+        }
+        if let Some(tis) = toolbar_icon_size {
+            if matches!(tis.as_str(), "small" | "large") {
+                data.toolbar_icon_size = Some(tis);
             }
         }
         if let Some(srn) = show_row_numbers {

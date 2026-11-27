@@ -98,6 +98,15 @@
           "default": "auto",
           "description": "%config.language.description%"
         },
+        "metatext.toolbarIconSize": {
+          "type": "string",
+          "enum": [
+            "small",
+            "large"
+          ],
+          "default": "small",
+          "description": "Toolbar icon size (small or large)."
+        },
         "metatext.defaultFontSize": {
           "type": "number",
           "default": 13,

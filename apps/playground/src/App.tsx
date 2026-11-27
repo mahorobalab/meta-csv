@@ -59,6 +59,10 @@ function loadPlaygroundSettings(): PlaygroundSettings {
       theme,
       showMetaPanel,
       language: isLanguagePreference(parsed.language) ? parsed.language : undefined,
+      toolbarIconSize:
+        parsed.toolbarIconSize === 'large' || parsed.toolbarIconSize === 'small'
+          ? parsed.toolbarIconSize
+          : undefined,
       defaultFontSize: parsed.defaultFontSize,
       defaultRowHeight: parsed.defaultRowHeight,
       defaultMarkerColor: parsed.defaultMarkerColor,
@@ -77,6 +81,7 @@ export const App: React.FC = () => {
   const [showMetaPanel, setShowMetaPanel] = useState<boolean>(initial.showMetaPanel);
   const [appSettings, setAppSettings] = useState<EditorAppSettings>({
     language: initial.language,
+    toolbarIconSize: initial.toolbarIconSize,
     defaultFontSize: initial.defaultFontSize,
     defaultRowHeight: initial.defaultRowHeight,
     defaultMarkerColor: initial.defaultMarkerColor,

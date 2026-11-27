@@ -11,6 +11,7 @@ import type {
 } from '@metatext-editor/schema';
 import type { ParsedCsvData, resolveCellStyle } from '@metatext-editor/core';
 import type { EditorHostMode } from '../../SettingsAboutDialogs';
+import type { ToolbarIconSize } from '../../dialogs/types';
 import type { NewFileFormat } from '../../newFileTemplates';
 import { useI18n } from '../../i18n';
 import { MarkerControls } from '../../MarkerControls';
@@ -18,10 +19,12 @@ import { EditorSearchBox } from './EditorSearchBox';
 import { EditorToolbarRight } from './EditorToolbarRight';
 import { FileMenuPopover } from './FileMenuPopover';
 import { StylePopover } from './StylePopover';
+import { ToolbarIconButton } from './ToolbarIconButton';
 
 export interface EditorToolbarProps {
   toolbarRef: React.RefObject<HTMLDivElement>;
   hostMode: EditorHostMode;
+  iconSize: ToolbarIconSize;
   themeMode: 'light' | 'dark';
   isDark: boolean;
   toolbarBg: string;
@@ -131,29 +134,31 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = (p) => {
   >
     {p.hostMode !== 'vscode' && (
       <>
-        <button
-          type="button"
-          aria-label={t('toolbar.menu')}
+        <ToolbarIconButton
+          isDark={p.isDark}
+          toolbarBorder={p.toolbarBorder}
+          fgColor={p.toolbarFg}
+          iconSize={p.iconSize}
+          active={p.openMenu === 'file'}
+          accent="blue"
+          ariaLabel={t('toolbar.menu')}
           title={t('toolbar.fileAndEditMenu')}
-          style={{
-            ...p.btnStyle,
-            padding: '3px 6px',
-            borderColor: p.openMenu === 'file' ? '#3b82f6' : p.toolbarBorder,
-          }}
           onClick={() => p.setOpenMenu((m) => (m === 'file' ? 'none' : 'file'))}
         >
-          <Menu size={15} />
-        </button>
+          <Menu size={p.iconSize === 'large' ? 23 : 15} />
+        </ToolbarIconButton>
         {p.onOpenFile && (
-          <button
-            type="button"
-            aria-label={t('toolbar.openFile')}
+          <ToolbarIconButton
+            isDark={p.isDark}
+            toolbarBorder={p.toolbarBorder}
+            fgColor={p.toolbarFg}
+            iconSize={p.iconSize}
+            ariaLabel={t('toolbar.openFile')}
             title={t('toolbar.openFileEllipsis')}
-            style={{ ...p.btnStyle, padding: '3px 6px' }}
             onClick={p.onOpenFile}
           >
-            <FolderOpen size={14} />
-          </button>
+            <FolderOpen size={p.iconSize === 'large' ? 22 : 14} />
+          </ToolbarIconButton>
         )}
       </>
     )}
@@ -222,6 +227,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = (p) => {
       isDark={p.isDark}
       toolbarBorder={p.toolbarBorder}
       btnStyle={p.btnStyle}
+      iconSize={p.iconSize}
       isReadOnly={p.isReadOnly}
       activeFormat={p.activeFormat}
       openMenu={p.openMenu}

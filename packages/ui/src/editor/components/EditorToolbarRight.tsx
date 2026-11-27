@@ -1,14 +1,17 @@
 import React from 'react';
 import { FileText, History, Info, Lock, Package, Settings, Unlock } from 'lucide-react';
 import type { MetaTextFormat } from '@metatext-editor/schema';
+import type { ToolbarIconSize } from '../../dialogs/types';
 import { FoxTailIcon } from '../../icons/FoxTailIcon';
 import { ZebraRowsIcon } from '../../icons/ZebraRowsIcon';
 import { useI18n } from '../../i18n';
+import { ToolbarIconButton } from './ToolbarIconButton';
 
 export interface EditorToolbarRightProps {
   isDark: boolean;
   toolbarBorder: string;
   btnStyle: React.CSSProperties;
+  iconSize: ToolbarIconSize;
   isReadOnly: boolean;
   activeFormat: MetaTextFormat;
   openMenu: 'none' | 'file' | 'edit' | 'unlock';
@@ -35,6 +38,7 @@ export const EditorToolbarRight: React.FC<EditorToolbarRightProps> = ({
   isDark,
   toolbarBorder,
   btnStyle,
+  iconSize,
   isReadOnly,
   activeFormat,
   openMenu,
@@ -57,6 +61,9 @@ export const EditorToolbarRight: React.FC<EditorToolbarRightProps> = ({
   onOpenAbout,
 }) => {
   const { t } = useI18n();
+  const basePx = iconSize === 'large' ? 22 : 14;
+  const tailPx = iconSize === 'large' ? 23 : 15;
+  const fgColor = typeof btnStyle.color === 'string' ? btnStyle.color : undefined;
   return (
   <div
     style={{
@@ -110,69 +117,54 @@ export const EditorToolbarRight: React.FC<EditorToolbarRightProps> = ({
       </button>
     )}
     {canTail && (
-      <button
-        type="button"
-        aria-label={t('toolbar.liveTailAria')}
+      <ToolbarIconButton
+        isDark={isDark}
+        toolbarBorder={toolbarBorder}
+        fgColor={fgColor}
+        iconSize={iconSize}
+        active={showTailPanel}
+        accent="emerald"
+        ariaLabel={t('toolbar.liveTailAria')}
         title={showTailPanel ? t('toolbar.liveTailOnTooltip') : t('toolbar.liveTailOffTooltip')}
-        style={{
-          ...btnStyle,
-          padding: '3px 6px',
-          borderColor: showTailPanel ? '#10b981' : toolbarBorder,
-          background: showTailPanel
-            ? isDark
-              ? 'rgba(16, 185, 129, 0.22)'
-              : 'rgba(16, 185, 129, 0.14)'
-            : btnStyle.background,
-          color: showTailPanel
-            ? isDark
-              ? '#6ee7b7'
-              : '#047857'
-            : btnStyle.color,
-        }}
         onClick={onToggleTailPanel}
       >
-        <FoxTailIcon size={15} />
-      </button>
+        <FoxTailIcon size={tailPx} />
+      </ToolbarIconButton>
     )}
-    <button
-      type="button"
-      aria-label={t('toolbar.zebraAria')}
+    <ToolbarIconButton
+      isDark={isDark}
+      toolbarBorder={toolbarBorder}
+      fgColor={fgColor}
+      iconSize={iconSize}
+      active={zebraEnabled}
+      accent="blue"
+      ariaLabel={t('toolbar.zebraAria')}
       title={zebraEnabled ? t('toolbar.zebraOnTooltip') : t('toolbar.zebraOffTooltip')}
-      style={{
-        ...btnStyle,
-        padding: '3px 6px',
-        borderColor: zebraEnabled ? '#3b82f6' : toolbarBorder,
-        background: zebraEnabled
-          ? isDark
-            ? 'rgba(59, 130, 246, 0.2)'
-            : 'rgba(59, 130, 246, 0.12)'
-          : btnStyle.background,
-      }}
       onClick={onToggleZebra}
     >
-      <ZebraRowsIcon size={14} active={zebraEnabled} />
-    </button>
-    <button
-      type="button"
-      aria-label={t('toolbar.inspectorAria')}
+      <ZebraRowsIcon size={basePx} active={zebraEnabled} />
+    </ToolbarIconButton>
+    <ToolbarIconButton
+      isDark={isDark}
+      toolbarBorder={toolbarBorder}
+      fgColor={fgColor}
+      iconSize={iconSize}
+      active={showCellInspector}
+      accent="blue"
+      ariaLabel={t('toolbar.inspectorAria')}
       title={t('toolbar.inspectorTooltip')}
-      style={{
-        ...btnStyle,
-        padding: '3px 6px',
-        borderColor: showCellInspector ? '#3b82f6' : toolbarBorder,
-        background: showCellInspector
-          ? isDark
-            ? 'rgba(59, 130, 246, 0.2)'
-            : 'rgba(59, 130, 246, 0.12)'
-          : btnStyle.background,
-      }}
       onClick={onToggleCellInspector}
     >
-      <FileText size={14} />
-    </button>
-    <button
-      type="button"
-      aria-label="History panel"
+      <FileText size={basePx} />
+    </ToolbarIconButton>
+    <ToolbarIconButton
+      isDark={isDark}
+      toolbarBorder={toolbarBorder}
+      fgColor={fgColor}
+      iconSize={iconSize}
+      active={savingSnapshot || showHistoryPanel}
+      accent={savingSnapshot ? 'amber' : 'blue'}
+      ariaLabel="History panel"
       title={
         savingSnapshot
           ? 'Saving snapshot...'
@@ -180,62 +172,45 @@ export const EditorToolbarRight: React.FC<EditorToolbarRightProps> = ({
             ? 'Hide History panel'
             : 'Show History panel'
       }
-      style={{
-        ...btnStyle,
-        padding: '3px 6px',
-        borderColor: savingSnapshot
-          ? '#f59e0b'
-          : showHistoryPanel
-            ? '#3b82f6'
-            : toolbarBorder,
-        background: savingSnapshot
-          ? isDark
-            ? 'rgba(245, 158, 11, 0.22)'
-            : 'rgba(245, 158, 11, 0.16)'
-          : showHistoryPanel
-            ? isDark
-              ? 'rgba(59, 130, 246, 0.2)'
-              : 'rgba(59, 130, 246, 0.12)'
-            : btnStyle.background,
-        color: savingSnapshot
-          ? isDark
-            ? '#fbbf24'
-            : '#d97706'
-          : btnStyle.color,
-      }}
       onClick={onToggleHistoryPanel}
     >
-      <History size={14} />
-    </button>
+      <History size={basePx} />
+    </ToolbarIconButton>
     {onOpenExportBundle && (
-      <button
-        type="button"
-        aria-label="Export as .metatext.zip"
+      <ToolbarIconButton
+        isDark={isDark}
+        toolbarBorder={toolbarBorder}
+        fgColor={fgColor}
+        iconSize={iconSize}
+        ariaLabel="Export as .metatext.zip"
         title="Export as .metatext.zip"
-        style={{ ...btnStyle, padding: '3px 6px' }}
         onClick={onOpenExportBundle}
       >
-        <Package size={14} />
-      </button>
+        <Package size={basePx} />
+      </ToolbarIconButton>
     )}
-    <button
-      type="button"
-      aria-label={t('common.settings')}
+    <ToolbarIconButton
+      isDark={isDark}
+      toolbarBorder={toolbarBorder}
+      fgColor={fgColor}
+      iconSize={iconSize}
+      ariaLabel={t('common.settings')}
       title={t('toolbar.settingsTooltip')}
-      style={{ ...btnStyle, padding: '3px 6px' }}
       onClick={onOpenSettings}
     >
-      <Settings size={14} />
-    </button>
-    <button
-      type="button"
-      aria-label={t('toolbar.aboutTitle')}
+      <Settings size={basePx} />
+    </ToolbarIconButton>
+    <ToolbarIconButton
+      isDark={isDark}
+      toolbarBorder={toolbarBorder}
+      fgColor={fgColor}
+      iconSize={iconSize}
+      ariaLabel={t('toolbar.aboutTitle')}
       title={t('toolbar.aboutTitle')}
-      style={{ ...btnStyle, padding: '3px 6px' }}
       onClick={onOpenAbout}
     >
-      <Info size={14} />
-    </button>
+      <Info size={basePx} />
+    </ToolbarIconButton>
 
     {openMenu === 'unlock' && isReadOnly && (
       <div

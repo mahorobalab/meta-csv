@@ -19,6 +19,7 @@ type LanguageSetting = 'auto' | 'en' | 'ja' | 'zh-cn' | 'zh-tw' | 'ko' | 'de' | 
 
 interface VsCodeAppSettings {
   language: LanguageSetting;
+  toolbarIconSize: 'small' | 'large';
   defaultFontSize: number;
   defaultRowHeight: number;
   defaultMarkerColor: 'amber' | 'rose' | 'emerald' | 'sky' | 'violet';
@@ -509,6 +510,7 @@ class MetaTextEditorProvider implements vscode.CustomEditorProvider<MetaTextDocu
             const cfg = vscode.workspace.getConfiguration('metatext');
             const allowedKeys = [
               'language',
+              'toolbarIconSize',
               'defaultFontSize',
               'defaultRowHeight',
               'defaultMarkerColor',
@@ -708,8 +710,11 @@ function readAppSettings(): VsCodeAppSettings {
   const rawSidecar = cfg.get<string>('sidecarVisibility', 'nest');
   const sidecarVisibility: SidecarVisibilityMode =
     rawSidecar === 'hide' || rawSidecar === 'show' ? rawSidecar : 'nest';
+  const rawIconSize = cfg.get<string>('toolbarIconSize', 'small');
+  const toolbarIconSize: 'small' | 'large' = rawIconSize === 'large' ? 'large' : 'small';
   return {
     language,
+    toolbarIconSize,
     defaultFontSize: cfg.get<number>('defaultFontSize', 13),
     defaultRowHeight: cfg.get<number>('defaultRowHeight', 28),
     defaultMarkerColor,
