@@ -2,13 +2,25 @@ import * as vscode from 'vscode';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 
+type SidecarVisibilityMode = 'nest' | 'hide' | 'show';
+
 interface VsCodeAppSettings {
   defaultFontSize: number;
   defaultRowHeight: number;
   defaultMarkerColor: 'amber' | 'rose' | 'emerald' | 'sky' | 'violet';
   showRowNumbers: boolean;
   noHeaderColumnStyle: 'excel' | 'numbered';
+  sidecarVisibility: SidecarVisibilityMode;
 }
+
+const SIDECAR_EXCLUDE_GLOB = '**/*.metatext.jsonc';
+const SIDECAR_NESTING_PATTERNS: Record<string, string> = {
+  '*.csv': '${capture}.csv.metatext.jsonc',
+  '*.tsv': '${capture}.tsv.metatext.jsonc',
+  '*.jsonl': '${capture}.jsonl.metatext.jsonc',
+  '*.ndjson': '${capture}.ndjson.metatext.jsonc',
+  '*.log': '${capture}.log.metatext.jsonc',
+};
 
 interface EditorStatusPayload {
   totalRows?: number;
@@ -240,6 +252,55 @@ class MetaTextEditorProvider implements vscode.CustomEditorProvider<MetaTextDocu
           await sendFilePayload();
           break;
 
+        case 'readAppend': {
+          const requestId = Number(message.requestId ?? 0);
+          const fromOffset = Math.max(0, Number(message.fromOffset ?? 0));
+          try {
+            const fh = await fs.open(csvPath, 'r');
+            try {
+              const stat = await fh.stat();
+              if (stat.size < fromOffset) {
+                await webview.postMessage({
+                  type: 'appendData',
+                  requestId,
+                  bytesBase64: '',
+                  nextOffset: stat.size,
+                  truncated: true,
+                });
+              } else if (stat.size === fromOffset) {
+                await webview.postMessage({
+                  type: 'appendData',
+                  requestId,
+                  bytesBase64: '',
+                  nextOffset: fromOffset,
+                  truncated: false,
+                });
+              } else {
+                const maxChunk = 4 * 1024 * 1024;
+                const toRead = Math.min(stat.size - fromOffset, maxChunk);
+                const buf = Buffer.allocUnsafe(toRead);
+                const { bytesRead } = await fh.read(buf, 0, toRead, fromOffset);
+                await webview.postMessage({
+                  type: 'appendData',
+                  requestId,
+                  bytesBase64: buf.subarray(0, bytesRead).toString('base64'),
+                  nextOffset: fromOffset + bytesRead,
+                  truncated: false,
+                });
+              }
+            } finally {
+              await fh.close();
+            }
+          } catch (err) {
+            await webview.postMessage({
+              type: 'appendError',
+              requestId,
+              message: String(err),
+            });
+          }
+          break;
+        }
+
         case 'openSettings':
           await vscode.commands.executeCommand('workbench.action.openSettings', 'metatext.');
           break;
@@ -254,6 +315,7 @@ class MetaTextEditorProvider implements vscode.CustomEditorProvider<MetaTextDocu
               'defaultMarkerColor',
               'showRowNumbers',
               'noHeaderColumnStyle',
+              'sidecarVisibility',
             ];
             for (const key of allowedKeys) {
               if (patch[key] !== undefined) {
@@ -423,13 +485,97 @@ function readAppSettings(): VsCodeAppSettings {
       : 'amber';
   const rawColStyle = cfg.get<string>('noHeaderColumnStyle', 'excel');
   const noHeaderColumnStyle = rawColStyle === 'numbered' ? 'numbered' : 'excel';
+  const rawSidecar = cfg.get<string>('sidecarVisibility', 'nest');
+  const sidecarVisibility: SidecarVisibilityMode =
+    rawSidecar === 'hide' || rawSidecar === 'show' ? rawSidecar : 'nest';
   return {
     defaultFontSize: cfg.get<number>('defaultFontSize', 13),
     defaultRowHeight: cfg.get<number>('defaultRowHeight', 28),
     defaultMarkerColor,
     showRowNumbers: cfg.get<boolean>('showRowNumbers', true),
     noHeaderColumnStyle,
+    sidecarVisibility,
   };
+}
+
+async function syncSidecarVisibility(): Promise<void> {
+  const mode = readAppSettings().sidecarVisibility;
+
+  // 1. Sync files.exclude for 'hide' mode (preserving all user-defined rules)
+  const filesCfg = vscode.workspace.getConfiguration('files');
+  const inspectedExclude = filesCfg.inspect<Record<string, boolean>>('exclude');
+  const currentExclude = { ...(inspectedExclude?.globalValue ?? {}) };
+  let excludeChanged = false;
+  if (mode === 'hide') {
+    if (currentExclude[SIDECAR_EXCLUDE_GLOB] !== true) {
+      currentExclude[SIDECAR_EXCLUDE_GLOB] = true;
+      excludeChanged = true;
+    }
+  } else if (SIDECAR_EXCLUDE_GLOB in currentExclude) {
+    delete currentExclude[SIDECAR_EXCLUDE_GLOB];
+    excludeChanged = true;
+  }
+  if (excludeChanged) {
+    await filesCfg.update(
+      'exclude',
+      Object.keys(currentExclude).length > 0 ? currentExclude : undefined,
+      vscode.ConfigurationTarget.Global,
+    );
+  }
+
+  // 2. Sync explorer.fileNesting for 'nest' mode (preserving all user-defined patterns)
+  const explorerCfg = vscode.workspace.getConfiguration('explorer');
+  const inspectedPatterns = explorerCfg.inspect<Record<string, string>>('fileNesting.patterns');
+  const nextPatterns = { ...(inspectedPatterns?.globalValue ?? {}) };
+  let patternsChanged = false;
+
+  if (mode === 'nest') {
+    if (explorerCfg.get<boolean>('fileNesting.enabled') !== true) {
+      await explorerCfg.update('fileNesting.enabled', true, vscode.ConfigurationTarget.Global);
+    }
+    const inspectedExpand = explorerCfg.inspect<boolean>('fileNesting.expand');
+    if (inspectedExpand?.globalValue === undefined) {
+      await explorerCfg.update('fileNesting.expand', false, vscode.ConfigurationTarget.Global);
+    }
+    for (const [key, pattern] of Object.entries(SIDECAR_NESTING_PATTERNS)) {
+      const existing = nextPatterns[key] ?? '';
+      const tokens = existing
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (!tokens.includes(pattern)) {
+        tokens.push(pattern);
+        nextPatterns[key] = tokens.join(', ');
+        patternsChanged = true;
+      }
+    }
+  } else {
+    for (const [key, pattern] of Object.entries(SIDECAR_NESTING_PATTERNS)) {
+      const existing = nextPatterns[key];
+      if (!existing) continue;
+      const tokens = existing
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const filtered = tokens.filter((t) => t !== pattern);
+      if (filtered.length !== tokens.length) {
+        if (filtered.length > 0) {
+          nextPatterns[key] = filtered.join(', ');
+        } else {
+          delete nextPatterns[key];
+        }
+        patternsChanged = true;
+      }
+    }
+  }
+
+  if (patternsChanged) {
+    await explorerCfg.update(
+      'fileNesting.patterns',
+      Object.keys(nextPatterns).length > 0 ? nextPatterns : undefined,
+      vscode.ConfigurationTarget.Global,
+    );
+  }
 }
 
 function getThemeMode(): 'light' | 'dark' {
@@ -467,6 +613,15 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand('metatext.selectZoom', async () => {
       await provider.promptZoomSelection();
+    }),
+  );
+
+  void syncSidecarVisibility();
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration('metatext.sidecarVisibility')) {
+        void syncSidecarVisibility();
+      }
     }),
   );
 

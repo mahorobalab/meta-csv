@@ -18,6 +18,7 @@ export interface EditorAppSettings {
   zebraStriping?: boolean;
   confirmHideColumn?: boolean;
   reopenLastFiles?: boolean;
+  sidecarVisibility?: 'nest' | 'hide' | 'show';
 }
 
 export interface FileLayoutSettingsProps {

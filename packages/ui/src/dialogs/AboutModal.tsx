@@ -82,6 +82,12 @@ const OSS_LICENSES: OssLicenseEntry[] = [
     url: 'https://github.com/vitejs/vite',
     note: 'Frontend build tool',
   },
+  {
+    name: 'Game-icons.net — Fox Tail (Delapouite)',
+    license: 'CC BY 3.0',
+    url: 'https://game-icons.net/1x1/delapouite/fox-tail.html',
+    note: 'Live Tail icon (modified: flipped horizontally & recolored)',
+  },
 ];
 
 export const AboutModal: React.FC<AboutModalProps> = ({

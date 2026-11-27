@@ -156,6 +156,25 @@ export const AppSettingsTab: React.FC<AppSettingsTabProps> = ({
       />
     </label>
 
+    {hostMode === 'vscode' && (
+      <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+        <span>.metatext.jsonc in Explorer</span>
+        <select
+          value={appSettings.sidecarVisibility ?? 'nest'}
+          onChange={(e) =>
+            onAppSettingsChange?.({
+              sidecarVisibility: e.target.value as 'nest' | 'hide' | 'show',
+            })
+          }
+          style={inputStyle}
+        >
+          <option value="nest">Nest under parent (Default)</option>
+          <option value="hide">Hide completely</option>
+          <option value="show">Show normally</option>
+        </select>
+      </label>
+    )}
+
     {hostMode === 'desktop' && (
       <label
         style={{

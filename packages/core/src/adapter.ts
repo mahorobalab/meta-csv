@@ -7,9 +7,20 @@ export interface CsvFilePayload {
   metaText: string | null;
 }
 
+export interface FileAppendResult {
+  /** Newly appended raw bytes starting at the requested byte offset */
+  bytes: Uint8Array;
+  /** New EOF byte offset after reading */
+  nextOffset: number;
+  /** True when the file shrank or was rotated and should be reloaded from 0 */
+  truncated: boolean;
+}
+
 export interface FileSystemAdapter {
   /** Load the active CSV file and its adjacent metadata file */
   load(): Promise<CsvFilePayload>;
+  /** Optional incremental byte-offset tail reader for Live Tail monitoring */
+  readAppend?(fromOffset: number): Promise<FileAppendResult>;
   /** Persist CSV bytes (already encoded in the target encoding) */
   saveCsv(bytes: Uint8Array): Promise<void>;
   /** Optional low-memory streaming save (preferred by Desktop Tauri for large files) */

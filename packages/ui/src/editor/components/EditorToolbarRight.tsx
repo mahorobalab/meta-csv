@@ -1,6 +1,7 @@
 import React from 'react';
 import { FileText, Info, Lock, Settings, Unlock } from 'lucide-react';
 import type { MetaTextFormat } from '@metatext-editor/schema';
+import { FoxTailIcon } from '../../icons/FoxTailIcon';
 import { ZebraRowsIcon } from '../../icons/ZebraRowsIcon';
 
 export interface EditorToolbarRightProps {
@@ -10,12 +11,15 @@ export interface EditorToolbarRightProps {
   isReadOnly: boolean;
   activeFormat: MetaTextFormat;
   openMenu: 'none' | 'file' | 'edit' | 'unlock';
+  canTail: boolean;
+  showTailPanel: boolean;
   zebraEnabled: boolean;
   showCellInspector: boolean;
   onToggleUnlockPopover: () => void;
   onLockReadOnly: () => void;
   onUnlockEditing: () => void;
   onCloseMenu: () => void;
+  onToggleTailPanel: () => void;
   onToggleZebra: () => void;
   onToggleCellInspector: () => void;
   onOpenSettings: () => void;
@@ -29,12 +33,15 @@ export const EditorToolbarRight: React.FC<EditorToolbarRightProps> = ({
   isReadOnly,
   activeFormat,
   openMenu,
+  canTail,
+  showTailPanel,
   zebraEnabled,
   showCellInspector,
   onToggleUnlockPopover,
   onLockReadOnly,
   onUnlockEditing,
   onCloseMenu,
+  onToggleTailPanel,
   onToggleZebra,
   onToggleCellInspector,
   onOpenSettings,
@@ -93,6 +100,35 @@ export const EditorToolbarRight: React.FC<EditorToolbarRightProps> = ({
       >
         {isReadOnly ? <Lock size={12} /> : <Unlock size={12} />}
         <span>{isReadOnly ? 'Read-Only' : 'Unlocked'}</span>
+      </button>
+    )}
+    {canTail && (
+      <button
+        type="button"
+        aria-label="Live Tail"
+        title={
+          showTailPanel
+            ? 'Live Tail: ON (click to close panel)'
+            : 'Live Tail: watch appended lines in bottom split panel'
+        }
+        style={{
+          ...btnStyle,
+          padding: '3px 6px',
+          borderColor: showTailPanel ? '#10b981' : toolbarBorder,
+          background: showTailPanel
+            ? isDark
+              ? 'rgba(16, 185, 129, 0.22)'
+              : 'rgba(16, 185, 129, 0.14)'
+            : btnStyle.background,
+          color: showTailPanel
+            ? isDark
+              ? '#6ee7b7'
+              : '#047857'
+            : btnStyle.color,
+        }}
+        onClick={onToggleTailPanel}
+      >
+        <FoxTailIcon size={15} />
       </button>
     )}
     <button

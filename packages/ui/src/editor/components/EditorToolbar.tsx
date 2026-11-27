@@ -74,10 +74,13 @@ export interface EditorToolbarProps {
   onRemoveMarker: (dataRow: number) => void;
   onClearAllMarkers: () => void;
   getRowPreview: (dataRow: number) => string;
+  canTail: boolean;
+  showTailPanel: boolean;
   zebraEnabled: boolean;
   showCellInspector: boolean;
   onLockReadOnly: () => void;
   onUnlockEditing: () => void;
+  onToggleTailPanel: () => void;
   onToggleZebra: () => void;
   onToggleCellInspector: () => void;
   onOpenSettings: () => void;
@@ -215,12 +218,15 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = (p) => (
       isReadOnly={p.isReadOnly}
       activeFormat={p.activeFormat}
       openMenu={p.openMenu}
+      canTail={p.canTail}
+      showTailPanel={p.showTailPanel}
       zebraEnabled={p.zebraEnabled}
       showCellInspector={p.showCellInspector}
       onToggleUnlockPopover={() => p.setOpenMenu((m) => (m === 'unlock' ? 'none' : 'unlock'))}
       onLockReadOnly={p.onLockReadOnly}
       onUnlockEditing={p.onUnlockEditing}
       onCloseMenu={() => p.setOpenMenu('none')}
+      onToggleTailPanel={p.onToggleTailPanel}
       onToggleZebra={p.onToggleZebra}
       onToggleCellInspector={p.onToggleCellInspector}
       onOpenSettings={p.onOpenSettings}

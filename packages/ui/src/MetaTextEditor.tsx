@@ -52,6 +52,7 @@ import { useEditorViewPipeline } from './editor/hooks/useEditorViewPipeline';
 import { useMarkerActions } from './editor/hooks/useMarkerActions';
 import { useEditorSearchAndStatus } from './editor/hooks/useEditorSearchAndStatus';
 import { useGridRendering } from './editor/hooks/useGridRendering';
+import { useLiveTail } from './editor/hooks/useLiveTail';
 import { useColumnOperations } from './editor/hooks/useColumnOperations';
 import { useRowOperations } from './editor/hooks/useRowOperations';
 import { useCellOperations } from './editor/hooks/useCellOperations';
@@ -72,6 +73,7 @@ import { RowResizeOverlay } from './editor/components/RowResizeOverlay';
 import { LoadingProgressOverlay } from './editor/components/LoadingProgressOverlay';
 import { GridCornerAndHeaderInput } from './editor/components/GridCornerAndHeaderInput';
 import { CellInspectorDrawer } from './editor/components/CellInspectorDrawer';
+import { LiveTailPanel } from './editor/components/LiveTailPanel';
 import { EditorStatusBar } from './editor/components/EditorStatusBar';
 import { EditorConfirmDialogs } from './editor/components/EditorConfirmDialogs';
 
@@ -766,6 +768,35 @@ export const MetaTextEditor = React.forwardRef<MetaTextEditorHandle, MetaTextEdi
     scheduleMetaSave,
   });
 
+  const {
+    canTail,
+    tailFollowGrid,
+    showTailPanel,
+    tailPanelPaused,
+    tailMaxLines,
+    tailLines,
+    setTailPanelPaused,
+    setTailMaxLines,
+    toggleTailFollowGrid,
+    toggleTailPanel,
+    clearTailLines,
+  } = useLiveTail({
+    adapter,
+    isActive,
+    csvData,
+    meta,
+    activeFormat,
+    fileBytes,
+    rowsRef,
+    gridRef,
+    viewRowCount: viewRowIndices.length,
+    appendRowsToOrder,
+    setFileBytes,
+    setDataVersion,
+    setReloadTick,
+    setStatusMsg,
+  });
+
   const { explicitRowHeightMap, rowHeightProp, autoFitRows, onGridMouseMove } = useRowHeight({
     csvData,
     meta,
@@ -824,6 +855,17 @@ export const MetaTextEditor = React.forwardRef<MetaTextEditorHandle, MetaTextEdi
     cursor: 'pointer',
     textAlign: 'left',
   };
+
+  const showRowNums = appSettings?.showRowNumbers !== false;
+  const baseRowMarkerWidth =
+    viewRowIndices.length >= 1_000_000
+      ? 72
+      : viewRowIndices.length >= 100_000
+        ? 64
+        : viewRowIndices.length >= 10_000
+          ? 56
+          : 48;
+  const rowMarkerWidth = Math.max(44, Math.round(baseRowMarkerWidth * zoomScale));
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%' }}>
@@ -884,6 +926,8 @@ export const MetaTextEditor = React.forwardRef<MetaTextEditorHandle, MetaTextEdi
         onRemoveMarker={handleRemoveMarker}
         onClearAllMarkers={handleClearAllMarkers}
         getRowPreview={getRowPreview}
+        canTail={canTail}
+        showTailPanel={showTailPanel}
         zebraEnabled={zebraEnabled}
         showCellInspector={showCellInspector}
         onLockReadOnly={() => {
@@ -898,6 +942,7 @@ export const MetaTextEditor = React.forwardRef<MetaTextEditorHandle, MetaTextEdi
           setOpenMenu('none');
           setStatusMsg('Editing unlocked (saved to .metatext.jsonc)');
         }}
+        onToggleTailPanel={toggleTailPanel}
         onToggleZebra={() => patchMeta(['table', 'zebraStriping'], !zebraEnabled)}
         onToggleCellInspector={() => setShowCellInspector((s) => !s)}
         onOpenSettings={() => {
@@ -977,16 +1022,6 @@ export const MetaTextEditor = React.forwardRef<MetaTextEditorHandle, MetaTextEdi
         )}
 
         {csvData && (() => {
-          const showRowNums = appSettings?.showRowNumbers !== false;
-          const baseRowMarkerWidth =
-            viewRowIndices.length >= 1_000_000
-              ? 72
-              : viewRowIndices.length >= 100_000
-                ? 64
-                : viewRowIndices.length >= 10_000
-                  ? 56
-                  : 48;
-          const rowMarkerWidth = Math.max(44, Math.round(baseRowMarkerWidth * zoomScale));
           const cornerLabel = appSettings?.noHeaderColumnStyle === 'numbered' ? 'R1C1' : 'A1';
           const isAllSelected =
             viewRowIndices.length > 0 && selection.rows.length === viewRowIndices.length;
@@ -1225,6 +1260,40 @@ export const MetaTextEditor = React.forwardRef<MetaTextEditorHandle, MetaTextEdi
             setStatusMsg('Copied cell text');
           }}
           onClose={() => setShowCellInspector(false)}
+        />
+      )}
+
+      {/* Optional Independent Live Tail Panel */}
+      {showTailPanel && canTail && (
+        <LiveTailPanel
+          isDark={isDark}
+          toolbarBg={toolbarBg}
+          toolbarBorder={toolbarBorder}
+          toolbarFg={toolbarFg}
+          btnStyle={btnStyle}
+          columns={visibleColIndices.map((actualCol, visIdx) => {
+            const col = columns[visIdx];
+            const width = col && 'width' in col && typeof col.width === 'number' ? col.width : 140;
+            return {
+              actualCol,
+              title: col?.title ?? getDefaultColumnTitle(actualCol),
+              width,
+            };
+          })}
+          showRowNums={showRowNums}
+          rowMarkerWidth={rowMarkerWidth}
+          scaledFontSize={scaledFontSize}
+          scaledRowHeight={scaledDefaultRowHeight}
+          scaledHeaderHeight={scaledHeaderHeight}
+          lines={tailLines}
+          maxLines={tailMaxLines}
+          paused={tailPanelPaused}
+          tailFollowGrid={tailFollowGrid}
+          onChangeMaxLines={setTailMaxLines}
+          onTogglePaused={() => setTailPanelPaused((p) => !p)}
+          onToggleFollowGrid={toggleTailFollowGrid}
+          onClear={clearTailLines}
+          onClose={toggleTailPanel}
         />
       )}
 

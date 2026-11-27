@@ -88,6 +88,17 @@
           "enum": ["excel", "numbered"],
           "default": "excel",
           "description": "Column header naming style when the first row is not a header ('excel' for A, B, C... or 'numbered' for column 1, 2, 3...)."
+        },
+        "metatext.sidecarVisibility": {
+          "type": "string",
+          "enum": ["nest", "hide", "show"],
+          "enumDescriptions": [
+            "Nest .metatext.jsonc under its parent file in the Explorer (default).",
+            "Hide .metatext.jsonc completely from the Explorer via files.exclude.",
+            "Show .metatext.jsonc as normal sibling files in the Explorer."
+          ],
+          "default": "nest",
+          "description": "How .metatext.jsonc sidecar files are displayed in the Explorer."
         }
       }
     }

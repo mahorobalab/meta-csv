@@ -507,6 +507,57 @@ fn percent_decode(input: &str) -> Result<String, String> {
     String::from_utf8(out).map_err(|_| "Invalid UTF-8 path".to_string())
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FileAppendResponse {
+    bytes: Vec<u8>,
+    next_offset: u64,
+    truncated: bool,
+}
+
+#[tauri::command]
+fn read_file_append(path: String, offset: u64) -> Result<FileAppendResponse, String> {
+    use std::io::{Read, Seek, SeekFrom};
+
+    let mut file = fs::File::open(&path)
+        .map_err(|e| format!("Failed to open file for tail read '{}': {}", path, e))?;
+    let file_len = file
+        .metadata()
+        .map_err(|e| format!("Failed to stat file '{}': {}", path, e))?
+        .len();
+
+    if file_len < offset {
+        return Ok(FileAppendResponse {
+            bytes: Vec::new(),
+            next_offset: file_len,
+            truncated: true,
+        });
+    }
+    if file_len == offset {
+        return Ok(FileAppendResponse {
+            bytes: Vec::new(),
+            next_offset: offset,
+            truncated: false,
+        });
+    }
+
+    const MAX_CHUNK_BYTES: u64 = 4 * 1024 * 1024;
+    let to_read = (file_len - offset).min(MAX_CHUNK_BYTES) as usize;
+    file.seek(SeekFrom::Start(offset))
+        .map_err(|e| format!("Failed to seek file '{}': {}", path, e))?;
+    let mut buf = vec![0u8; to_read];
+    let n = file
+        .read(&mut buf)
+        .map_err(|e| format!("Failed to read appended bytes '{}': {}", path, e))?;
+    buf.truncate(n);
+
+    Ok(FileAppendResponse {
+        bytes: buf,
+        next_offset: offset + n as u64,
+        truncated: false,
+    })
+}
+
 #[tauri::command]
 fn read_clipboard_text() -> Result<String, String> {
     let mut clipboard = arboard::Clipboard::new().map_err(|e| e.to_string())?;
@@ -582,6 +633,7 @@ pub fn run() {
             set_window_title,
             get_initial_file,
             load_csv_bytes,
+            read_file_append,
             load_meta_text,
             save_csv_raw,
             begin_file_write,

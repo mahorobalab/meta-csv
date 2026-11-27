@@ -1,4 +1,4 @@
-import type { CsvFilePayload, FileSystemAdapter } from '@metatext-editor/core';
+import type { CsvFilePayload, FileAppendResult, FileSystemAdapter } from '@metatext-editor/core';
 import type { EditorAppSettings, EditorStatusInfo } from '@metatext-editor/ui';
 
 interface VsCodeApi {
@@ -52,6 +52,10 @@ export function createVsCodeAdapter(): VsCodeAdapterBundle {
     number,
     { resolve: () => void; reject: (err: Error) => void }
   >();
+  const pendingAppends = new Map<
+    number,
+    { resolve: (res: FileAppendResult) => void; reject: (err: Error) => void }
+  >();
   let pendingLoad: {
     resolve: (payload: CsvFilePayload) => void;
     reject: (err: Error) => void;
@@ -94,6 +98,23 @@ export function createVsCodeAdapter(): VsCodeAdapterBundle {
         pendingSaves.delete(msg.requestId);
         p.reject(new Error(String(msg.message ?? 'Save failed')));
       }
+    } else if (msg.type === 'appendData') {
+      const p = pendingAppends.get(msg.requestId);
+      if (p) {
+        pendingAppends.delete(msg.requestId);
+        const bytes = msg.bytesBase64 ? base64ToBytes(msg.bytesBase64) : new Uint8Array(0);
+        p.resolve({
+          bytes,
+          nextOffset: Number(msg.nextOffset ?? 0),
+          truncated: Boolean(msg.truncated),
+        });
+      }
+    } else if (msg.type === 'appendError') {
+      const p = pendingAppends.get(msg.requestId);
+      if (p) {
+        pendingAppends.delete(msg.requestId);
+        p.reject(new Error(String(msg.message ?? 'Append read failed')));
+      }
     } else if (msg.type === 'themeChanged') {
       themeListeners.forEach((cb) => cb(msg.themeMode));
     } else if (msg.type === 'configChanged' && msg.appSettings) {
@@ -110,6 +131,14 @@ export function createVsCodeAdapter(): VsCodeAdapterBundle {
       return new Promise((resolve, reject) => {
         pendingLoad = { resolve, reject };
         vscode.postMessage({ type: 'ready' });
+      });
+    },
+
+    readAppend(fromOffset: number): Promise<FileAppendResult> {
+      const requestId = reqSeq++;
+      return new Promise((resolve, reject) => {
+        pendingAppends.set(requestId, { resolve, reject });
+        vscode.postMessage({ type: 'readAppend', requestId, fromOffset });
       });
     },
 

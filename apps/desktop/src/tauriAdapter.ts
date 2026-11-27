@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { CsvFilePayload, FileSystemAdapter } from '@metatext-editor/core';
+import type { CsvFilePayload, FileAppendResult, FileSystemAdapter } from '@metatext-editor/core';
 import { createNewFileTemplate, type NewFileFormat } from '@metatext-editor/ui';
 
 function extractFileName(filePath: string): string {
@@ -55,6 +55,18 @@ export function createTauriAdapter(initialPath: string): DesktopFileSystemAdapte
         fileName: extractFileName(currentPath),
         csvBytes: new Uint8Array(buffer),
         metaText,
+      };
+    },
+
+    async readAppend(fromOffset: number): Promise<FileAppendResult> {
+      const res = await invoke<{ bytes: number[]; nextOffset: number; truncated: boolean }>(
+        'read_file_append',
+        { path: currentPath, offset: fromOffset },
+      );
+      return {
+        bytes: new Uint8Array(res.bytes),
+        nextOffset: res.nextOffset,
+        truncated: res.truncated,
       };
     },
 
