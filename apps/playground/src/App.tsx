@@ -34,6 +34,7 @@ import {
   createWebBundleSession,
   triggerZipDownload,
 } from './webBundle';
+import { FloatingInfoCards } from './FloatingInfoCards';
 
 type PresetKey = 'spec' | 'jsonl' | 'log' | 'large100k' | 'new' | 'custom';
 
@@ -599,6 +600,7 @@ export const App: React.FC = () => {
           />
         </aside>
       )}
+      <FloatingInfoCards isDark={isDark} />
     </div>
     </I18nProvider>
   );

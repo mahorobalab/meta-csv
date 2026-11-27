@@ -5,13 +5,16 @@
 ・Largeアイコン 1.6倍は大きすぎ？ 1.4倍で確認
 
 ・Web版は、VS Code Addon と デスクトップ版のリンク 表示する
+
     ・MetaText Spec 
         Schema https://mahorobalab.github.io/metatext-spec/
         manifest.json
+
     ・Development 
         Visual Studio Code Extension
+
     ・Desktop App
-        Windows MS Store, BOOTH
+        Windows Microsoft Store BOOTH
         Mac Coming soon...
 
     ・アマゾンアソシエイトも？
