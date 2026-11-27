@@ -1,0 +1,46 @@
+{
+  "$schema": "https://mahorobalab.github.io/metatext-spec/schemas/v1/metatext.schema.json",
+  "version": "1.0",
+  "format": "log",
+  "readOnly": true,
+  "log": {
+    "linePattern": "^(?<timestamp>\\d{4}-\\d{2}-\\d{2}[T ]\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?)\\s+\\[(?<level>[A-Z]+)\\]\\s+(?<message>.*)$",
+    "columnNames": ["timestamp", "level", "message"],
+    "timestampColumn": "timestamp",
+    "levelColumn": "level",
+    "multilinePattern": "^(\\s+at\\s+|Caused by:)",
+    "wordWrap": false,
+    "encoding": "utf-8"
+  },
+  "table": {
+    "fontFamily": "'Consolas', monospace",
+    "fontSize": 12,
+    "defaultRowHeight": 24,
+    "freezeColumns": 2
+  },
+  "view": {
+    "activeFilter": "level:ERROR OR level:WARN",
+    "filterContextRows": 2,
+    "filterPresets": [
+      {
+        "name": "Errors + Context",
+        "query": "level:ERROR",
+        "contextRows": 5
+      }
+    ],
+    "markers": [
+      { "row": 12, "color": "rose", "note": "First DB timeout" }
+    ]
+  },
+  "styles": {
+    "errorRow": { "backgroundColor": "rgba(244, 63, 94, 0.16)", "color": "#fecdd3" }
+  },
+  "rules": [
+    {
+      "name": "Highlight ERROR rows",
+      "target": "row",
+      "when": { "column": "level", "operator": "equals", "value": "ERROR" },
+      "style": "errorRow"
+    }
+  ]
+}

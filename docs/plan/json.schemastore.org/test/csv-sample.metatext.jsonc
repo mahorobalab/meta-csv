@@ -1,0 +1,50 @@
+{
+  "$schema": "https://mahorobalab.github.io/metatext-spec/schemas/v1/metatext.schema.json",
+  "version": "1.0",
+  "format": "csv",
+  "csv": {
+    "hasHeader": true,
+    "delimiter": ",",
+    "encoding": "utf-8",
+    "lineEnding": "lf"
+  },
+  "table": {
+    "fontSize": 13,
+    "defaultRowHeight": 28,
+    "freezeColumns": 1,
+    "zebraStriping": true
+  },
+  "view": {
+    "sort": [
+      { "column": "amount", "direction": "desc" }
+    ]
+  },
+  "styles": {
+    "highlight": {
+      "bold": true,
+      "backgroundColor": "rgba(59, 130, 246, 0.14)"
+    }
+  },
+  "columns": {
+    "id": { "label": "ID", "width": 80, "align": "center", "readonly": true },
+    "amount": { "width": 120, "align": "right", "type": "number", "numberFormat": "#,##0" },
+    "status": { "width": 100, "type": "enum", "options": ["open", "done"] }
+  },
+  "rules": [
+    {
+      "name": "Highlight done rows",
+      "target": "row",
+      "when": { "column": "status", "operator": "equals", "value": "done" },
+      "style": "highlight"
+    }
+  ],
+  "ranges": [
+    { "ref": "0:0..2:2", "style": { "italic": true } }
+  ],
+  "rows": {
+    "0": { "height": 36 }
+  },
+  "cells": {
+    "0:amount": { "bold": true, "color": "#2563eb" }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "MetaText",
+  "description": "Sidecar metadata (.metatext.jsonc) for plain-text tabular and log files (CSV, TSV, Log, JSONL)",
+  "fileMatch": ["*.metatext.jsonc"],
+  "url": "https://mahorobalab.github.io/metatext-spec/schemas/v1/metatext.schema.json"
+}
