@@ -190,17 +190,9 @@ export function createWebBundleSession(
     },
     async saveCsv(bytes: Uint8Array) {
       const bundle = await ensureLoaded();
-      const nextBytes = bytes.slice();
-      bundle.dataBytes = nextBytes;
-      const { bundleFileName, zipBytes } = buildMetaTextBundleWeb({
-        fileName: file.name,
-        dataBytes: nextBytes,
-        metaText: bundle.metaText,
-        existingManifest: bundle.manifest,
-        existingHistoryEntries: bundle.historyEntries,
-        includeHistory: Object.keys(bundle.historyEntries).length > 0,
-      });
-      triggerZipDownload(bundleFileName, zipBytes);
+      bundle.dataBytes = bytes.slice();
+      // In Web mode, Ctrl+S commits in-memory state + snapshot without triggering a browser download dialog;
+      // users download the updated .metatext.zip explicitly via Export (.metatext.zip) or Save As.
     },
     async saveMeta(text: string) {
       if (cached) {

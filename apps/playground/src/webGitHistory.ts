@@ -1,4 +1,4 @@
-import { unzlibSync, zlibSync } from 'fflate';
+import { Unzlib, unzlibSync, zlibSync } from 'fflate';
 import type {
   HistoryAdapter,
   HistoryRestorePayload,
@@ -68,6 +68,53 @@ function readLooseObject(
   const size = Number(header.slice(spaceIdx + 1));
   const body = raw.subarray(nulIdx + 1);
   return { type, size: Number.isFinite(size) ? size : body.byteLength, body };
+}
+
+/**
+ * Reads only the Git loose object header (`<type> <size>\0`) via streaming Unzlib
+ * so listing snapshots does not inflate multi-megabyte data blobs into memory.
+ */
+function readLooseObjectSize(
+  entries: Record<string, Uint8Array>,
+  oid: string,
+): number | null {
+  if (oid.length !== 40) return null;
+  const key = `history/objects/${oid.slice(0, 2)}/${oid.slice(2)}`;
+  const compressed = entries[key];
+  if (!compressed) return null;
+
+  let headerText = '';
+  let resolvedSize: number | null = null;
+  const uz = new Unzlib((chunk) => {
+    if (resolvedSize !== null) return;
+    const nulIdx = chunk.indexOf(0);
+    if (nulIdx >= 0) {
+      headerText += textDecoder.decode(chunk.subarray(0, nulIdx));
+      const spaceIdx = headerText.indexOf(' ');
+      if (spaceIdx >= 0) {
+        const parsed = Number(headerText.slice(spaceIdx + 1));
+        if (Number.isFinite(parsed)) {
+          resolvedSize = parsed;
+        }
+      }
+    } else if (headerText.length < 64) {
+      headerText += textDecoder.decode(chunk);
+    }
+  });
+
+  const step = 128;
+  for (let offset = 0; offset < compressed.byteLength && resolvedSize === null; offset += step) {
+    const end = Math.min(offset + step, compressed.byteLength);
+    try {
+      uz.push(compressed.subarray(offset, end), end >= compressed.byteLength);
+    } catch {
+      break;
+    }
+  }
+
+  if (resolvedSize !== null) return resolvedSize;
+  const fallback = readLooseObject(entries, oid);
+  return fallback ? fallback.size : null;
 }
 
 async function writeLooseObject(
@@ -209,11 +256,11 @@ function buildSnapshotMetaFromEntries(
   let metaBytes = 0;
   for (const te of treeEntries) {
     if (te.name === DATA_ENTRY_NAME) {
-      const blob = readLooseObject(entries, te.oid);
-      if (blob) dataBytes = blob.size;
+      const size = readLooseObjectSize(entries, te.oid);
+      if (size !== null) dataBytes = size;
     } else if (te.name === META_ENTRY_NAME) {
-      const blob = readLooseObject(entries, te.oid);
-      if (blob) metaBytes = blob.size;
+      const size = readLooseObjectSize(entries, te.oid);
+      if (size !== null) metaBytes = size;
     }
   }
 

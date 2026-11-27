@@ -1,33 +1,12 @@
 
-PLAN
-    docs\plan\history-gix-plan.md
-        ・Undo Ctrl+Z 実装 → metatext-editor\docs\plan\history-gix-plan.md のとき対応
-        ・履歴ファイルは作らない設定も作る Undoはできるように
-
-    docs\plan\packaging-metatext-zip-plan.md
-        ・Web版は、OPFS に .metatext.jsonc 保存 パッケージのときに一緒に
-        ・同じタイミングでWeb版もメタデータウィンドウと履歴 表示実装
-
-
-        Gemini
-        実装時のちょっとした注意点
-        localStorage はオリジン全体で 約 5 MB 上限 かつ同期 I/O なので、10万行級のファイルで大量にセル装飾をしたり、複数ファイルを次々開いたりすると容量エラー（QuotaExceededError）に当たる可能性があります。
-        キー設計（例：ファイル名＋先頭ハッシュやサイズで紐付け＋LRUで古いものを削除）を入れておくか、Phase C で導入予定の OPFS（または IndexedDB）を .metatext.jsonc の一時保存先としても兼用できるようにしておくと
-
-
 ・ファイルを変更してないとスナップショットが撮られない
 
-・新規作成に ndjson がない
-・履歴は開いてたら開いたままにする
-・Web版は、OPFS に記録してるのか確認
 
 ・Web版は、VS Code Addon と デスクトップ版のリンク 表示する
     アマゾンアソシエイトも？
 
 ・デスクトップ版のメリット洗い出す
     メモリー節約
-
-
 
 ・デスクトップ版にもエクスプローラーあると便利だけど保留
 
@@ -213,6 +192,27 @@ PLAN
 ・普通のテキストを開くとどうなるのか確認
     → グリッドで開く
 ・ZIPのときは、Tailボタン無効、意味がないし文字化けする → 非表示
+
+・新規作成に ndjson がない
+・履歴は開いてたら開いたままにする
+・Web版は、OPFS に記録してるのか確認
+    → メモリー内のみ、対策済み fflate.Inflate を使って 先頭ヘッダー（blob <size>\0 の数十バイト）だけ展開して即停止 する
+
+PLAN
+    docs\plan\history-gix-plan.md
+        ・Undo Ctrl+Z 実装 → metatext-editor\docs\plan\history-gix-plan.md のとき対応
+        ・履歴ファイルは作らない設定も作る Undoはできるように
+
+    docs\plan\packaging-metatext-zip-plan.md
+        ・Web版は、OPFS に .metatext.jsonc 保存 パッケージのときに一緒に
+        ・同じタイミングでWeb版もメタデータウィンドウと履歴 表示実装
+
+        Gemini
+        実装時のちょっとした注意点
+        localStorage はオリジン全体で 約 5 MB 上限 かつ同期 I/O なので、10万行級のファイルで大量にセル装飾をしたり、複数ファイルを次々開いたりすると容量エラー（QuotaExceededError）に当たる可能性があります。
+        キー設計（例：ファイル名＋先頭ハッシュやサイズで紐付け＋LRUで古いものを削除）を入れておくか、Phase C で導入予定の OPFS（または IndexedDB）を .metatext.jsonc の一時保存先としても兼用できるようにしておくと
+
+・Web版で、Ctrl+S 押すとSnapshotとともにDLが始まる → 抑止
 
 ----------------------------------------
 Gemin talk
