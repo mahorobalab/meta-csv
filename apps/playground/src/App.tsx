@@ -79,7 +79,10 @@ export const App: React.FC = () => {
   const initial = useMemo(() => loadPlaygroundSettings(), []);
   const [preset, setPreset] = useState<PresetKey>('spec');
   const [themePref, setThemePref] = useState<ThemePreference>(initial.theme);
-  const [showMetaPanel, setShowMetaPanel] = useState<boolean>(initial.showMetaPanel);
+  const [rightPanel, setRightPanel] = useState<'none' | 'history' | 'meta'>(
+    initial.showMetaPanel ? 'meta' : 'none',
+  );
+  const showMetaPanel = rightPanel === 'meta';
   const [appSettings, setAppSettings] = useState<EditorAppSettings>({
     language: initial.language,
     toolbarIconSize: initial.toolbarIconSize,
@@ -322,7 +325,7 @@ export const App: React.FC = () => {
       <button
         type="button"
         style={menuRowStyle}
-        onClick={() => setShowMetaPanel((s) => !s)}
+        onClick={() => setRightPanel((p) => (p === 'meta' ? 'none' : 'meta'))}
       >
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
           <Code2 size={13} />
@@ -359,7 +362,7 @@ export const App: React.FC = () => {
       <input
         type="checkbox"
         checked={showMetaPanel}
-        onChange={(e) => setShowMetaPanel(e.target.checked)}
+        onChange={(e) => setRightPanel(e.target.checked ? 'meta' : 'none')}
       />
     </label>
   );
@@ -539,6 +542,8 @@ export const App: React.FC = () => {
               : 'MetaText Editor Web';
           }}
           historyAdapter={bundleSession?.historyAdapter}
+          rightSidePanel={rightPanel}
+          onRightSidePanelChange={setRightPanel}
           onExportBundle={async (opts) => {
             const currentBytes =
               editorRef.current?.serializeCurrentCsv() ?? (await adapter.load()).csvBytes;
@@ -560,46 +565,6 @@ export const App: React.FC = () => {
           onMetaTextChange={setMetaText}
         />
       </div>
-
-      {showMetaPanel && (
-        <aside
-          style={{
-            width: 360,
-            borderLeft: `1px solid ${border}`,
-            display: 'flex',
-            flexDirection: 'column',
-            background: isDark ? '#1a1a1d' : '#f8fafc',
-          }}
-        >
-          <div
-            style={{
-              padding: '6px 10px',
-              fontSize: 12,
-              fontWeight: 600,
-              borderBottom: `1px solid ${border}`,
-            }}
-          >
-            {t('web.liveMetaHeader')}
-          </div>
-          <textarea
-            value={metaText}
-            onChange={(e) => setMetaText(e.target.value)}
-            spellCheck={false}
-            style={{
-              flex: 1,
-              resize: 'none',
-              border: 'none',
-              outline: 'none',
-              padding: 10,
-              fontFamily: "'Consolas', 'Courier New', monospace",
-              fontSize: 12,
-              lineHeight: 1.5,
-              background: isDark ? '#141416' : '#ffffff',
-              color: isDark ? '#d4d4d8' : '#1e293b',
-            }}
-          />
-        </aside>
-      )}
       <FloatingInfoCards isDark={isDark} />
     </div>
     </I18nProvider>

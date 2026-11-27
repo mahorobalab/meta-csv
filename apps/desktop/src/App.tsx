@@ -19,7 +19,6 @@ import {
 } from '@metatext-editor/ui';
 import { useDesktopTabs } from './hooks/useDesktopTabs';
 import { DesktopTabBar } from './components/DesktopTabBar';
-import { MetaJsoncSidePanel } from './components/MetaJsoncSidePanel';
 
 export const App: React.FC = () => {
   const {
@@ -38,7 +37,6 @@ export const App: React.FC = () => {
     saveTabAsStream,
     handleThemeChange,
     handleAppSettingsChange,
-    handleMetaPanelEdit,
     handleTabMetaTextChange,
     handleTabStatusChange,
   } = useDesktopTabs();
@@ -316,10 +314,8 @@ export const App: React.FC = () => {
                     settingsExtraSection={settingsExtraSection}
                     nativeClipboard={nativeClipboard}
                     historyAdapter={tab.historyAdapter}
-                    showHistoryPanel={showHistoryPanel}
-                    onToggleHistoryPanel={() =>
-                      setRightPanel((p) => (p === 'history' ? 'none' : 'history'))
-                    }
+                    rightSidePanel={rightPanel}
+                    onRightSidePanelChange={setRightPanel}
                     onExportBundle={
                       tab.filePath
                         ? async ({ includeHistory }) => {
@@ -363,18 +359,6 @@ export const App: React.FC = () => {
               );
             })}
           </div>
-
-          {showMetaPanel && activeTab && (
-            <MetaJsoncSidePanel
-              fileName={activeTab.fileName}
-              metaText={activeTab.metaText ?? ''}
-              isDark={isDark}
-              barFg={barFg}
-              border={border}
-              onChangeMetaText={(nextText) => handleMetaPanelEdit(activeTab, nextText)}
-              onClose={() => setRightPanel('none')}
-            />
-          )}
         </div>
       </div>
       </I18nProvider>

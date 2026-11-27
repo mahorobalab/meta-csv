@@ -75,7 +75,7 @@ import { RowResizeOverlay } from './editor/components/RowResizeOverlay';
 import { LoadingProgressOverlay } from './editor/components/LoadingProgressOverlay';
 import { GridCornerAndHeaderInput } from './editor/components/GridCornerAndHeaderInput';
 import { CellInspectorDrawer } from './editor/components/CellInspectorDrawer';
-import { HistorySidePanel } from './editor/components/HistorySidePanel';
+import { RightSidePanel } from './editor/components/RightSidePanel';
 import { LiveTailPanel } from './editor/components/LiveTailPanel';
 import { EditorStatusBar } from './editor/components/EditorStatusBar';
 import { EditorConfirmDialogs } from './editor/components/EditorConfirmDialogs';
@@ -87,6 +87,7 @@ export type {
   EditorViewSnapshot,
   MetaTextEditorHandle,
   MetaTextEditorProps,
+  RightSidePanelTab,
 } from './editor/types';
 
 export const MetaTextEditor = React.forwardRef<MetaTextEditorHandle, MetaTextEditorProps>(
@@ -120,23 +121,47 @@ export const MetaTextEditor = React.forwardRef<MetaTextEditorHandle, MetaTextEdi
       historyAdapter,
       showHistoryPanel: controlledShowHistoryPanel,
       onToggleHistoryPanel: controlledToggleHistoryPanel,
+      rightSidePanel: controlledRightSidePanel,
+      onRightSidePanelChange: controlledRightSidePanelChange,
       historyRefreshTick,
       externalSavingSnapshot = false,
       onExportBundle,
     },
     ref,
   ) {
-  const [internalShowHistoryPanel, setInternalShowHistoryPanel] = useState(false);
+  const [internalRightPanel, setInternalRightPanel] = useState<'none' | 'history' | 'meta'>('none');
+  const [internalSubTabWhenLegacyOpen, setInternalSubTabWhenLegacyOpen] = useState<'history' | 'meta'>('history');
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportHistoryBytes, setExportHistoryBytes] = useState<number | null>(null);
-  const showHistoryPanel = controlledShowHistoryPanel ?? internalShowHistoryPanel;
+  const activeRightPanel: 'none' | 'history' | 'meta' =
+    controlledRightSidePanel !== undefined
+      ? controlledRightSidePanel
+      : controlledShowHistoryPanel !== undefined
+        ? controlledShowHistoryPanel
+          ? internalSubTabWhenLegacyOpen
+          : 'none'
+        : internalRightPanel;
+  const showHistoryPanel = activeRightPanel === 'history';
+  const setRightSidePanel = useCallback(
+    (next: 'none' | 'history' | 'meta') => {
+      if (controlledRightSidePanelChange) {
+        controlledRightSidePanelChange(next);
+      } else if (controlledToggleHistoryPanel) {
+        if (next === 'none') {
+          if (controlledShowHistoryPanel) controlledToggleHistoryPanel();
+        } else {
+          setInternalSubTabWhenLegacyOpen(next);
+          if (!controlledShowHistoryPanel) controlledToggleHistoryPanel();
+        }
+      } else {
+        setInternalRightPanel(next);
+      }
+    },
+    [controlledRightSidePanelChange, controlledToggleHistoryPanel, controlledShowHistoryPanel],
+  );
   const handleToggleHistoryPanel = useCallback(() => {
-    if (controlledToggleHistoryPanel) {
-      controlledToggleHistoryPanel();
-    } else {
-      setInternalShowHistoryPanel((s) => !s);
-    }
-  }, [controlledToggleHistoryPanel]);
+    setRightSidePanel(activeRightPanel === 'history' ? 'none' : 'history');
+  }, [activeRightPanel, setRightSidePanel]);
   const [fileName, setFileName] = useState<string>('');
   const [csvData, setCsvData] = useState<ParsedCsvData | null>(null);
   const [meta, setMeta] = useState<MetaTextDocument>({ version: DEFAULT_META_VERSION });
@@ -1329,31 +1354,43 @@ export const MetaTextEditor = React.forwardRef<MetaTextEditorHandle, MetaTextEdi
         />
       </div>
 
-      {/* Optional right-side History panel (exclusive with host Meta JSONC panel) */}
-      {showHistoryPanel && (
-        <HistorySidePanel
+      {/* Unified right-side panel with History / Metadata tabs */}
+      {activeRightPanel !== 'none' && (
+        <RightSidePanel
+          activeTab={activeRightPanel}
+          onSelectTab={(tab) => setRightSidePanel(tab)}
+          onClose={() => setRightSidePanel('none')}
           isDark={isDark}
           toolbarBg={toolbarBg}
           toolbarBorder={toolbarBorder}
           toolbarFg={toolbarFg}
-          actionEntries={historyRef.current.getEntries()}
-          actionCursor={historyRef.current.getCursor()}
-          onJumpToActionCursor={(cursor) => {
-            jumpToHistoryCursor(cursor);
+          fileName={fileName || 'untitled.csv'}
+          metaText={externalMetaText ?? metaTextRef.current ?? ''}
+          onChangeMetaText={(nextText) => {
+            scheduleMetaSave(nextText, {
+              skipHistory: false,
+              label: 'Edit .metatext.jsonc',
+            });
           }}
-          hasSnapshotBackend={Boolean(historyAdapter && filePath)}
-          historyRecordingEnabled={historyPolicy.enabled}
-          snapshots={snapshots}
-          loadingSnapshots={loadingSnapshots}
-          savingSnapshot={savingSnapshot}
-          activeSnapshotId={activeSnapshotId}
-          storageUsageBytes={storageUsageBytes}
-          diffBySnapshotId={diffBySnapshotId}
-          loadingDiffId={loadingDiffId}
-          onRefreshSnapshots={() => void refreshSnapshots()}
-          onRestoreSnapshot={(snap) => void restoreSnapshotToView(snap)}
-          onToggleSnapshotDiff={(snap) => void computeSnapshotDiffWithCurrent(snap)}
-          onClose={handleToggleHistoryPanel}
+          historyProps={{
+            actionEntries: historyRef.current.getEntries(),
+            actionCursor: historyRef.current.getCursor(),
+            onJumpToActionCursor: (cursor) => {
+              jumpToHistoryCursor(cursor);
+            },
+            hasSnapshotBackend: Boolean(historyAdapter && (filePath || hostMode === 'web')),
+            historyRecordingEnabled: historyPolicy.enabled,
+            snapshots,
+            loadingSnapshots,
+            savingSnapshot: savingSnapshot || externalSavingSnapshot,
+            activeSnapshotId,
+            storageUsageBytes,
+            diffBySnapshotId,
+            loadingDiffId,
+            onRefreshSnapshots: () => void refreshSnapshots(),
+            onRestoreSnapshot: (snap) => void restoreSnapshotToView(snap),
+            onToggleSnapshotDiff: (snap) => void computeSnapshotDiffWithCurrent(snap),
+          }}
         />
       )}
       </div>

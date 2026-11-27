@@ -45,6 +45,8 @@ export interface EditorStatusInfo {
   lineEnding?: string;
 }
 
+export type RightSidePanelTab = 'none' | 'history' | 'meta';
+
 export interface MetaTextEditorProps {
   adapter: FileSystemAdapter;
   hostMode?: EditorHostMode;
@@ -82,6 +84,10 @@ export interface MetaTextEditorProps {
   showHistoryPanel?: boolean;
   /** Optional controlled toggle handler for the right-side History panel */
   onToggleHistoryPanel?: () => void;
+  /** Optional controlled unified right side panel state ('none' | 'history' | 'meta') */
+  rightSidePanel?: RightSidePanelTab;
+  /** Optional controlled change handler for the unified right side panel */
+  onRightSidePanelChange?: (panel: RightSidePanelTab) => void;
   /** Optional counter bumped by host when background snapshot recording completes */
   historyRefreshTick?: number;
   /** Optional host-controlled saving indicator for background snapshots */

@@ -36,6 +36,8 @@ export interface HistorySidePanelProps {
   onRestoreSnapshot: (snap: HistorySnapshotMeta) => void;
   onToggleSnapshotDiff: (snap: HistorySnapshotMeta) => void;
   onClose: () => void;
+  /** When rendered inside RightSidePanel, omit the outer <aside> and top History title bar */
+  embedded?: boolean;
 }
 
 function formatActionTime(ts: number): string {
@@ -78,6 +80,7 @@ export const HistorySidePanel: React.FC<HistorySidePanelProps> = ({
   onRestoreSnapshot,
   onToggleSnapshotDiff,
   onClose,
+  embedded = false,
 }) => {
   const [activeTab, setActiveTab] = useState<'actions' | 'snapshots'>('actions');
 
@@ -105,17 +108,29 @@ export const HistorySidePanel: React.FC<HistorySidePanelProps> = ({
 
   return (
     <aside
-      style={{
-        width: 340,
-        display: 'flex',
-        flexDirection: 'column',
-        borderLeft: `1px solid ${toolbarBorder}`,
-        background: panelBg,
-        color: toolbarFg,
-        flexShrink: 0,
-      }}
+      style={
+        embedded
+          ? {
+              flex: 1,
+              minHeight: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              background: panelBg,
+              color: toolbarFg,
+            }
+          : {
+              width: 340,
+              display: 'flex',
+              flexDirection: 'column',
+              borderLeft: `1px solid ${toolbarBorder}`,
+              background: panelBg,
+              color: toolbarFg,
+              flexShrink: 0,
+            }
+      }
     >
       {/* Header */}
+      {!embedded && (
       <div
         style={{
           display: 'flex',
@@ -184,6 +199,7 @@ export const HistorySidePanel: React.FC<HistorySidePanelProps> = ({
           </button>
         </div>
       </div>
+      )}
 
       {/* Tabs: Actions (Layer 1) vs Snapshots (Layer 2) */}
       <div
