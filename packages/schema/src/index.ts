@@ -133,9 +133,11 @@ export interface RowConfig {
   style?: StyleRef;
 }
 
+export type MetaTextVersion = '1.0' | '0.1';
+
 export interface MetaTextDocument {
   $schema?: string;
-  version?: '0.1';
+  version?: '1.0' | '0.1';
   format?: MetaTextFormat;
   readOnly?: boolean;
   csv?: CsvDialectConfig;
@@ -153,7 +155,9 @@ export interface MetaTextDocument {
   [key: `x-${string}`]: unknown;
 }
 
-export const DEFAULT_META_VERSION = '0.1' as const;
+export const DEFAULT_META_VERSION = '1.0' as const;
+export const DEFAULT_META_SCHEMA_URL =
+  'https://mahorobalab.github.io/metatext-spec/schemas/v1/metatext.schema.json' as const;
 export const DEFAULT_ROW_HEIGHT = 28;
 export const DEFAULT_HEADER_HEIGHT = 32;
 export const DEFAULT_FONT_SIZE = 13;

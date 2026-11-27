@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://mahorobalab.github.io/metatext-spec/schemas/v0.1/metatext.schema.json",
+  "$id": "https://mahorobalab.github.io/metatext-spec/schemas/v1/metatext.schema.json",
   "title": "MetaText Sidecar Metadata",
-  "description": "Sidecar metadata (.metatext.jsonc) for plain-text tabular and log files (CSV, TSV, Log, JSONL).",
+  "description": "Open JSONC sidecar metadata (.metatext.jsonc) for plain-text tabular and log files (CSV, TSV, Log, JSONL, Text). Preserves layout, parsing rules, filter presets, row bookmarks, conditional highlights, and cell styling without modifying raw data.",
   "type": "object",
   "additionalProperties": false,
   "patternProperties": {
@@ -13,16 +13,23 @@
   "properties": {
     "$schema": {
       "type": "string",
-      "description": "JSON Schema URL for editor completion and validation."
+      "format": "uri",
+      "examples": [
+        "https://mahorobalab.github.io/metatext-spec/schemas/v1/metatext.schema.json"
+      ],
+      "description": "JSON Schema URL for editor completion, hover documentation, and validation."
     },
     "version": {
       "type": "string",
-      "const": "0.1",
-      "description": "MetaText schema version."
+      "pattern": "^(1\\.[0-9]+|0\\.1)$",
+      "default": "1.0",
+      "examples": ["1.0"],
+      "description": "MetaText schema version (1.x for v1; 0.1 accepted for legacy draft files)."
     },
     "format": {
       "type": "string",
       "enum": ["csv", "tsv", "log", "jsonl", "text"],
+      "examples": ["csv", "tsv", "jsonl", "log"],
       "description": "Target plain-text format. Omit to auto-detect from the target file extension."
     },
     "readOnly": {
@@ -131,6 +138,7 @@
       "properties": {
         "fontFamily": {
           "type": "string",
+          "examples": ["'Consolas', 'JetBrains Mono', monospace"],
           "description": "Font family used in cells."
         },
         "fontSize": {
@@ -192,6 +200,7 @@
         },
         "activeFilter": {
           "type": "string",
+          "examples": ["level:ERROR OR level:WARN"],
           "description": "Persisted filter query string applied on open."
         },
         "filterContextRows": {
@@ -268,6 +277,7 @@
           "ref": {
             "type": "string",
             "pattern": "^[0-9]+:[0-9]+\\.\\.[0-9]+:[0-9]+$",
+            "examples": ["10:0..13:5"],
             "description": "0-based inclusive range in '<startRow>:<startCol>..<endRow>:<endCol>' format (e.g. '10:0..13:5')."
           },
           "style": {
@@ -328,10 +338,12 @@
         "italic": { "type": "boolean" },
         "color": {
           "type": "string",
+          "examples": ["#ff5555"],
           "description": "CSS color string for text (e.g. '#ff5555')."
         },
         "backgroundColor": {
           "type": "string",
+          "examples": ["rgba(0, 122, 204, 0.15)"],
           "description": "CSS color string for cell background (e.g. 'rgba(0, 122, 204, 0.15)')."
         },
         "fontFamily": { "type": "string" },
@@ -347,6 +359,7 @@
         },
         "numberFormat": {
           "type": "string",
+          "examples": ["#,##0", "¥#,##0", "0.0%"],
           "description": "Excel-compatible number format string (ECMA-376 / numfmt, e.g. '#,##0', '0,000', '¥#,##0', '0.0%')."
         }
       }
@@ -394,6 +407,7 @@
         },
         "numberFormat": {
           "type": "string",
+          "examples": ["#,##0", "¥#,##0", "0.0%"],
           "description": "Excel-compatible number format string for the column (e.g. '#,##0', '0,000', '¥#,##0')."
         },
         "style": {

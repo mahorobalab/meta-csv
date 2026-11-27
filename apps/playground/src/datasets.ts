@@ -22,8 +22,8 @@ export const SPEC_SETTING_CSV = [
 ].join('\r\n');
 
 export const SPEC_SETTING_META = `{
-  "$schema": "./metatext.schema.json",
-  "version": "0.1",
+  "$schema": "https://mahorobalab.github.io/metatext-spec/schemas/v1/metatext.schema.json",
+  "version": "1.0",
   "format": "csv",
 
   // ヘッダー行が無い仕様一覧 CSV の例
@@ -126,7 +126,8 @@ export function generateLargeCsvBytes(rowCount = 100_000): Uint8Array {
 }
 
 export const LARGE_CSV_META = `{
-  "version": "0.1",
+  "$schema": "https://mahorobalab.github.io/metatext-spec/schemas/v1/metatext.schema.json",
+  "version": "1.0",
   "format": "csv",
   // 10万行ベンチマーク用メタデータ
   "csv": { "hasHeader": true },
@@ -233,8 +234,8 @@ export const EVENTS_JSONL = [
 ].join('\n');
 
 export const EVENTS_JSONL_META = `{
-  "$schema": "./metatext.schema.json",
-  "version": "0.1",
+  "$schema": "https://mahorobalab.github.io/metatext-spec/schemas/v1/metatext.schema.json",
+  "version": "1.0",
   "format": "jsonl",
   "readOnly": true,
 
@@ -313,8 +314,8 @@ export const APP_LOG = [
 ].join('\n');
 
 export const APP_LOG_META = `{
-  "$schema": "./metatext.schema.json",
-  "version": "0.1",
+  "$schema": "https://mahorobalab.github.io/metatext-spec/schemas/v1/metatext.schema.json",
+  "version": "1.0",
   "format": "log",
   "readOnly": true,
 

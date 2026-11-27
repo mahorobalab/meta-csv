@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_META_SCHEMA_URL, DEFAULT_META_VERSION } from '@metatext-editor/schema';
 import {
   UndoRedoHistory,
   applyViewFilter,
   buildDefaultHighlightRules,
   buildSortedRowIndices,
   computeColumnFacets,
+  createInitialMetaJsonc,
   createStyleResolverContext,
   detectEncoding,
   detectTargetFormat,
@@ -632,5 +634,23 @@ describe('@metatext-editor/core', () => {
     expect(parsed.rows.length).toBe(100);
     expect(parsed.headers.length).toBe(100);
     expect(parsed.rows[0]!.length).toBe(100);
+  });
+
+  it('includes $schema header and v1 version when creating new .metatext.jsonc documents', () => {
+    const initial = createInitialMetaJsonc();
+    const parsedInitial = parseMetaJsonc(initial);
+    expect(parsedInitial.$schema).toBe(DEFAULT_META_SCHEMA_URL);
+    expect(parsedInitial.version).toBe(DEFAULT_META_VERSION);
+    expect(initial.indexOf('"$schema"')).toBeLessThan(initial.indexOf('"version"'));
+
+    const patchedFromNull = patchMetaJsonc(null, ['table', 'freezeColumns'], 1);
+    const parsedPatched = parseMetaJsonc(patchedFromNull);
+    expect(parsedPatched.$schema).toBe(DEFAULT_META_SCHEMA_URL);
+    expect(parsedPatched.version).toBe('1.0');
+    expect(parsedPatched.table?.freezeColumns).toBe(1);
+
+    const withoutSchema = createInitialMetaJsonc(null);
+    expect(withoutSchema).not.toContain('$schema');
+    expect(parseMetaJsonc(withoutSchema).version).toBe('1.0');
   });
 });

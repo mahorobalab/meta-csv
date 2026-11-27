@@ -1,5 +1,7 @@
 import { applyEdits, modify, parse as parseJsonc, type JSONPath } from 'jsonc-parser';
 import {
+  DEFAULT_META_SCHEMA_URL,
+  DEFAULT_META_SCHEMA_URL,
   DEFAULT_META_VERSION,
   type CellStyle,
   type ConditionalRule,
@@ -18,7 +20,9 @@ export function parseMetaJsonc(text: string | null): MetaTextDocument {
   return parsed as MetaTextDocument;
 }
 
-export function createInitialMetaJsonc(schemaUrl?: string): string {
+export function createInitialMetaJsonc(
+  schemaUrl: string | null = DEFAULT_META_SCHEMA_URL,
+): string {
   const lines = ['{'];
   if (schemaUrl) {
     lines.push(`  "$schema": "${schemaUrl}",`);

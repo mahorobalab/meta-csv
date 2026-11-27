@@ -15,6 +15,7 @@ import '@glideapps/glide-data-grid/dist/index.css';
 import {
   DEFAULT_FONT_SIZE,
   DEFAULT_HEADER_HEIGHT,
+  DEFAULT_META_VERSION,
   DEFAULT_ROW_HEIGHT,
   type ConditionalRule,
   type FilterPreset,
@@ -117,7 +118,7 @@ export const MetaTextEditor = React.forwardRef<MetaTextEditorHandle, MetaTextEdi
   ) {
   const [fileName, setFileName] = useState<string>('');
   const [csvData, setCsvData] = useState<ParsedCsvData | null>(null);
-  const [meta, setMeta] = useState<MetaTextDocument>({ version: '0.1' });
+  const [meta, setMeta] = useState<MetaTextDocument>({ version: DEFAULT_META_VERSION });
   const [activeFormat, setActiveFormat] = useState<MetaTextFormat>('csv');
   const [isReadOnly, setIsReadOnly] = useState<boolean>(false);
   const [autoWidths, setAutoWidths] = useState<number[]>([]);

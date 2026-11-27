@@ -11,7 +11,7 @@ const sourceSchema = path.resolve(
   '..',
   'metatext-spec',
   'schemas',
-  'v0.1',
+  'v1',
   'metatext.schema.json',
 );
 
