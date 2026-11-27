@@ -81,76 +81,93 @@ export function useFileSaveAndUndo({
   }, [csvData, rowsRef]);
 
   const handleSaveCsv = useCallback(async () => {
-    if (isReadOnly) {
-      setStatusMsg('Read-Only mode — unlock to save changes');
-      return;
-    }
     if (!csvData) return;
-    const isCsvOrTsv = !csvData.format || csvData.format === 'csv' || csvData.format === 'tsv';
-    let savedBytesForSnapshot: Uint8Array | undefined;
-    if (isCsvOrTsv && adapter.saveCsvStream) {
-      const chunkRows = 20_000;
-      const totalRows = rowsRef.current.length;
-      const showProgress = totalRows >= 50_000;
-      if (showProgress) {
-        setStatusMsg(`Saving ${fileName} (0%)...`);
+    try {
+      // Metadata-only save: when raw text/data has no unsaved edits, flush .metatext.jsonc
+      // and record a snapshot WITHOUT rewriting the source file so its mtime stays unchanged.
+      if (!dirtyCsv) {
+        if (metaTextRef.current !== null) {
+          await adapter.saveMeta(metaTextRef.current);
+        }
+        setStatusMsg(`Saved metadata (${fileName})`);
+        onAfterSaveSnapshot?.(undefined, `Saved metadata (${fileName})`);
+        return;
       }
-      const snapshotChunks: Uint8Array[] = [];
-      let snapshotByteTotal = 0;
-      const capBytes = maxSnapshotDataBytes ?? 20 * 1024 * 1024;
-      let captureExceeded = Boolean(skipSnapshotBytesCapture) || capBytes === 0;
-      const chunkGen = iterateSerializedCsvChunks(
-        csvData.headers,
-        rowsRef.current,
-        csvData.dialect,
-        chunkRows,
-      );
-      const trackedChunks = (function* () {
-        let processedRows = 0;
-        for (const chunk of chunkGen) {
-          if (!captureExceeded) {
-            snapshotByteTotal += chunk.byteLength;
-            if (snapshotByteTotal <= capBytes) {
-              snapshotChunks.push(chunk);
-            } else {
-              snapshotChunks.length = 0;
-              captureExceeded = true;
+      if (isReadOnly) {
+        setStatusMsg('Read-Only mode — unlock to save changes');
+        return;
+      }
+      const isCsvOrTsv = !csvData.format || csvData.format === 'csv' || csvData.format === 'tsv';
+      let savedBytesForSnapshot: Uint8Array | undefined;
+      if (isCsvOrTsv && adapter.saveCsvStream) {
+        const chunkRows = 20_000;
+        const totalRows = rowsRef.current.length;
+        const showProgress = totalRows >= 50_000;
+        if (showProgress) {
+          setStatusMsg(`Saving ${fileName} (0%)...`);
+        }
+        const snapshotChunks: Uint8Array[] = [];
+        let snapshotByteTotal = 0;
+        const capBytes = maxSnapshotDataBytes ?? 20 * 1024 * 1024;
+        let captureExceeded = Boolean(skipSnapshotBytesCapture) || capBytes === 0;
+        const chunkGen = iterateSerializedCsvChunks(
+          csvData.headers,
+          rowsRef.current,
+          csvData.dialect,
+          chunkRows,
+        );
+        const trackedChunks = (function* () {
+          let processedRows = 0;
+          for (const chunk of chunkGen) {
+            if (!captureExceeded) {
+              snapshotByteTotal += chunk.byteLength;
+              if (snapshotByteTotal <= capBytes) {
+                snapshotChunks.push(chunk);
+              } else {
+                snapshotChunks.length = 0;
+                captureExceeded = true;
+              }
+            }
+            yield chunk;
+            if (showProgress) {
+              processedRows = Math.min(totalRows, processedRows + chunkRows);
+              const pct = Math.min(99, Math.round((processedRows / Math.max(1, totalRows)) * 100));
+              setStatusMsg(`Saving ${fileName} (${pct}%)...`);
             }
           }
-          yield chunk;
-          if (showProgress) {
-            processedRows = Math.min(totalRows, processedRows + chunkRows);
-            const pct = Math.min(99, Math.round((processedRows / Math.max(1, totalRows)) * 100));
-            setStatusMsg(`Saving ${fileName} (${pct}%)...`);
+        })();
+        await adapter.saveCsvStream(trackedChunks);
+        if (!captureExceeded && snapshotChunks.length > 0) {
+          const merged = new Uint8Array(snapshotByteTotal);
+          let offset = 0;
+          for (const c of snapshotChunks) {
+            merged.set(c, offset);
+            offset += c.byteLength;
           }
+          savedBytesForSnapshot = merged;
         }
-      })();
-      await adapter.saveCsvStream(trackedChunks);
-      if (!captureExceeded && snapshotChunks.length > 0) {
-        const merged = new Uint8Array(snapshotByteTotal);
-        let offset = 0;
-        for (const c of snapshotChunks) {
-          merged.set(c, offset);
-          offset += c.byteLength;
-        }
-        savedBytesForSnapshot = merged;
+      } else {
+        const bytes = serializeCurrentCsv();
+        if (!bytes) return;
+        await adapter.saveCsv(bytes);
+        savedBytesForSnapshot = bytes;
       }
-    } else {
-      const bytes = serializeCurrentCsv();
-      if (!bytes) return;
-      await adapter.saveCsv(bytes);
-      savedBytesForSnapshot = bytes;
+      setDirtyCsv(false);
+      setStatusMsg(`Saved ${fileName} (${rowsRef.current.length.toLocaleString()} rows)`);
+      onAfterSaveSnapshot?.(savedBytesForSnapshot, `Saved ${fileName}`);
+    } catch (err) {
+      console.error('[MetaText] Save failed:', err);
+      setStatusMsg(`Save failed: ${err instanceof Error ? err.message : String(err)}`);
     }
-    setDirtyCsv(false);
-    setStatusMsg(`Saved ${fileName} (${rowsRef.current.length.toLocaleString()} rows)`);
-    onAfterSaveSnapshot?.(savedBytesForSnapshot, `Saved ${fileName}`);
   }, [
     isReadOnly,
+    dirtyCsv,
     csvData,
     adapter,
     serializeCurrentCsv,
     fileName,
     rowsRef,
+    metaTextRef,
     setDirtyCsv,
     setStatusMsg,
     onAfterSaveSnapshot,

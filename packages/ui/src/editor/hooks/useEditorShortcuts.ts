@@ -11,6 +11,7 @@ export interface UseEditorShortcutsParams {
   hostMode: EditorHostMode;
   csvData: ParsedCsvData | null;
   isReadOnly: boolean;
+  dirtyCsv: boolean;
   selection: GridSelection;
   visibleColIndices: number[];
   viewRowIndices: Int32Array;
@@ -45,6 +46,7 @@ export function useEditorShortcuts({
   hostMode,
   csvData,
   isReadOnly,
+  dirtyCsv,
   selection,
   visibleColIndices,
   viewRowIndices,
@@ -103,8 +105,17 @@ export function useEditorShortcuts({
         return;
       }
 
-      if (!mod || hostMode === 'vscode') return;
+      if (!mod) return;
       const key = e.key.toLowerCase();
+      // In VS Code, when the raw CSV has no edits (!dirtyCsv), VS Code won't fire saveCustomDocument.
+      // Handle Ctrl+S inside the webview to flush .metatext.jsonc + record a snapshot without touching CSV mtime.
+      if (hostMode === 'vscode') {
+        if (key === 's' && !e.shiftKey && !dirtyCsv) {
+          e.preventDefault();
+          void handleSaveCsv();
+        }
+        return;
+      }
       if (key === 's' && e.shiftKey && hasSaveAs) {
         e.preventDefault();
         void handleSaveAs();
@@ -284,6 +295,7 @@ export function useEditorShortcuts({
     visibleColIndices,
     viewRowIndices,
     isReadOnly,
+    dirtyCsv,
     isF2EditTriggerRef,
     handleCopyColumns,
     handlePasteColumns,

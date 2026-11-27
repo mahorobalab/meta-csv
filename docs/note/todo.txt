@@ -1,14 +1,24 @@
 
-・ファイルを変更してないとスナップショットが撮られない
 
+・履歴はやメタデータサイドパネルは、最後に開いてたら開いたまま新しいファイルを開く
+
+・Largeアイコン 1.6倍は大きすぎ？ 1.4倍で確認
 
 ・Web版は、VS Code Addon と デスクトップ版のリンク 表示する
-    アマゾンアソシエイトも？
+    ・MetaText Spec 
+        Schema https://mahorobalab.github.io/metatext-spec/
+        manifest.json
+    ・Development 
+        Visual Studio Code Extension
+    ・Desktop App
+        Windows MS Store, BOOTH
+        Mac Coming soon...
+
+    ・アマゾンアソシエイトも？
 
 ・デスクトップ版のメリット洗い出す
     メモリー節約
 
-・デスクトップ版にもエクスプローラーあると便利だけど保留
 
  ・SchemaStore に登録
     → docs\plan\json.schemastore.org
@@ -47,6 +57,7 @@
 
 -- 保留 --
 
+・デスクトップ版にもエクスプローラーあると便利だけど保留
 ・MetaTextの商標を将来取る？
 ・スキーマ定義エディタ
     テキストとか未知のカオスの定義を既存ファイルから抽出
@@ -193,8 +204,6 @@
     → グリッドで開く
 ・ZIPのときは、Tailボタン無効、意味がないし文字化けする → 非表示
 
-・新規作成に ndjson がない
-・履歴は開いてたら開いたままにする
 ・Web版は、OPFS に記録してるのか確認
     → メモリー内のみ、対策済み fflate.Inflate を使って 先頭ヘッダー（blob <size>\0 の数十バイト）だけ展開して即停止 する
 
@@ -213,6 +222,8 @@ PLAN
         キー設計（例：ファイル名＋先頭ハッシュやサイズで紐付け＋LRUで古いものを削除）を入れておくか、Phase C で導入予定の OPFS（または IndexedDB）を .metatext.jsonc の一時保存先としても兼用できるようにしておくと
 
 ・Web版で、Ctrl+S 押すとSnapshotとともにDLが始まる → 抑止
+・新規作成に ndjson がない 開くにはある → JSONL / NDJSON 表示で調整
+・ファイルを変更してないとスナップショットが撮られない
 
 ----------------------------------------
 Gemin talk

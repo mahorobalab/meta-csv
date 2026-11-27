@@ -55,11 +55,13 @@ export interface VsCodeAdapterBundle {
   onThemeMode: (cb: (mode: 'light' | 'dark') => void) => () => void;
   onHostLanguage: (cb: (lang: string) => void) => () => void;
   onAppSettings: (cb: (settings: EditorAppSettings) => void) => () => void;
+  onShowHistoryPanel: (cb: (open: boolean) => void) => () => void;
   onHostCommand: (cb: (cmd: HostCommand) => void) => () => void;
   respondCsvData: (requestId: number, bytes: Uint8Array | null) => void;
   notifyEdit: (label: string) => void;
   notifyStatus: (status: EditorStatusInfo) => void;
   updateSettings: (patch: Partial<EditorAppSettings>) => void;
+  setShowHistoryPanel: (open: boolean) => void;
   openSettings: () => void;
   exportBundle: (options: { includeHistory: boolean }) => Promise<boolean | string>;
 }
@@ -87,6 +89,7 @@ export function createVsCodeAdapter(): VsCodeAdapterBundle {
   const themeListeners = new Set<(mode: 'light' | 'dark') => void>();
   const languageListeners = new Set<(lang: string) => void>();
   const settingsListeners = new Set<(settings: EditorAppSettings) => void>();
+  const showHistoryListeners = new Set<(open: boolean) => void>();
   const commandListeners = new Set<(cmd: HostCommand) => void>();
 
   window.addEventListener('message', (event: MessageEvent) => {
@@ -104,6 +107,9 @@ export function createVsCodeAdapter(): VsCodeAdapterBundle {
       }
       if (msg.payload?.appSettings) {
         settingsListeners.forEach((cb) => cb(msg.payload.appSettings));
+      }
+      if (typeof msg.payload?.showHistoryPanel === 'boolean') {
+        showHistoryListeners.forEach((cb) => cb(msg.payload.showHistoryPanel));
       }
       resolve({
         fileName: msg.payload.fileName,
@@ -310,6 +316,10 @@ export function createVsCodeAdapter(): VsCodeAdapterBundle {
       settingsListeners.add(cb);
       return () => settingsListeners.delete(cb);
     },
+    onShowHistoryPanel(cb) {
+      showHistoryListeners.add(cb);
+      return () => showHistoryListeners.delete(cb);
+    },
     onHostCommand(cb) {
       commandListeners.add(cb);
       return () => commandListeners.delete(cb);
@@ -329,6 +339,9 @@ export function createVsCodeAdapter(): VsCodeAdapterBundle {
     },
     updateSettings(patch) {
       vscode.postMessage({ type: 'updateConfig', patch });
+    },
+    setShowHistoryPanel(open) {
+      vscode.postMessage({ type: 'setShowHistoryPanel', open });
     },
     openSettings() {
       vscode.postMessage({ type: 'openSettings' });

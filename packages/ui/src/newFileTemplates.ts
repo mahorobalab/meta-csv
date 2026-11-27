@@ -10,7 +10,7 @@ export interface NewFileFormatOption {
 export const NEW_FILE_FORMAT_OPTIONS: readonly NewFileFormatOption[] = [
   { format: 'csv', label: 'CSV', extension: '.csv', description: 'Comma-separated (100×100)' },
   { format: 'tsv', label: 'TSV', extension: '.tsv', description: 'Tab-separated (100×100)' },
-  { format: 'jsonl', label: 'JSONL', extension: '.jsonl', description: 'JSON Lines' },
+  { format: 'jsonl', label: 'JSONL / NDJSON', extension: '.jsonl', description: 'JSON Lines / NDJSON' },
   { format: 'log', label: 'Log / Text', extension: '.log', description: 'Plain log / text' },
 ] as const;
 

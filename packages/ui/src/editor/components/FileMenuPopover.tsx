@@ -66,7 +66,7 @@ export const FileMenuPopover: React.FC<FileMenuPopoverProps> = ({
           ? t('fileMenu.saveDownloadCsv')
           : t('fileMenu.saveCsv');
 
-  const saveDisabled = isReadOnly || (!dirtyCsv && hostMode === 'desktop');
+  const saveDisabled = !hasCsvData;
 
   return (
     <div

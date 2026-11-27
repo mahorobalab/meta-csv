@@ -15,11 +15,13 @@ const VsCodeApp: React.FC = () => {
     onThemeMode,
     onHostLanguage,
     onAppSettings,
+    onShowHistoryPanel,
     onHostCommand,
     respondCsvData,
     notifyEdit,
     notifyStatus,
     updateSettings,
+    setShowHistoryPanel: persistShowHistoryPanel,
     openSettings,
     exportBundle,
   } = useMemo(() => createVsCodeAdapter(), []);
@@ -29,12 +31,14 @@ const VsCodeApp: React.FC = () => {
   );
   const [hostLanguage, setHostLanguage] = useState<string | undefined>(undefined);
   const [appSettings, setAppSettings] = useState<EditorAppSettings>({});
+  const [showHistoryPanel, setShowHistoryPanel] = useState(false);
   const [historyRefreshTick, setHistoryRefreshTick] = useState(0);
   const [externalSavingSnapshot, setExternalSavingSnapshot] = useState(false);
 
   useEffect(() => onThemeMode(setThemeMode), [onThemeMode]);
   useEffect(() => onHostLanguage(setHostLanguage), [onHostLanguage]);
   useEffect(() => onAppSettings(setAppSettings), [onAppSettings]);
+  useEffect(() => onShowHistoryPanel(setShowHistoryPanel), [onShowHistoryPanel]);
   useEffect(
     () =>
       onHostCommand((cmd) => {
@@ -91,6 +95,14 @@ const VsCodeApp: React.FC = () => {
           }}
           onOpenSettings={openSettings}
           onExportBundle={exportBundle}
+          showHistoryPanel={showHistoryPanel}
+          onToggleHistoryPanel={() => {
+            setShowHistoryPanel((prev) => {
+              const next = !prev;
+              persistShowHistoryPanel(next);
+              return next;
+            });
+          }}
           historyRefreshTick={historyRefreshTick}
           externalSavingSnapshot={externalSavingSnapshot}
           onDocumentEdit={notifyEdit}

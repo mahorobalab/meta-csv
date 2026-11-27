@@ -311,6 +311,10 @@ class MetaTextEditorProvider implements vscode.CustomEditorProvider<MetaTextDocu
             themeMode: getThemeMode(),
             hostLanguage: vscode.env.language,
             appSettings: readAppSettings(),
+            showHistoryPanel: this.context.globalState.get<boolean>(
+              'metatext.showHistoryPanel',
+              false,
+            ),
           },
         });
       } catch (err) {
@@ -502,6 +506,13 @@ class MetaTextEditorProvider implements vscode.CustomEditorProvider<MetaTextDocu
 
         case 'openSettings':
           await vscode.commands.executeCommand('workbench.action.openSettings', 'metatext.');
+          break;
+
+        case 'setShowHistoryPanel':
+          await this.context.globalState.update(
+            'metatext.showHistoryPanel',
+            Boolean(message.open),
+          );
           break;
 
         case 'updateConfig': {

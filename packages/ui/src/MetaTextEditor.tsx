@@ -787,6 +787,7 @@ export const MetaTextEditor = React.forwardRef<MetaTextEditorHandle, MetaTextEdi
     hostMode,
     csvData,
     isReadOnly,
+    dirtyCsv,
     selection,
     visibleColIndices,
     viewRowIndices,
