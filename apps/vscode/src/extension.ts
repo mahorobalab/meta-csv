@@ -3,8 +3,10 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 
 type SidecarVisibilityMode = 'nest' | 'hide' | 'show';
+type LanguageSetting = 'auto' | 'en' | 'ja' | 'zh-cn' | 'zh-tw' | 'ko' | 'de' | 'fr' | 'es';
 
 interface VsCodeAppSettings {
+  language: LanguageSetting;
   defaultFontSize: number;
   defaultRowHeight: number;
   defaultMarkerColor: 'amber' | 'rose' | 'emerald' | 'sky' | 'violet';
@@ -233,6 +235,7 @@ class MetaTextEditorProvider implements vscode.CustomEditorProvider<MetaTextDocu
             csvBase64: csvBuffer.toString('base64'),
             metaText,
             themeMode: getThemeMode(),
+            hostLanguage: vscode.env.language,
             appSettings: readAppSettings(),
           },
         });
@@ -310,6 +313,7 @@ class MetaTextEditorProvider implements vscode.CustomEditorProvider<MetaTextDocu
           if (patch && typeof patch === 'object') {
             const cfg = vscode.workspace.getConfiguration('metatext');
             const allowedKeys = [
+              'language',
               'defaultFontSize',
               'defaultRowHeight',
               'defaultMarkerColor',
@@ -474,6 +478,18 @@ class MetaTextEditorProvider implements vscode.CustomEditorProvider<MetaTextDocu
 
 function readAppSettings(): VsCodeAppSettings {
   const cfg = vscode.workspace.getConfiguration('metatext');
+  const rawLang = cfg.get<string>('language', 'auto');
+  const language: LanguageSetting =
+    rawLang === 'en' ||
+    rawLang === 'ja' ||
+    rawLang === 'zh-cn' ||
+    rawLang === 'zh-tw' ||
+    rawLang === 'ko' ||
+    rawLang === 'de' ||
+    rawLang === 'fr' ||
+    rawLang === 'es'
+      ? rawLang
+      : 'auto';
   const rawColor = cfg.get<string>('defaultMarkerColor', 'amber');
   const defaultMarkerColor =
     rawColor === 'amber' ||
@@ -489,6 +505,7 @@ function readAppSettings(): VsCodeAppSettings {
   const sidecarVisibility: SidecarVisibilityMode =
     rawSidecar === 'hide' || rawSidecar === 'show' ? rawSidecar : 'nest';
   return {
+    language,
     defaultFontSize: cfg.get<number>('defaultFontSize', 13),
     defaultRowHeight: cfg.get<number>('defaultRowHeight', 28),
     defaultMarkerColor,

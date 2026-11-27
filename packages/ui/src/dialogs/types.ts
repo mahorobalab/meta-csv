@@ -6,10 +6,12 @@ import type {
   MetaTextFormat,
 } from '@metatext-editor/schema';
 import type { ThemePreference } from '../theme';
+import type { LanguagePreference } from '../i18n';
 
 export type EditorHostMode = 'vscode' | 'desktop' | 'web';
 
 export interface EditorAppSettings {
+  language?: LanguagePreference;
   defaultFontSize?: number;
   defaultRowHeight?: number;
   defaultMarkerColor?: MarkerColor;

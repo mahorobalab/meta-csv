@@ -1,0 +1,14 @@
+{
+  "extension.description": "Editor y visor de CSV, TSV, JSONL y registros de alto rendimiento con metadatos JSONC (.metatext.jsonc)",
+  "command.openWithEditor": "MetaText Editor: Abrir con MetaText Editor",
+  "config.language.description": "Idioma de interfaz de MetaText Editor ('auto' sigue el idioma de VS Code).",
+  "config.defaultFontSize.description": "Tamaño de fuente predeterminado de celda en píxeles cuando no se especifica en .metatext.jsonc.",
+  "config.defaultRowHeight.description": "Altura de fila predeterminada en píxeles cuando no se especifica en .metatext.jsonc.",
+  "config.defaultMarkerColor.description": "Color de resaltado predeterminado al añadir un marcador de fila.",
+  "config.showRowNumbers.description": "Mostrar números de fila basados en 1 en el margen izquierdo.",
+  "config.noHeaderColumnStyle.description": "Estilo de encabezados de columna sin fila de encabezado ('excel' para A, B, C... o 'numbered' para column 1, 2, 3...).",
+  "config.sidecarVisibility.description": "Cómo se muestran los archivos .metatext.jsonc en el Explorador.",
+  "config.sidecarVisibility.nest": "Anidar .metatext.jsonc bajo su archivo padre en el Explorador (predeterminado).",
+  "config.sidecarVisibility.hide": "Ocultar .metatext.jsonc por completo del Explorador mediante files.exclude.",
+  "config.sidecarVisibility.show": "Mostrar .metatext.jsonc como archivos normales en el Explorador."
+}

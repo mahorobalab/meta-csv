@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Check, Copy, X } from 'lucide-react';
+import { useI18n } from '@metatext-editor/ui';
 
 export interface MetaJsoncSidePanelProps {
   fileName: string;
@@ -20,6 +21,7 @@ export const MetaJsoncSidePanel: React.FC<MetaJsoncSidePanelProps> = ({
   onChangeMetaText,
   onClose,
 }) => {
+  const { t } = useI18n();
   const [metaCopied, setMetaCopied] = useState(false);
 
   return (
@@ -60,7 +62,7 @@ export const MetaJsoncSidePanel: React.FC<MetaJsoncSidePanelProps> = ({
         </span>
         <button
           type="button"
-          title="Copy JSONC"
+          title={t('desktop.copyJsonc')}
           onClick={() => {
             void navigator.clipboard?.writeText(metaText);
             setMetaCopied(true);
@@ -80,12 +82,12 @@ export const MetaJsoncSidePanel: React.FC<MetaJsoncSidePanelProps> = ({
           }}
         >
           {metaCopied ? <Check size={11} /> : <Copy size={11} />}
-          <span>{metaCopied ? 'Copied' : 'Copy'}</span>
+          <span>{metaCopied ? t('common.copied') : t('common.copy')}</span>
         </button>
         <button
           type="button"
-          aria-label="Close .metatext.jsonc panel"
-          title="Close panel"
+          aria-label={t('desktop.closePanel')}
+          title={t('desktop.closePanel')}
           onClick={onClose}
           style={{
             display: 'inline-flex',
@@ -109,7 +111,7 @@ export const MetaJsoncSidePanel: React.FC<MetaJsoncSidePanelProps> = ({
         value={metaText}
         onChange={(e) => onChangeMetaText(e.target.value)}
         spellCheck={false}
-        placeholder="// Sidecar .metatext.jsonc (live synced with grid & disk)"
+        placeholder={t('desktop.metaPlaceholder')}
         style={{
           flex: 1,
           resize: 'none',

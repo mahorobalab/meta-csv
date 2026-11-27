@@ -3,6 +3,7 @@ import { FileText, Info, Lock, Settings, Unlock } from 'lucide-react';
 import type { MetaTextFormat } from '@metatext-editor/schema';
 import { FoxTailIcon } from '../../icons/FoxTailIcon';
 import { ZebraRowsIcon } from '../../icons/ZebraRowsIcon';
+import { useI18n } from '../../i18n';
 
 export interface EditorToolbarRightProps {
   isDark: boolean;
@@ -46,7 +47,9 @@ export const EditorToolbarRight: React.FC<EditorToolbarRightProps> = ({
   onToggleCellInspector,
   onOpenSettings,
   onOpenAbout,
-}) => (
+}) => {
+  const { t } = useI18n();
+  return (
   <div
     style={{
       marginLeft: 'auto',
@@ -60,12 +63,8 @@ export const EditorToolbarRight: React.FC<EditorToolbarRightProps> = ({
     {(isReadOnly || activeFormat === 'jsonl' || activeFormat === 'log') && (
       <button
         type="button"
-        title={
-          isReadOnly
-            ? 'Read-Only mode (click to unlock editing)'
-            : 'Editing unlocked (click to re-lock as Read-Only)'
-        }
-        aria-label={isReadOnly ? 'Read-Only mode' : 'Editing unlocked'}
+        title={isReadOnly ? t('toolbar.readOnlyTooltip') : t('toolbar.unlockedTooltip')}
+        aria-label={isReadOnly ? t('toolbar.readOnlyAria') : t('toolbar.unlockedAria')}
         style={{
           ...btnStyle,
           padding: '3px 8px',
@@ -99,18 +98,14 @@ export const EditorToolbarRight: React.FC<EditorToolbarRightProps> = ({
         }}
       >
         {isReadOnly ? <Lock size={12} /> : <Unlock size={12} />}
-        <span>{isReadOnly ? 'Read-Only' : 'Unlocked'}</span>
+        <span>{isReadOnly ? t('toolbar.readOnly') : t('toolbar.unlocked')}</span>
       </button>
     )}
     {canTail && (
       <button
         type="button"
-        aria-label="Live Tail"
-        title={
-          showTailPanel
-            ? 'Live Tail: ON (click to close panel)'
-            : 'Live Tail: watch appended lines in bottom split panel'
-        }
+        aria-label={t('toolbar.liveTailAria')}
+        title={showTailPanel ? t('toolbar.liveTailOnTooltip') : t('toolbar.liveTailOffTooltip')}
         style={{
           ...btnStyle,
           padding: '3px 6px',
@@ -133,12 +128,8 @@ export const EditorToolbarRight: React.FC<EditorToolbarRightProps> = ({
     )}
     <button
       type="button"
-      aria-label="Alternating Row Colors"
-      title={
-        zebraEnabled
-          ? 'Alternating Row Colors: ON (click to disable)'
-          : 'Alternating Row Colors: OFF (click to enable)'
-      }
+      aria-label={t('toolbar.zebraAria')}
+      title={zebraEnabled ? t('toolbar.zebraOnTooltip') : t('toolbar.zebraOffTooltip')}
       style={{
         ...btnStyle,
         padding: '3px 6px',
@@ -155,8 +146,8 @@ export const EditorToolbarRight: React.FC<EditorToolbarRightProps> = ({
     </button>
     <button
       type="button"
-      aria-label="Cell Inspector"
-      title="Toggle Cell Inspector (view full multiline text / stack trace)"
+      aria-label={t('toolbar.inspectorAria')}
+      title={t('toolbar.inspectorTooltip')}
       style={{
         ...btnStyle,
         padding: '3px 6px',
@@ -173,8 +164,8 @@ export const EditorToolbarRight: React.FC<EditorToolbarRightProps> = ({
     </button>
     <button
       type="button"
-      aria-label="Settings"
-      title="Settings (File layout & App)"
+      aria-label={t('common.settings')}
+      title={t('toolbar.settingsTooltip')}
       style={{ ...btnStyle, padding: '3px 6px' }}
       onClick={onOpenSettings}
     >
@@ -182,8 +173,8 @@ export const EditorToolbarRight: React.FC<EditorToolbarRightProps> = ({
     </button>
     <button
       type="button"
-      aria-label="About MetaText Editor"
-      title="About MetaText Editor"
+      aria-label={t('toolbar.aboutTitle')}
+      title={t('toolbar.aboutTitle')}
       style={{ ...btnStyle, padding: '3px 6px' }}
       onClick={onOpenAbout}
     >
@@ -211,15 +202,14 @@ export const EditorToolbarRight: React.FC<EditorToolbarRightProps> = ({
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700 }}>
           <Lock size={13} />
-          <span>Unlock Source Editing?</span>
+          <span>{t('toolbar.unlockTitle')}</span>
         </div>
         <div style={{ opacity: 0.8, lineHeight: 1.45, fontSize: 11.5 }}>
-          This file is currently protected as Read-Only. Sidecar metadata (filters, markers, styles)
-          can still be saved without unlocking.
+          {t('toolbar.unlockBody')}
         </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, marginTop: 2 }}>
           <button type="button" style={btnStyle} onClick={onCloseMenu}>
-            Cancel
+            {t('common.cancel')}
           </button>
           <button
             type="button"
@@ -233,10 +223,11 @@ export const EditorToolbarRight: React.FC<EditorToolbarRightProps> = ({
             onClick={onUnlockEditing}
           >
             <Unlock size={12} />
-            <span>Unlock Editing</span>
+            <span>{t('toolbar.unlockConfirm')}</span>
           </button>
         </div>
       </div>
     )}
   </div>
-);
+  );
+};

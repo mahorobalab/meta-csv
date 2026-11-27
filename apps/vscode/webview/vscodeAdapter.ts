@@ -35,6 +35,7 @@ export interface HostCommand {
 export interface VsCodeAdapterBundle {
   adapter: FileSystemAdapter;
   onThemeMode: (cb: (mode: 'light' | 'dark') => void) => () => void;
+  onHostLanguage: (cb: (lang: string) => void) => () => void;
   onAppSettings: (cb: (settings: EditorAppSettings) => void) => () => void;
   onHostCommand: (cb: (cmd: HostCommand) => void) => () => void;
   respondCsvData: (requestId: number, bytes: Uint8Array | null) => void;
@@ -61,6 +62,7 @@ export function createVsCodeAdapter(): VsCodeAdapterBundle {
     reject: (err: Error) => void;
   } | null = null;
   const themeListeners = new Set<(mode: 'light' | 'dark') => void>();
+  const languageListeners = new Set<(lang: string) => void>();
   const settingsListeners = new Set<(settings: EditorAppSettings) => void>();
   const commandListeners = new Set<(cmd: HostCommand) => void>();
 
@@ -73,6 +75,9 @@ export function createVsCodeAdapter(): VsCodeAdapterBundle {
       pendingLoad = null;
       if (msg.payload?.themeMode) {
         themeListeners.forEach((cb) => cb(msg.payload.themeMode));
+      }
+      if (typeof msg.payload?.hostLanguage === 'string' && msg.payload.hostLanguage) {
+        languageListeners.forEach((cb) => cb(msg.payload.hostLanguage));
       }
       if (msg.payload?.appSettings) {
         settingsListeners.forEach((cb) => cb(msg.payload.appSettings));
@@ -172,6 +177,10 @@ export function createVsCodeAdapter(): VsCodeAdapterBundle {
     onThemeMode(cb) {
       themeListeners.add(cb);
       return () => themeListeners.delete(cb);
+    },
+    onHostLanguage(cb) {
+      languageListeners.add(cb);
+      return () => languageListeners.delete(cb);
     },
     onAppSettings(cb) {
       settingsListeners.add(cb);

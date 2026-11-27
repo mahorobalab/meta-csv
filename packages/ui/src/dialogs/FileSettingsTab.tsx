@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { JsonlArrayMode } from '@metatext-editor/schema';
 import { LOG_PRESETS, previewLogPattern } from '@metatext-editor/core';
+import { useI18n } from '../i18n';
 import type { EditorAppSettings, FileLayoutSettingsProps } from './types';
 
 export interface FileSettingsTabProps {
@@ -26,6 +27,7 @@ export const FileSettingsTab: React.FC<FileSettingsTabProps> = ({
   appSettings,
   onAppSettingsChange,
 }) => {
+  const { t } = useI18n();
   const [draftLinePattern, setDraftLinePattern] = useState(fileSettings.logLinePattern ?? '');
   const [draftColumnNamesText, setDraftColumnNamesText] = useState(
     (fileSettings.logColumnNames ?? []).join(', '),
@@ -88,7 +90,7 @@ export const FileSettingsTab: React.FC<FileSettingsTabProps> = ({
           cursor: 'pointer',
         }}
       >
-        <span>Read-Only Mode (Protect Source Data)</span>
+        <span>{t('fileSettings.readOnly')}</span>
         <input
           type="checkbox"
           checked={fileSettings.readOnly}
@@ -99,7 +101,7 @@ export const FileSettingsTab: React.FC<FileSettingsTabProps> = ({
       {fileSettings.format === 'jsonl' ? (
         <>
           <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-            <span>JSONL Flatten Depth (0-8)</span>
+            <span>{t('fileSettings.jsonlFlattenDepth')}</span>
             <input
               type="number"
               min={0}
@@ -115,7 +117,7 @@ export const FileSettingsTab: React.FC<FileSettingsTabProps> = ({
           </label>
 
           <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-            <span>JSONL Array Display</span>
+            <span>{t('fileSettings.jsonlArrayDisplay')}</span>
             <select
               value={fileSettings.jsonlArrayMode ?? 'json'}
               onChange={(e) =>
@@ -123,15 +125,15 @@ export const FileSettingsTab: React.FC<FileSettingsTabProps> = ({
               }
               style={inputStyle}
             >
-              <option value="json">Compact JSON ([...])</option>
-              <option value="join">Comma-joined (a, b)</option>
+              <option value="json">{t('fileSettings.jsonlArrayJson')}</option>
+              <option value="join">{t('fileSettings.jsonlArrayJoin')}</option>
             </select>
           </label>
         </>
       ) : fileSettings.format === 'log' || fileSettings.format === 'text' ? (
         <>
           <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-            <span>Log Format Preset</span>
+            <span>{t('fileSettings.logPreset')}</span>
             <select
               value={draftPresetId}
               onChange={(e) => {
@@ -151,14 +153,14 @@ export const FileSettingsTab: React.FC<FileSettingsTabProps> = ({
                   {p.label}
                 </option>
               ))}
-              <option value="iis-w3c">IIS W3C (#Fields: Auto)</option>
-              <option value="docker-json">Docker / JSON Log (Auto)</option>
-              <option value="custom">Custom Pattern</option>
+              <option value="iis-w3c">{t('fileSettings.logPresetIis')}</option>
+              <option value="docker-json">{t('fileSettings.logPresetDocker')}</option>
+              <option value="custom">{t('fileSettings.logPresetCustom')}</option>
             </select>
           </label>
 
           <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={{ fontSize: 12 }}>Line Pattern (Regex — named or numbered captures)</span>
+            <span style={{ fontSize: 12 }}>{t('fileSettings.logLinePattern')}</span>
             <input
               type="text"
               value={draftLinePattern}
@@ -166,7 +168,7 @@ export const FileSettingsTab: React.FC<FileSettingsTabProps> = ({
                 setDraftLinePattern(e.target.value);
                 setDraftPresetId('custom');
               }}
-              placeholder="Empty = plain lines (single message column)"
+              placeholder={t('fileSettings.logLinePatternPlaceholder')}
               style={{
                 ...inputStyle,
                 fontFamily: "'Consolas', 'Courier New', monospace",
@@ -177,7 +179,7 @@ export const FileSettingsTab: React.FC<FileSettingsTabProps> = ({
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={{ fontSize: 12 }}>Column Names (numbered fallback)</span>
+              <span style={{ fontSize: 12 }}>{t('fileSettings.logColNames')}</span>
               <input
                 type="text"
                 value={draftColumnNamesText}
@@ -188,7 +190,7 @@ export const FileSettingsTab: React.FC<FileSettingsTabProps> = ({
             </label>
 
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={{ fontSize: 12 }}>Multiline Continuation Regex</span>
+              <span style={{ fontSize: 12 }}>{t('fileSettings.logMultilinePattern')}</span>
               <input
                 type="text"
                 value={draftMultilinePattern}
@@ -212,7 +214,7 @@ export const FileSettingsTab: React.FC<FileSettingsTabProps> = ({
               cursor: 'pointer',
             }}
           >
-            <span>Word Wrap (Default)</span>
+            <span>{t('fileSettings.logWordWrap')}</span>
             <input
               type="checkbox"
               checked={Boolean(fileSettings.logWordWrap)}
@@ -234,9 +236,12 @@ export const FileSettingsTab: React.FC<FileSettingsTabProps> = ({
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <strong>Live Preview</strong>
+                <strong>{t('fileSettings.logPreviewTitle')}</strong>
                 <span style={{ opacity: 0.75 }}>
-                  Matched {logPreview.matchedEntries}/{logPreview.totalEntries} sample entries
+                  {t('fileSettings.logPreviewMatched', {
+                    matched: logPreview.matchedEntries,
+                    total: logPreview.totalEntries,
+                  })}
                 </span>
               </div>
               {(logPreview.error || fileSettings.logRegexError) && (
@@ -316,7 +321,7 @@ export const FileSettingsTab: React.FC<FileSettingsTabProps> = ({
                   cursor: 'pointer',
                 }}
               >
-                Apply Log Parser
+                {t('fileSettings.logApply')}
               </button>
             </div>
           )}
@@ -332,7 +337,7 @@ export const FileSettingsTab: React.FC<FileSettingsTabProps> = ({
               cursor: 'pointer',
             }}
           >
-            <span>First Row is Header</span>
+            <span>{t('fileSettings.hasHeader')}</span>
             <input
               type="checkbox"
               checked={fileSettings.hasHeader}
@@ -342,7 +347,7 @@ export const FileSettingsTab: React.FC<FileSettingsTabProps> = ({
 
           {!fileSettings.hasHeader && onAppSettingsChange && (
             <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-              <span>Column Names (No Header)</span>
+              <span>{t('appSettings.noHeaderColStyle')}</span>
               <select
                 value={appSettings.noHeaderColumnStyle ?? 'excel'}
                 onChange={(e) =>
@@ -352,8 +357,8 @@ export const FileSettingsTab: React.FC<FileSettingsTabProps> = ({
                 }
                 style={inputStyle}
               >
-                <option value="excel">A, B, C... (Excel)</option>
-                <option value="numbered">column 1, 2, 3...</option>
+                <option value="excel">{t('appSettings.colStyleExcel')}</option>
+                <option value="numbered">{t('appSettings.colStyleNumbered')}</option>
               </select>
             </label>
           )}
@@ -361,7 +366,7 @@ export const FileSettingsTab: React.FC<FileSettingsTabProps> = ({
       )}
 
       <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-        <span>Freeze Columns</span>
+        <span>{t('fileSettings.freezeColumns')}</span>
         <input
           type="number"
           min={0}
@@ -375,7 +380,7 @@ export const FileSettingsTab: React.FC<FileSettingsTabProps> = ({
       </label>
 
       <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-        <span>Font Size (px)</span>
+        <span>{t('fileSettings.fontSize')}</span>
         <input
           type="number"
           min={9}
@@ -391,7 +396,7 @@ export const FileSettingsTab: React.FC<FileSettingsTabProps> = ({
       </label>
 
       <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-        <span>Row Height (px)</span>
+        <span>{t('fileSettings.rowHeight')}</span>
         <input
           type="number"
           min={20}
@@ -408,7 +413,7 @@ export const FileSettingsTab: React.FC<FileSettingsTabProps> = ({
 
       <hr style={{ border: 'none', borderTop: `1px solid ${border}`, margin: '2px 0' }} />
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        <div style={{ fontWeight: 600, fontSize: 12 }}>Columns (Show / Wrap)</div>
+        <div style={{ fontWeight: 600, fontSize: 12 }}>{t('fileSettings.columnsTitle')}</div>
         <label
           style={{
             display: 'inline-flex',
@@ -419,14 +424,14 @@ export const FileSettingsTab: React.FC<FileSettingsTabProps> = ({
             cursor: 'pointer',
             opacity: 0.85,
           }}
-          title="列を非表示にするときに確認ダイアログを表示する"
+          title={t('fileSettings.confirmHideColTooltip')}
         >
           <input
             type="checkbox"
             checked={appSettings.confirmHideColumn !== false}
             onChange={(e) => onAppSettingsChange?.({ confirmHideColumn: e.target.checked })}
           />
-          <span>確認表示</span>
+          <span>{t('fileSettings.confirmHideCol')}</span>
         </label>
       </div>
       <div
@@ -476,7 +481,9 @@ export const FileSettingsTab: React.FC<FileSettingsTabProps> = ({
               <button
                 type="button"
                 title={
-                  col.wrap ? 'Disable text wrap for this column' : 'Enable text wrap for this column'
+                  col.wrap
+                    ? t('fileSettings.disableWrapTooltip')
+                    : t('fileSettings.enableWrapTooltip')
                 }
                 onClick={() => fileSettings.onToggleColumnWrap?.(col.key, !col.wrap)}
                 style={{
@@ -491,7 +498,7 @@ export const FileSettingsTab: React.FC<FileSettingsTabProps> = ({
                   flexShrink: 0,
                 }}
               >
-                Wrap
+                {t('common.wrap')}
               </button>
             )}
           </div>

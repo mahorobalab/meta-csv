@@ -12,6 +12,7 @@ import type {
 import type { ParsedCsvData, resolveCellStyle } from '@metatext-editor/core';
 import type { EditorHostMode } from '../../SettingsAboutDialogs';
 import type { NewFileFormat } from '../../newFileTemplates';
+import { useI18n } from '../../i18n';
 import { MarkerControls } from '../../MarkerControls';
 import { EditorSearchBox } from './EditorSearchBox';
 import { EditorToolbarRight } from './EditorToolbarRight';
@@ -106,7 +107,9 @@ export interface EditorToolbarProps {
   onOpenRulesModal: () => void;
 }
 
-export const EditorToolbar: React.FC<EditorToolbarProps> = (p) => (
+export const EditorToolbar: React.FC<EditorToolbarProps> = (p) => {
+  const { t } = useI18n();
+  return (
   <div
     ref={p.toolbarRef}
     style={{
@@ -126,8 +129,8 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = (p) => (
       <>
         <button
           type="button"
-          aria-label="Menu"
-          title="File & Edit Menu"
+          aria-label={t('toolbar.menu')}
+          title={t('toolbar.fileAndEditMenu')}
           style={{
             ...p.btnStyle,
             padding: '3px 6px',
@@ -140,8 +143,8 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = (p) => (
         {p.onOpenFile && (
           <button
             type="button"
-            aria-label="Open File"
-            title="Open File..."
+            aria-label={t('toolbar.openFile')}
+            title={t('toolbar.openFileEllipsis')}
             style={{ ...p.btnStyle, padding: '3px 6px' }}
             onClick={p.onOpenFile}
           >
@@ -153,8 +156,8 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = (p) => (
 
     <button
       type="button"
-      title="Cell styles & row actions"
-      aria-label="Cell styles & row actions"
+      title={t('toolbar.cellStylesTitle')}
+      aria-label={t('toolbar.cellStylesTitle')}
       style={{
         ...p.btnStyle,
         borderColor: p.openMenu === 'edit' ? '#3b82f6' : p.toolbarBorder,
@@ -162,7 +165,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = (p) => (
       onClick={() => p.setOpenMenu((m) => (m === 'edit' ? 'none' : 'edit'))}
     >
       <Palette size={13} />
-      <span>Style</span>
+      <span>{t('common.style')}</span>
     </button>
 
     <span style={{ opacity: 0.35 }}>|</span>
@@ -285,4 +288,5 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = (p) => (
       />
     )}
   </div>
-);
+  );
+};

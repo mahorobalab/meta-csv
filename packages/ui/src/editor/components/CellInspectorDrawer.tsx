@@ -1,6 +1,7 @@
 import React from 'react';
 import { Copy, FileText, X } from 'lucide-react';
 import type { MetaTextFormat } from '@metatext-editor/schema';
+import { useI18n } from '../../i18n';
 
 export interface CellInspectorDrawerProps {
   isDark: boolean;
@@ -30,7 +31,9 @@ export const CellInspectorDrawer: React.FC<CellInspectorDrawerProps> = ({
   selectedCellLineCount,
   onCopy,
   onClose,
-}) => (
+}) => {
+  const { t } = useI18n();
+  return (
   <div
     style={{
       height: 132,
@@ -57,11 +60,13 @@ export const CellInspectorDrawer: React.FC<CellInspectorDrawerProps> = ({
         <FileText size={12} />
         <strong>
           {selectedDataRow !== undefined && selectedColLabel
-            ? `Row #${selectedDataRow + 1} · ${selectedColLabel}`
-            : 'Cell Inspector (select a cell)'}
+            ? t('inspector.rowTitle', { row: selectedDataRow + 1, col: selectedColLabel })
+            : t('inspector.emptyTitle')}
         </strong>
         {selectedCellLineCount > 1 && (
-          <span style={{ opacity: 0.7 }}>({selectedCellLineCount} lines)</span>
+          <span style={{ opacity: 0.7 }}>
+            {t('inspector.linesCount', { count: selectedCellLineCount })}
+          </span>
         )}
       </div>
       <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -72,12 +77,12 @@ export const CellInspectorDrawer: React.FC<CellInspectorDrawerProps> = ({
             onClick={onCopy}
           >
             <Copy size={11} />
-            <span>Copy</span>
+            <span>{t('common.copy')}</span>
           </button>
         )}
         <button
           type="button"
-          aria-label="Close cell inspector"
+          aria-label={t('inspector.closeAria')}
           style={{ ...btnStyle, height: 20, padding: '1px 5px' }}
           onClick={onClose}
         >
@@ -88,7 +93,7 @@ export const CellInspectorDrawer: React.FC<CellInspectorDrawerProps> = ({
     <textarea
       readOnly
       value={selectedCellValue}
-      placeholder="Select any cell in the grid to inspect full multiline content or stack traces..."
+      placeholder={t('inspector.placeholder')}
       style={{
         flex: 1,
         resize: 'none',
@@ -107,4 +112,5 @@ export const CellInspectorDrawer: React.FC<CellInspectorDrawerProps> = ({
       }}
     />
   </div>
-);
+  );
+};

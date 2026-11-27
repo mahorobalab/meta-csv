@@ -1,5 +1,6 @@
 import React from 'react';
 import { ClipboardPaste, Copy, Palette } from 'lucide-react';
+import { useI18n } from '../../i18n';
 import type { CellContextMenuState, CellRangeRect } from '../types';
 
 export interface CellContextMenuProps {
@@ -29,6 +30,7 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
   onPaste,
   onClose,
 }) => {
+  const { t } = useI18n();
   const { range, x, y } = menu;
   const ctxItemStyle = (disabled = false): React.CSSProperties => ({
     ...menuItemStyle,
@@ -68,7 +70,7 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
       >
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
           <Palette size={13} />
-          <span>スタイル</span>
+          <span>{t('ctx.style')}</span>
         </span>
       </button>
 
@@ -82,7 +84,7 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
       >
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
           <Copy size={13} />
-          <span>コピー</span>
+          <span>{t('ctx.copy')}</span>
         </span>
         <span style={{ fontSize: 10.5, opacity: 0.6 }}>Ctrl+C</span>
       </button>
@@ -98,7 +100,7 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
       >
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
           <ClipboardPaste size={13} />
-          <span>貼り付け (スタイルあり)</span>
+          <span>{t('ctx.pasteWithStyle')}</span>
         </span>
         <span style={{ fontSize: 10.5, opacity: 0.6 }}>Ctrl+V</span>
       </button>
@@ -114,7 +116,7 @@ export const CellContextMenu: React.FC<CellContextMenuProps> = ({
       >
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
           <ClipboardPaste size={13} />
-          <span>値のみ貼り付け</span>
+          <span>{t('ctx.pasteValuesOnly')}</span>
         </span>
         <span style={{ fontSize: 10.5, opacity: 0.6 }}>Ctrl+Shift+V</span>
       </button>

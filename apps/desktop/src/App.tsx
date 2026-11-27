@@ -4,11 +4,15 @@ import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { Check, ChevronDown, Code2, Info, Settings } from 'lucide-react';
 import {
   AboutModal,
+  I18nProvider,
   MetaTextEditor,
   NEW_FILE_FORMAT_OPTIONS,
   SettingsModal,
+  resolveLocale,
   resolveThemeMode,
+  translate,
   useSystemTheme,
+  type MessageKey,
   type NativeClipboardBridge,
 } from '@metatext-editor/ui';
 import { useDesktopTabs } from './hooks/useDesktopTabs';
@@ -113,6 +117,9 @@ export const App: React.FC = () => {
 
   const systemTheme = useSystemTheme();
   const resolvedTheme = resolveThemeMode(themePref, systemTheme);
+  const resolvedLocale = resolveLocale(appSettings.language);
+  const t = (key: MessageKey, params?: Record<string, string | number>) =>
+    translate(resolvedLocale, key, params);
 
   const nativeClipboard = useMemo<NativeClipboardBridge>(
     () => ({
@@ -165,7 +172,7 @@ export const App: React.FC = () => {
       <button type="button" style={menuRowStyle} onClick={() => setShowMetaPanel((s) => !s)}>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
           <Code2 size={13} />
-          <span>{showMetaPanel ? 'Hide .metatext.jsonc Panel' : 'Show .metatext.jsonc Panel'}</span>
+          <span>{showMetaPanel ? t('desktop.hideMetaPanel') : t('desktop.showMetaPanel')}</span>
         </span>
         {showMetaPanel && <Check size={13} />}
       </button>
@@ -182,7 +189,7 @@ export const App: React.FC = () => {
         cursor: 'pointer',
       }}
     >
-      <span>Show live .metatext.jsonc panel</span>
+      <span>{t('desktop.showLiveMetaPanel')}</span>
       <input
         type="checkbox"
         checked={showMetaPanel}
@@ -217,13 +224,14 @@ export const App: React.FC = () => {
           border: `1px solid ${border}`,
         }}
       >
-        ドロップして新しいタブで開く (CSV / TSV / JSONL / LOG)
+        {t('desktop.dropOverlay')}
       </div>
     </div>
   ) : null;
 
   if (tabs.length > 0) {
     return (
+      <I18nProvider preference={appSettings.language}>
       <div
         style={{
           display: 'flex',
@@ -309,10 +317,12 @@ export const App: React.FC = () => {
           )}
         </div>
       </div>
+      </I18nProvider>
     );
   }
 
   return (
+    <I18nProvider preference={appSettings.language}>
     <div
       style={{
         display: 'flex',
@@ -336,7 +346,7 @@ export const App: React.FC = () => {
         <button
           type="button"
           style={{ ...btnStyle, padding: '5px 8px' }}
-          title="Settings"
+          title={t('common.settings')}
           onClick={() => setShowEmptySettings(true)}
         >
           <Settings size={14} />
@@ -344,7 +354,7 @@ export const App: React.FC = () => {
         <button
           type="button"
           style={{ ...btnStyle, padding: '5px 8px' }}
-          title="About MetaText Editor"
+          title={t('toolbar.aboutTitle')}
           onClick={() => setShowEmptyAbout(true)}
         >
           <Info size={14} />
@@ -364,7 +374,7 @@ export const App: React.FC = () => {
       >
         <div style={{ fontSize: 20, fontWeight: 700 }}>MetaText Editor</div>
         <div style={{ fontSize: 13, opacity: 0.75 }}>
-          CSV / TSV / JSONL / LOG を開くと、隣の .metatext.jsonc を自動で読み書きします
+          {t('desktop.welcomeSubtitle')}
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <button
@@ -380,7 +390,7 @@ export const App: React.FC = () => {
             }}
             onClick={() => void handleOpenFile()}
           >
-            ファイルを開く
+            {t('desktop.openFile')}
           </button>
           <div ref={welcomeNewMenuRef} style={{ position: 'relative', display: 'inline-flex' }}>
             <button
@@ -393,7 +403,7 @@ export const App: React.FC = () => {
               }}
               onClick={() => setShowWelcomeNewMenu((v) => !v)}
             >
-              <span>新規作成</span>
+              <span>{t('desktop.newFile')}</span>
               <ChevronDown size={14} />
             </button>
             {showWelcomeNewMenu && (
@@ -453,5 +463,6 @@ export const App: React.FC = () => {
         hostMode="desktop"
       />
     </div>
+    </I18nProvider>
   );
 };

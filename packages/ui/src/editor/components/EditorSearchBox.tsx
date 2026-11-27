@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp, Search, X } from 'lucide-react';
+import { useI18n } from '../../i18n';
 
 export interface EditorSearchBoxProps {
   isDark: boolean;
@@ -34,6 +35,7 @@ export const EditorSearchBox: React.FC<EditorSearchBoxProps> = ({
   onRemoveHistory,
   onClearHistory,
 }) => {
+  const { t } = useI18n();
   const [showHistory, setShowHistory] = useState(false);
 
   const filteredHistory = useMemo(() => {
@@ -76,7 +78,7 @@ export const EditorSearchBox: React.FC<EditorSearchBoxProps> = ({
               }
             }
           }}
-          placeholder="Search..."
+          placeholder={t('search.placeholder')}
           style={{
             padding: '3px 38px 3px 24px',
             height: 26,
@@ -92,7 +94,7 @@ export const EditorSearchBox: React.FC<EditorSearchBoxProps> = ({
         {searchQuery.length > 0 && (
           <button
             type="button"
-            aria-label="Clear search"
+            aria-label={t('search.clearAria')}
             onClick={() => onSearchQueryChange('')}
             style={{
               position: 'absolute',
@@ -111,7 +113,7 @@ export const EditorSearchBox: React.FC<EditorSearchBoxProps> = ({
         )}
         <button
           type="button"
-          title="Search history"
+          title={t('search.historyTooltip')}
           onClick={() => setShowHistory((s) => !s)}
           style={{
             position: 'absolute',
@@ -158,7 +160,10 @@ export const EditorSearchBox: React.FC<EditorSearchBoxProps> = ({
               }}
             >
               <strong style={{ fontSize: 11 }}>
-                Search History ({filteredHistory.length}/{historyItems.length})
+                {t('search.historyTitle', {
+                  filtered: filteredHistory.length,
+                  total: historyItems.length,
+                })}
               </strong>
               {historyItems.length > 0 && (
                 <button
@@ -166,12 +171,12 @@ export const EditorSearchBox: React.FC<EditorSearchBoxProps> = ({
                   style={{ ...btnStyle, height: 20, padding: '1px 6px', fontSize: 11 }}
                   onClick={onClearHistory}
                 >
-                  Clear History
+                  {t('search.clearHistory')}
                 </button>
               )}
             </div>
             {filteredHistory.length === 0 ? (
-              <div style={{ fontSize: 11, opacity: 0.65 }}>No history yet.</div>
+              <div style={{ fontSize: 11, opacity: 0.65 }}>{t('search.noHistory')}</div>
             ) : (
               filteredHistory.map((item) => (
                 <div
@@ -204,7 +209,7 @@ export const EditorSearchBox: React.FC<EditorSearchBoxProps> = ({
                   </span>
                   <button
                     type="button"
-                    title="Remove"
+                    title={t('common.remove')}
                     onClick={() => onRemoveHistory(item)}
                     style={{
                       border: 'none',
@@ -234,7 +239,7 @@ export const EditorSearchBox: React.FC<EditorSearchBoxProps> = ({
             style={{ ...btnStyle, padding: '3px 4px' }}
             disabled={matchCount === 0}
             onClick={onPrevMatch}
-            title="Previous match"
+            title={t('search.prevMatch')}
           >
             <ChevronUp size={13} />
           </button>
@@ -243,7 +248,7 @@ export const EditorSearchBox: React.FC<EditorSearchBoxProps> = ({
             style={{ ...btnStyle, padding: '3px 4px' }}
             disabled={matchCount === 0}
             onClick={onNextMatch}
-            title="Next match"
+            title={t('search.nextMatch')}
           >
             <ChevronDown size={13} />
           </button>

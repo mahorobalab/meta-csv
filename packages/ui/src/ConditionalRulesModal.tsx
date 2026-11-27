@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ArrowDown, ArrowUp, Plus, Sparkles, Trash2, X } from 'lucide-react';
 import type { CellStyle, ConditionalRule, RuleOperator } from '@metatext-editor/schema';
 import { resolveStyleRef } from '@metatext-editor/core';
+import { useI18n, type MessageKey } from './i18n';
 
 export interface StyleSwatch {
   label: string;
@@ -33,14 +34,14 @@ export const TEXT_SWATCH_COLORS: readonly StyleSwatch[] = [
   { label: 'Pink', value: '#ec4899' },
 ];
 
-const OPERATORS: Array<{ value: RuleOperator; label: string }> = [
-  { value: 'equals', label: 'Equals (=)' },
-  { value: 'notEquals', label: 'Not Equals (!=)' },
-  { value: 'contains', label: 'Contains' },
-  { value: 'startsWith', label: 'Starts With' },
-  { value: 'regex', label: 'Regex (/.../)' },
-  { value: 'empty', label: 'Is Empty' },
-  { value: 'notEmpty', label: 'Is Not Empty' },
+const OPERATORS: Array<{ value: RuleOperator; labelKey: MessageKey }> = [
+  { value: 'equals', labelKey: 'rules.opEquals' },
+  { value: 'notEquals', labelKey: 'rules.opNotEquals' },
+  { value: 'contains', labelKey: 'rules.opContains' },
+  { value: 'startsWith', labelKey: 'rules.opStartsWith' },
+  { value: 'regex', labelKey: 'rules.opRegex' },
+  { value: 'empty', labelKey: 'rules.opEmpty' },
+  { value: 'notEmpty', labelKey: 'rules.opNotEmpty' },
 ];
 
 export interface ConditionalRulesModalProps {
@@ -66,6 +67,7 @@ export const ConditionalRulesModal: React.FC<ConditionalRulesModalProps> = ({
   styles,
   onChangeRules,
 }) => {
+  const { t } = useI18n();
   const [name, setName] = useState('');
   const [target, setTarget] = useState<'row' | 'cell'>('row');
   const [column, setColumn] = useState(columns[0]?.key ?? '');
@@ -184,7 +186,7 @@ export const ConditionalRulesModal: React.FC<ConditionalRulesModalProps> = ({
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Conditional Formatting Rules"
+        aria-label={t('rules.ariaLabel')}
         style={{
           width: '100%',
           maxWidth: 560,
@@ -205,11 +207,11 @@ export const ConditionalRulesModal: React.FC<ConditionalRulesModalProps> = ({
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontWeight: 700 }}>
             <Sparkles size={16} />
-            <span>Conditional Formatting Rules (.metatext.jsonc)</span>
+            <span>{t('rules.title')}</span>
           </div>
           <button
             type="button"
-            aria-label="Close conditional rules"
+            aria-label={t('rules.closeAria')}
             onClick={onClose}
             style={{
               border: 'none',
@@ -229,7 +231,12 @@ export const ConditionalRulesModal: React.FC<ConditionalRulesModalProps> = ({
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div style={{ fontWeight: 600, fontSize: 12 }}>
-              Active Rules ({usingDefaultRules && defaultRules ? `${defaultRules.length} built-in` : rules.length})
+              {t('rules.activeRules', {
+                count:
+                  usingDefaultRules && defaultRules
+                    ? t('rules.builtInCount', { count: defaultRules.length })
+                    : rules.length,
+              })}
             </div>
             {usingDefaultRules && defaultRules && defaultRules.length > 0 && (
               <div style={{ display: 'inline-flex', gap: 6 }}>
@@ -238,14 +245,14 @@ export const ConditionalRulesModal: React.FC<ConditionalRulesModalProps> = ({
                   style={{ ...btnStyle, padding: '2px 8px', fontSize: 11 }}
                   onClick={() => onChangeRules(defaultRules)}
                 >
-                  Copy Defaults to .metatext.jsonc
+                  {t('rules.copyDefaults')}
                 </button>
                 <button
                   type="button"
                   style={{ ...btnStyle, padding: '2px 8px', fontSize: 11 }}
                   onClick={() => onChangeRules([])}
                 >
-                  Disable Defaults
+                  {t('rules.disableDefaults')}
                 </button>
               </div>
             )}
@@ -253,7 +260,7 @@ export const ConditionalRulesModal: React.FC<ConditionalRulesModalProps> = ({
           {usingDefaultRules && defaultRules && defaultRules.length > 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 220, overflowY: 'auto' }}>
               <div style={{ fontSize: 11.5, opacity: 0.78 }}>
-                Zero-Config built-in highlight rules are active automatically for this file (not yet written to <code>.metatext.jsonc</code>).
+                {t('rules.zeroConfigNotice')}
               </div>
               {defaultRules.map((rule, idx) => {
                 const resolved = resolveStyleRef(rule.style, styles);
@@ -303,7 +310,7 @@ export const ConditionalRulesModal: React.FC<ConditionalRulesModalProps> = ({
                 opacity: 0.7,
               }}
             >
-              No conditional formatting rules yet. Add a rule below to highlight rows or cells automatically.
+              {t('rules.emptyNotice')}
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 220, overflowY: 'auto' }}>
@@ -356,7 +363,7 @@ export const ConditionalRulesModal: React.FC<ConditionalRulesModalProps> = ({
                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
                       <button
                         type="button"
-                        title="Move up"
+                        title={t('rules.moveUp')}
                         disabled={idx === 0}
                         onClick={() => moveRule(idx, -1)}
                         style={{ ...btnStyle, padding: 4, opacity: idx === 0 ? 0.35 : 1 }}
@@ -365,7 +372,7 @@ export const ConditionalRulesModal: React.FC<ConditionalRulesModalProps> = ({
                       </button>
                       <button
                         type="button"
-                        title="Move down"
+                        title={t('rules.moveDown')}
                         disabled={idx === rules.length - 1}
                         onClick={() => moveRule(idx, 1)}
                         style={{ ...btnStyle, padding: 4, opacity: idx === rules.length - 1 ? 0.35 : 1 }}
@@ -374,7 +381,7 @@ export const ConditionalRulesModal: React.FC<ConditionalRulesModalProps> = ({
                       </button>
                       <button
                         type="button"
-                        title="Delete rule"
+                        title={t('rules.deleteRule')}
                         onClick={() => deleteRule(idx)}
                         style={{ ...btnStyle, padding: 4, color: '#f43f5e' }}
                       >
@@ -392,14 +399,14 @@ export const ConditionalRulesModal: React.FC<ConditionalRulesModalProps> = ({
 
         {/* Add new rule */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div style={{ fontWeight: 600, fontSize: 12 }}>Add New Rule</div>
+          <div style={{ fontWeight: 600, fontSize: 12 }}>{t('rules.addNewTitle')}</div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 130px', gap: 8 }}>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Rule name (optional, e.g. Highlight Errors)"
+              placeholder={t('rules.namePlaceholder')}
               style={inputStyle}
             />
             <select
@@ -407,8 +414,8 @@ export const ConditionalRulesModal: React.FC<ConditionalRulesModalProps> = ({
               onChange={(e) => setTarget(e.target.value as 'row' | 'cell')}
               style={inputStyle}
             >
-              <option value="row">Entire Row</option>
-              <option value="cell">Matched Cell</option>
+              <option value="row">{t('rules.targetRow')}</option>
+              <option value="cell">{t('rules.targetCell')}</option>
             </select>
           </div>
 
@@ -431,7 +438,7 @@ export const ConditionalRulesModal: React.FC<ConditionalRulesModalProps> = ({
             >
               {OPERATORS.map((op) => (
                 <option key={op.value} value={op.value}>
-                  {op.label}
+                  {t(op.labelKey)}
                 </option>
               ))}
             </select>
@@ -440,7 +447,9 @@ export const ConditionalRulesModal: React.FC<ConditionalRulesModalProps> = ({
               value={value}
               disabled={!needsValue}
               onChange={(e) => setValue(e.target.value)}
-              placeholder={needsValue ? 'Match value...' : '(not needed)'}
+              placeholder={
+                needsValue ? t('rules.matchValuePlaceholder') : t('rules.notNeededPlaceholder')
+              }
               style={{ ...inputStyle, opacity: needsValue ? 1 : 0.45 }}
             />
           </div>
@@ -458,7 +467,7 @@ export const ConditionalRulesModal: React.FC<ConditionalRulesModalProps> = ({
                     background: bold ? (isDark ? '#1e3a8a' : '#dbeafe') : mutedBg,
                   }}
                 >
-                  Bold
+                  {t('common.bold')}
                 </button>
                 <button
                   type="button"
@@ -470,11 +479,11 @@ export const ConditionalRulesModal: React.FC<ConditionalRulesModalProps> = ({
                     background: italic ? (isDark ? '#1e3a8a' : '#dbeafe') : mutedBg,
                   }}
                 >
-                  Italic
+                  {t('common.italic')}
                 </button>
               </div>
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
-                <span style={{ opacity: 0.7 }}>Preview:</span>
+                <span style={{ opacity: 0.7 }}>{t('rules.previewLabel')}</span>
                 <span
                   style={{
                     padding: '2px 10px',
@@ -486,20 +495,20 @@ export const ConditionalRulesModal: React.FC<ConditionalRulesModalProps> = ({
                     fontStyle: italic ? 'italic' : 'normal',
                   }}
                 >
-                  Sample Cell
+                  {t('rules.sampleCell')}
                 </span>
               </div>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 11.5, opacity: 0.75, width: 72 }}>Background</span>
+              <span style={{ fontSize: 11.5, opacity: 0.75, width: 72 }}>{t('rules.background')}</span>
               {BG_SWATCH_COLORS.map((sw) => {
                 const active = backgroundColor === sw.value;
                 return (
                   <button
                     key={sw.label}
                     type="button"
-                    title={`Background: ${sw.label}`}
+                    title={t('style.backgroundTooltip', { color: sw.label })}
                     onClick={() => setBackgroundColor(sw.value)}
                     style={{
                       width: 20,
@@ -524,14 +533,14 @@ export const ConditionalRulesModal: React.FC<ConditionalRulesModalProps> = ({
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 11.5, opacity: 0.75, width: 72 }}>Text Color</span>
+              <span style={{ fontSize: 11.5, opacity: 0.75, width: 72 }}>{t('rules.textColor')}</span>
               {TEXT_SWATCH_COLORS.map((sw) => {
                 const active = color === sw.value;
                 return (
                   <button
                     key={sw.label}
                     type="button"
-                    title={`Text: ${sw.label}`}
+                    title={t('style.textColorTooltip', { color: sw.label })}
                     onClick={() => setColor(sw.value)}
                     style={{
                       width: 20,
@@ -573,7 +582,7 @@ export const ConditionalRulesModal: React.FC<ConditionalRulesModalProps> = ({
               }}
             >
               <Plus size={13} />
-              <span>Add Rule</span>
+              <span>{t('rules.addRule')}</span>
             </button>
           </div>
         </div>

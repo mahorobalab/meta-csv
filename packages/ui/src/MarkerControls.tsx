@@ -8,6 +8,7 @@ import {
   X,
 } from 'lucide-react';
 import type { MarkerColor, RowMarker } from '@metatext-editor/schema';
+import { useI18n } from './i18n';
 
 export const MARKER_COLORS: MarkerColor[] = ['amber', 'rose', 'emerald', 'sky', 'violet'];
 
@@ -90,6 +91,7 @@ export const MarkerControls: React.FC<MarkerControlsProps> = ({
   getRowPreview,
   themeMode,
 }) => {
+  const { t } = useI18n();
   const [showList, setShowList] = useState(false);
   const [noteDrafts, setNoteDrafts] = useState<Record<number, string>>({});
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -164,11 +166,11 @@ export const MarkerControls: React.FC<MarkerControlsProps> = ({
         }}
         disabled={selectedDataRow === undefined}
         onClick={onToggleSelectedMarker}
-        title="Toggle marker on selected row (Ctrl+M / Ctrl+F2)"
-        aria-label="Toggle marker"
+        title={t('marker.toggleTooltip')}
+        aria-label={t('marker.toggleAria')}
       >
         {selectedMarker ? <BookmarkCheck size={14} /> : <Bookmark size={14} />}
-        <span>Marker</span>
+        <span>{t('marker.label')}</span>
       </button>
 
       {/* Color swatches */}
@@ -179,7 +181,7 @@ export const MarkerControls: React.FC<MarkerControlsProps> = ({
           gap: 3,
           padding: '0 2px',
         }}
-        title="Marker color"
+        title={t('marker.colorTitle')}
       >
         {MARKER_COLORS.map((color) => {
           const pal = MARKER_PALETTE[color];
@@ -188,8 +190,8 @@ export const MarkerControls: React.FC<MarkerControlsProps> = ({
             <button
               key={color}
               type="button"
-              aria-label={`Marker color ${pal.label}`}
-              title={`Marker color: ${pal.label}`}
+              aria-label={t('marker.colorTooltip', { color: pal.label })}
+              title={t('marker.colorTooltip', { color: pal.label })}
               onClick={() => onActiveColorChange(color)}
               style={{
                 width: 10,
@@ -212,8 +214,8 @@ export const MarkerControls: React.FC<MarkerControlsProps> = ({
         style={{ ...iconBtnStyle, padding: '3px 4px', opacity: visibleMarkerCount === 0 ? 0.45 : 1 }}
         disabled={visibleMarkerCount === 0}
         onClick={onJumpPrev}
-        title="Previous marker (Alt+Shift+F2)"
-        aria-label="Previous marker"
+        title={t('marker.prevTooltip')}
+        aria-label={t('marker.prevAria')}
       >
         <ChevronUp size={14} />
       </button>
@@ -222,8 +224,8 @@ export const MarkerControls: React.FC<MarkerControlsProps> = ({
         style={{ ...iconBtnStyle, padding: '3px 4px', opacity: visibleMarkerCount === 0 ? 0.45 : 1 }}
         disabled={visibleMarkerCount === 0}
         onClick={onJumpNext}
-        title="Next marker (Alt+F2)"
-        aria-label="Next marker"
+        title={t('marker.nextTooltip')}
+        aria-label={t('marker.nextAria')}
       >
         <ChevronDown size={14} />
       </button>
@@ -239,10 +241,10 @@ export const MarkerControls: React.FC<MarkerControlsProps> = ({
         }}
         disabled={markers.length === 0}
         onClick={() => onOnlyMarkedChange(!onlyMarked)}
-        title="Show only marked rows"
+        title={t('marker.onlyTooltip')}
       >
         <Bookmark size={12} color={onlyMarked ? '#f59e0b' : undefined} fill={onlyMarked ? '#f59e0b' : 'none'} />
-        <span>Only</span>
+        <span>{t('marker.only')}</span>
       </button>
 
       <button
@@ -252,7 +254,7 @@ export const MarkerControls: React.FC<MarkerControlsProps> = ({
           borderColor: showList ? '#3b82f6' : border,
         }}
         onClick={() => setShowList((s) => !s)}
-        title="Open marker list"
+        title={t('marker.openListTooltip')}
       >
         <span>{markers.length}</span>
         <ChevronDown size={12} />
@@ -279,7 +281,7 @@ export const MarkerControls: React.FC<MarkerControlsProps> = ({
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <strong style={{ fontSize: 12 }}>Markers ({markers.length})</strong>
+            <strong style={{ fontSize: 12 }}>{t('marker.listTitle', { count: markers.length })}</strong>
             {markers.length > 0 && (
               <button
                 type="button"
@@ -287,15 +289,14 @@ export const MarkerControls: React.FC<MarkerControlsProps> = ({
                 onClick={onClearAll}
               >
                 <Trash2 size={12} />
-                <span>Clear All</span>
+                <span>{t('marker.clearAll')}</span>
               </button>
             )}
           </div>
 
           {markers.length === 0 ? (
             <div style={{ fontSize: 11, opacity: 0.72, lineHeight: 1.5 }}>
-              Select a row and press <code>Ctrl+M</code> (or <code>Ctrl+F2</code>) to add a marker.
-              Jump between markers with <code>F2</code> / <code>Shift+F2</code>.
+              {t('marker.emptyHint')}
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -323,7 +324,7 @@ export const MarkerControls: React.FC<MarkerControlsProps> = ({
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <button
                         type="button"
-                        title="Cycle marker color"
+                        title={t('marker.cycleColorTooltip')}
                         onClick={() => onCycleMarkerColor(m.row)}
                         style={{
                           width: 11,
@@ -368,17 +369,17 @@ export const MarkerControls: React.FC<MarkerControlsProps> = ({
                             fontSize: 11,
                           }}
                         >
-                          {preview || '(empty row)'}
+                          {preview || t('marker.emptyRow')}
                         </span>
                       </button>
                       {!isVisible && (
                         <span style={{ fontSize: 10, opacity: 0.7, flexShrink: 0 }}>
-                          (filtered)
+                          {t('marker.filtered')}
                         </span>
                       )}
                       <button
                         type="button"
-                        title="Remove marker"
+                        title={t('marker.removeTooltip')}
                         onClick={() => onRemoveMarker(m.row)}
                         style={{
                           border: 'none',
@@ -396,7 +397,7 @@ export const MarkerControls: React.FC<MarkerControlsProps> = ({
                     <input
                       type="text"
                       value={draft}
-                      placeholder="Note..."
+                      placeholder={t('marker.notePlaceholder')}
                       onChange={(e) =>
                         setNoteDrafts((prev) => ({ ...prev, [m.row]: e.target.value }))
                       }

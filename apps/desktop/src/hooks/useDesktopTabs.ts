@@ -342,6 +342,7 @@ export function useDesktopTabs() {
         }
         if (settings.lastDirectory) setLastDirectory(settings.lastDirectory);
         setAppSettings({
+          language: settings.language,
           defaultFontSize: settings.defaultFontSize,
           defaultRowHeight: settings.defaultRowHeight,
           defaultMarkerColor: settings.defaultMarkerColor,

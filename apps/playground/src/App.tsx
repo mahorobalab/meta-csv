@@ -1,12 +1,17 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, Code2, ExternalLink, FileSpreadsheet } from 'lucide-react';
 import {
+  I18nProvider,
   MetaTextEditor,
   createNewFileTemplate,
+  isLanguagePreference,
+  resolveLocale,
   resolveThemeMode,
+  translate,
   useSystemTheme,
   type EditorAppSettings,
   type EditorStatusInfo,
+  type MessageKey,
   type NewFileFormat,
   type ThemePreference,
 } from '@metatext-editor/ui';
@@ -46,6 +51,7 @@ function loadPlaygroundSettings(): PlaygroundSettings {
     return {
       theme,
       showMetaPanel,
+      language: isLanguagePreference(parsed.language) ? parsed.language : undefined,
       defaultFontSize: parsed.defaultFontSize,
       defaultRowHeight: parsed.defaultRowHeight,
       defaultMarkerColor: parsed.defaultMarkerColor,
@@ -63,6 +69,7 @@ export const App: React.FC = () => {
   const [themePref, setThemePref] = useState<ThemePreference>(initial.theme);
   const [showMetaPanel, setShowMetaPanel] = useState<boolean>(initial.showMetaPanel);
   const [appSettings, setAppSettings] = useState<EditorAppSettings>({
+    language: initial.language,
     defaultFontSize: initial.defaultFontSize,
     defaultRowHeight: initial.defaultRowHeight,
     defaultMarkerColor: initial.defaultMarkerColor,
@@ -81,6 +88,9 @@ export const App: React.FC = () => {
 
   const systemTheme = useSystemTheme();
   const resolvedTheme = resolveThemeMode(themePref, systemTheme);
+  const resolvedLocale = resolveLocale(appSettings.language);
+  const t = (key: MessageKey, params?: Record<string, string | number>) =>
+    translate(resolvedLocale, key, params);
 
   useEffect(() => {
     try {
@@ -151,7 +161,7 @@ export const App: React.FC = () => {
 
     if (
       isDirtyRef.current &&
-      !window.confirm(`未保存の変更があります。破棄して "${dataFile.name}" を開きますか？`)
+      !window.confirm(t('web.discardConfirm', { name: dataFile.name }))
     ) {
       return;
     }
@@ -177,7 +187,7 @@ export const App: React.FC = () => {
     if (!file) return;
     if (
       isDirtyRef.current &&
-      !window.confirm(`未保存の変更があります。破棄して "${file.name}" を開きますか？`)
+      !window.confirm(t('web.discardConfirm', { name: file.name }))
     ) {
       return;
     }
@@ -211,7 +221,7 @@ export const App: React.FC = () => {
   const fileMenuItems = (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       <div style={{ padding: '4px 8px 2px', fontSize: 10.5, opacity: 0.6, fontWeight: 600 }}>
-        Sample Datasets
+        {t('web.sampleDatasets')}
       </div>
       <button
         type="button"
@@ -265,7 +275,7 @@ export const App: React.FC = () => {
       >
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
           <FileSpreadsheet size={13} />
-          <span>100,000 Rows Benchmark</span>
+          <span>{t('web.benchmark100k')}</span>
         </span>
         {preset === 'large100k' && <Check size={13} />}
       </button>
@@ -276,7 +286,7 @@ export const App: React.FC = () => {
       >
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
           <Code2 size={13} />
-          <span>{showMetaPanel ? 'Hide .metatext.jsonc Panel' : 'Show .metatext.jsonc Panel'}</span>
+          <span>{showMetaPanel ? t('desktop.hideMetaPanel') : t('desktop.showMetaPanel')}</span>
         </span>
         {showMetaPanel && <Check size={13} />}
       </button>
@@ -289,7 +299,7 @@ export const App: React.FC = () => {
       >
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
           <ExternalLink size={13} />
-          <span>Back to MetaText Editor Home</span>
+          <span>{t('web.backToHome')}</span>
         </span>
       </a>
     </div>
@@ -305,7 +315,7 @@ export const App: React.FC = () => {
         cursor: 'pointer',
       }}
     >
-      <span>Show live .metatext.jsonc panel</span>
+      <span>{t('desktop.showLiveMetaPanel')}</span>
       <input
         type="checkbox"
         checked={showMetaPanel}
@@ -315,6 +325,7 @@ export const App: React.FC = () => {
   );
 
   return (
+    <I18nProvider preference={appSettings.language}>
     <div
       onDragEnter={(e) => {
         if (!e.dataTransfer.types.includes('Files')) return;
@@ -377,7 +388,7 @@ export const App: React.FC = () => {
               border: `1px solid ${border}`,
             }}
           >
-            ドロップしてファイルを開く (CSV / TSV / JSONL / LOG)
+            {t('web.dropOverlay')}
           </div>
         </div>
       )}
@@ -455,7 +466,7 @@ export const App: React.FC = () => {
               }
             }
 
-            const name = window.prompt('Save As file name:', suggestedName)?.trim();
+            const name = window.prompt(t('web.saveAsPrompt'), suggestedName)?.trim();
             if (!name) return false;
             const blob = new Blob([copy], { type: 'text/plain;charset=utf-8' });
             const url = URL.createObjectURL(blob);
@@ -506,7 +517,7 @@ export const App: React.FC = () => {
               borderBottom: `1px solid ${border}`,
             }}
           >
-            Live .metatext.jsonc (drag columns / click header / add markers)
+            {t('web.liveMetaHeader')}
           </div>
           <textarea
             value={metaText}
@@ -528,5 +539,6 @@ export const App: React.FC = () => {
         </aside>
       )}
     </div>
+    </I18nProvider>
   );
 };

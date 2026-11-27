@@ -1,0 +1,14 @@
+{
+  "extension.description": "支持 JSONC 配套元数据 (.metatext.jsonc) 的高性能 CSV、TSV、JSONL 与日志编辑器及查看器",
+  "command.openWithEditor": "MetaText Editor: 使用 MetaText Editor 打开",
+  "config.language.description": "MetaText Editor 的界面显示语言（'auto' 跟随 VS Code 显示语言）。",
+  "config.defaultFontSize.description": "当 .metatext.jsonc 未指定时使用的默认单元格字号（像素）。",
+  "config.defaultRowHeight.description": "当 .metatext.jsonc 未指定时使用的默认行高（像素）。",
+  "config.defaultMarkerColor.description": "添加新行标记时的默认高亮颜色。",
+  "config.showRowNumbers.description": "在左侧边栏显示从 1 开始的行号。",
+  "config.noHeaderColumnStyle.description": "首行不是表头时的列标题命名样式（'excel' 为 A, B, C...，'numbered' 为 column 1, 2, 3...）。",
+  "config.sidecarVisibility.description": "控制资源管理器中 .metatext.jsonc 配套文件的显示方式。",
+  "config.sidecarVisibility.nest": "将 .metatext.jsonc 嵌套在父文件下方（默认）。",
+  "config.sidecarVisibility.hide": "通过 files.exclude 在资源管理器中完全隐藏 .metatext.jsonc。",
+  "config.sidecarVisibility.show": "在资源管理器中作为普通同级文件显示 .metatext.jsonc。"
+}

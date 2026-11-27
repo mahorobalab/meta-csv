@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { FileSpreadsheet, Moon, Plus, X } from 'lucide-react';
-import { NEW_FILE_FORMAT_OPTIONS, type NewFileFormat } from '@metatext-editor/ui';
+import { NEW_FILE_FORMAT_OPTIONS, useI18n, type NewFileFormat } from '@metatext-editor/ui';
 import type { DesktopTab } from '../hooks/useDesktopTabs';
 import { formatBytesShort } from '../utils/pathUtils';
 
@@ -29,6 +29,7 @@ export const DesktopTabBar: React.FC<DesktopTabBarProps> = ({
   onCloseTab,
   onNewTab,
 }) => {
+  const { t } = useI18n();
   const [newMenuPos, setNewMenuPos] = useState<{ left: number; top: number } | null>(null);
   const plusBtnRef = useRef<HTMLButtonElement | null>(null);
   const newMenuRef = useRef<HTMLDivElement | null>(null);
@@ -77,7 +78,7 @@ export const DesktopTabBar: React.FC<DesktopTabBarProps> = ({
   return (
   <div
     role="tablist"
-    aria-label="Open Files"
+    aria-label={t('desktop.openFilesAria')}
     style={{
       display: 'flex',
       alignItems: 'stretch',
@@ -96,7 +97,7 @@ export const DesktopTabBar: React.FC<DesktopTabBarProps> = ({
       const tabTooltip = [
         tab.filePath ?? tab.fileName,
         sizeLabel ? `(${sizeLabel})` : '',
-        tab.sleeping ? '— Sleeping (memory freed; click to reload)' : '',
+        tab.sleeping ? t('desktop.tabSleeping') : '',
       ]
         .filter(Boolean)
         .join(' ');
@@ -149,7 +150,7 @@ export const DesktopTabBar: React.FC<DesktopTabBarProps> = ({
           </span>
           {tab.dirty && (
             <span
-              title="Unsaved changes"
+              title={t('desktop.unsavedChanges')}
               style={{
                 width: 6,
                 height: 6,
@@ -161,8 +162,8 @@ export const DesktopTabBar: React.FC<DesktopTabBarProps> = ({
           )}
           <button
             type="button"
-            aria-label={`Close ${tab.fileName}`}
-            title="Close tab (Ctrl+W)"
+            aria-label={`${t('common.close')} ${tab.fileName}`}
+            title={t('desktop.closeTabTooltip')}
             onClick={(e) => {
               e.stopPropagation();
               onCloseTab(tab.id);
@@ -192,8 +193,8 @@ export const DesktopTabBar: React.FC<DesktopTabBarProps> = ({
     <button
       ref={plusBtnRef}
       type="button"
-      aria-label="New File Tab"
-      title="New File (select format)"
+      aria-label={t('desktop.newTabAria')}
+      title={t('desktop.newTabTooltip')}
       onClick={toggleNewMenu}
       style={{
         display: 'inline-flex',

@@ -25,6 +25,8 @@ struct AppSettings {
     #[serde(default = "default_theme")]
     theme: String, // "system" | "light" | "dark"
     #[serde(default)]
+    language: Option<String>,
+    #[serde(default)]
     window: Option<WindowState>,
     #[serde(default)]
     last_directory: Option<String>,
@@ -58,6 +60,7 @@ impl Default for AppSettings {
     fn default() -> Self {
         Self {
             theme: default_theme(),
+            language: None,
             window: None,
             last_directory: None,
             default_font_size: None,
@@ -215,6 +218,7 @@ fn update_app_settings(
     app: tauri::AppHandle,
     state: tauri::State<'_, SettingsStore>,
     theme: Option<String>,
+    language: Option<String>,
     last_directory: Option<String>,
     default_font_size: Option<u32>,
     default_row_height: Option<u32>,
@@ -240,6 +244,14 @@ fn update_app_settings(
             data.theme = normalized;
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.set_theme(parse_tauri_theme(&data.theme));
+            }
+        }
+        if let Some(lang) = language {
+            if matches!(
+                lang.as_str(),
+                "auto" | "en" | "ja" | "zh-cn" | "zh-tw" | "ko" | "de" | "fr" | "es"
+            ) {
+                data.language = Some(lang);
             }
         }
         if let Some(dir) = last_directory {

@@ -10,6 +10,7 @@ import {
 import type { FilterPreset } from '@metatext-editor/schema';
 import { computeColumnFacets } from '@metatext-editor/core';
 import { useInputHistory } from './useInputHistory';
+import { useI18n } from './i18n';
 
 export interface FilterColumnOption {
   index: number;
@@ -60,6 +61,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   extraControls,
   themeMode,
 }) => {
+  const { t } = useI18n();
   const [showFacets, setShowFacets] = useState(false);
   const [facetColIdx, setFacetColIdx] = useState<number>(0);
   const [showPresets, setShowPresets] = useState(false);
@@ -142,7 +144,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
         }}
       >
         <Filter size={13} />
-        <span>Filter:</span>
+        <span>{t('filter.label')}</span>
       </span>
 
       <div
@@ -193,7 +195,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
         {query.length > 0 && (
           <button
             type="button"
-            aria-label="Clear filter"
+            aria-label={t('filter.clearAria')}
             onClick={() => onQueryChange('')}
             style={{
               position: 'absolute',
@@ -212,7 +214,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
         )}
         <button
           type="button"
-          title="Filter history"
+          title={t('filter.historyTooltip')}
           onClick={() => {
             setShowHistory((s) => !s);
             setShowFacets(false);
@@ -256,7 +258,10 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
               <strong style={{ fontSize: 11 }}>
-                Filter History ({filteredHistory.length}/{history.items.length})
+                {t('filter.historyTitle', {
+                  filtered: filteredHistory.length,
+                  total: history.items.length,
+                })}
               </strong>
               {history.items.length > 0 && (
                 <button
@@ -264,12 +269,12 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                   style={{ ...btnStyle, padding: '1px 6px', fontSize: 11 }}
                   onClick={() => history.clear()}
                 >
-                  Clear History
+                  {t('filter.clearHistory')}
                 </button>
               )}
             </div>
             {filteredHistory.length === 0 ? (
-              <div style={{ fontSize: 11, opacity: 0.65 }}>No history yet.</div>
+              <div style={{ fontSize: 11, opacity: 0.65 }}>{t('filter.noHistory')}</div>
             ) : (
               filteredHistory.map((item) => (
                 <div
@@ -303,7 +308,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                   </span>
                   <button
                     type="button"
-                    title="Remove"
+                    title={t('common.remove')}
                     onClick={() => history.remove(item)}
                     style={{
                       border: 'none',
@@ -327,9 +332,9 @@ export const FilterBar: React.FC<FilterBarProps> = ({
       {/* grep -C context rows */}
       <label
         style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
-        title="Show N rows before & after each match (grep -C)"
+        title={t('filter.contextTooltip')}
       >
-        <span style={{ opacity: 0.8 }}>Context ±</span>
+        <span style={{ opacity: 0.8 }}>{t('filter.contextLabel')}</span>
         <input
           type="number"
           min={0}
@@ -353,11 +358,11 @@ export const FilterBar: React.FC<FilterBarProps> = ({
       {/* Consecutive duplicate collapse */}
       <label
         style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
-        title="Collapse consecutive duplicate values in a column (non-destructive)"
+        title={t('filter.collapseTooltip')}
       >
         <Layers size={13} style={{ opacity: 0.8 }} />
         <select
-          aria-label="Collapse consecutive duplicates"
+          aria-label={t('filter.collapseAria')}
           value={collapseColKey}
           onChange={(e) => onCollapseColKeyChange(e.target.value)}
           style={{
@@ -370,7 +375,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
             maxWidth: 130,
           }}
         >
-          <option value="">Collapse: Off</option>
+          <option value="">{t('filter.collapseOff')}</option>
           {columns.map((c) => (
             <option key={c.key} value={c.key}>
               {c.label}
@@ -395,7 +400,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
         }}
       >
         <BarChart2 size={13} />
-        <span>Facets</span>
+        <span>{t('filter.facets')}</span>
       </button>
 
       {/* Presets Popover Toggle */}
@@ -414,7 +419,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
         }}
       >
         <BookmarkPlus size={13} />
-        <span>Presets ({presets.length})</span>
+        <span>{t('filter.presets', { count: presets.length })}</span>
       </button>
 
       {extraControls && (
@@ -430,12 +435,12 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           <span style={{ color: '#ef4444' }}>{filterError}</span>
         ) : isFiltering ? (
           <span>
-            {activeIndices.length.toLocaleString()} shown
-            {contextRows > 0 ? ` (${matchedCount.toLocaleString()} hits)` : ''} /{' '}
+            {t('filter.shown', { shown: activeIndices.length.toLocaleString() })}
+            {contextRows > 0 ? ` ${t('filter.hits', { hits: matchedCount.toLocaleString() })}` : ''} /{' '}
             {totalRows.toLocaleString()} ({filterElapsedMs} ms)
           </span>
         ) : (
-          <span>Tip: col:val, OR, -not, &gt;100, /regex/</span>
+          <span>{t('filter.tip')}</span>
         )}
       </div>
 
@@ -461,7 +466,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-            <strong>Value Frequency (Top 20)</strong>
+            <strong>{t('filter.facetsTitle')}</strong>
             <select
               value={facetColIdx}
               onChange={(e) => setFacetColIdx(Number(e.target.value))}
@@ -485,8 +490,10 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           {facetData && (
             <>
               <div style={{ fontSize: 11, opacity: 0.7 }}>
-                {facetData.uniqueCount.toLocaleString()} unique values across{' '}
-                {facetData.totalCount.toLocaleString()} rows
+                {t('filter.facetsSummary', {
+                  unique: facetData.uniqueCount.toLocaleString(),
+                  total: facetData.totalCount.toLocaleString(),
+                })}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {facetData.entries.map((entry) => {
@@ -507,14 +514,14 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                     >
                       <button
                         style={{ ...btnStyle, padding: '1px 5px', fontSize: 11 }}
-                        title="Include this value"
+                        title={t('filter.includeValue')}
                         onClick={() => appendFacetToken(colKey, entry.value, false)}
                       >
                         +
                       </button>
                       <button
                         style={{ ...btnStyle, padding: '1px 5px', fontSize: 11 }}
-                        title="Exclude this value"
+                        title={t('filter.excludeValue')}
                         onClick={() => appendFacetToken(colKey, entry.value, true)}
                       >
                         -
@@ -533,9 +540,9 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                               textOverflow: 'ellipsis',
                               whiteSpace: 'nowrap',
                             }}
-                            title={entry.value || '(empty)'}
+                            title={entry.value || t('filter.emptyValue')}
                           >
-                            {entry.value || '(empty)'}
+                            {entry.value || t('filter.emptyValue')}
                           </span>
                           <span style={{ opacity: 0.75, flexShrink: 0 }}>
                             {entry.count.toLocaleString()} ({pct}%)
@@ -589,13 +596,13 @@ export const FilterBar: React.FC<FilterBarProps> = ({
             gap: 8,
           }}
         >
-          <strong>Filter Presets (.metatext.jsonc)</strong>
+          <strong>{t('filter.presetsTitle')}</strong>
           <div style={{ display: 'flex', gap: 6 }}>
             <input
               type="text"
               value={presetName}
               onChange={(e) => setPresetName(e.target.value)}
-              placeholder="Preset name..."
+              placeholder={t('filter.presetNamePlaceholder')}
               style={{
                 flex: 1,
                 padding: '4px 8px',
@@ -619,13 +626,13 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                 setPresetName('');
               }}
             >
-              Save
+              {t('common.save')}
             </button>
           </div>
 
           {presets.length === 0 ? (
             <div style={{ fontSize: 11, opacity: 0.7 }}>
-              No presets yet. Enter a filter query and save it here.
+              {t('filter.noPresets')}
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -666,7 +673,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                   </div>
                   <button
                     style={{ ...btnStyle, padding: '2px 6px' }}
-                    title="Delete preset"
+                    title={t('filter.deletePreset')}
                     onClick={() => onDeletePreset(p.name)}
                   >
                     ×

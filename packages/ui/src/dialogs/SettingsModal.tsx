@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ExternalLink, Settings, X } from 'lucide-react';
+import { useI18n } from '../i18n';
 import type { SettingsModalProps } from './types';
 import { FileSettingsTab } from './FileSettingsTab';
 import { AppSettingsTab } from './AppSettingsTab';
@@ -18,6 +19,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onOpenHostSettings,
   extraSection,
 }) => {
+  const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<'file' | 'app'>(fileSettings ? 'file' : 'app');
   const hasFileSettings = Boolean(fileSettings);
 
@@ -86,7 +88,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="MetaText Editor Settings"
+        aria-label={t('settings.ariaLabel')}
         style={{
           width: '100%',
           maxWidth:
@@ -108,11 +110,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontWeight: 700 }}>
             <Settings size={16} />
-            <span>Settings</span>
+            <span>{t('settings.title')}</span>
           </div>
           <button
             type="button"
-            aria-label="Close settings"
+            aria-label={t('settings.closeAria')}
             onClick={onClose}
             style={{
               border: 'none',
@@ -144,14 +146,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               style={tabBtnStyle(effectiveTab === 'file')}
               onClick={() => setActiveTab('file')}
             >
-              File (.metatext.jsonc)
+              {t('settings.tabFile')}
             </button>
             <button
               type="button"
               style={tabBtnStyle(effectiveTab === 'app')}
               onClick={() => setActiveTab('app')}
             >
-              App Settings
+              {t('settings.tabApp')}
             </button>
           </div>
         )}
@@ -210,7 +212,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 }}
               >
                 <Settings size={13} />
-                <span>VS Code Settings</span>
+                <span>{t('settings.vscodeSettings')}</span>
                 <ExternalLink size={12} />
               </button>
             </div>

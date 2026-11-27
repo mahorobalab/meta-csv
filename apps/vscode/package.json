@@ -1,7 +1,7 @@
 {
   "name": "metatext-editor",
   "displayName": "MetaText Editor",
-  "description": "High-performance CSV, TSV, JSONL & Log editor and viewer with JSONC sidecar metadata (.metatext.jsonc)",
+  "description": "%extension.description%",
   "version": "0.1.0",
   "publisher": "metatext-editor",
   "private": true,
@@ -31,7 +31,7 @@
     "commands": [
       {
         "command": "metatext.openWithEditor",
-        "title": "MetaText Editor: Open with MetaText Editor"
+        "title": "%command.openWithEditor%"
       }
     ],
     "menus": {
@@ -58,47 +58,53 @@
     "configuration": {
       "title": "MetaText Editor",
       "properties": {
+        "metatext.language": {
+          "type": "string",
+          "enum": ["auto", "en", "ja", "zh-cn", "zh-tw", "ko", "de", "fr", "es"],
+          "default": "auto",
+          "description": "%config.language.description%"
+        },
         "metatext.defaultFontSize": {
           "type": "number",
           "default": 13,
           "minimum": 9,
           "maximum": 32,
-          "description": "Default cell font size in pixels when not specified in .metatext.jsonc."
+          "description": "%config.defaultFontSize.description%"
         },
         "metatext.defaultRowHeight": {
           "type": "number",
           "default": 28,
           "minimum": 20,
           "maximum": 200,
-          "description": "Default row height in pixels when not specified in .metatext.jsonc."
+          "description": "%config.defaultRowHeight.description%"
         },
         "metatext.defaultMarkerColor": {
           "type": "string",
           "enum": ["amber", "rose", "emerald", "sky", "violet"],
           "default": "amber",
-          "description": "Default highlight color when adding a new row marker."
+          "description": "%config.defaultMarkerColor.description%"
         },
         "metatext.showRowNumbers": {
           "type": "boolean",
           "default": true,
-          "description": "Show 1-based row numbers in the left gutter."
+          "description": "%config.showRowNumbers.description%"
         },
         "metatext.noHeaderColumnStyle": {
           "type": "string",
           "enum": ["excel", "numbered"],
           "default": "excel",
-          "description": "Column header naming style when the first row is not a header ('excel' for A, B, C... or 'numbered' for column 1, 2, 3...)."
+          "description": "%config.noHeaderColumnStyle.description%"
         },
         "metatext.sidecarVisibility": {
           "type": "string",
           "enum": ["nest", "hide", "show"],
           "enumDescriptions": [
-            "Nest .metatext.jsonc under its parent file in the Explorer (default).",
-            "Hide .metatext.jsonc completely from the Explorer via files.exclude.",
-            "Show .metatext.jsonc as normal sibling files in the Explorer."
+            "%config.sidecarVisibility.nest%",
+            "%config.sidecarVisibility.hide%",
+            "%config.sidecarVisibility.show%"
           ],
           "default": "nest",
-          "description": "How .metatext.jsonc sidecar files are displayed in the Explorer."
+          "description": "%config.sidecarVisibility.description%"
         }
       }
     }

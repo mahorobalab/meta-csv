@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight, FilePlus, FolderOpen, Redo2, Save, SaveAll, 
 import type { MetaTextFormat } from '@metatext-editor/schema';
 import type { EditorHostMode } from '../../SettingsAboutDialogs';
 import { NEW_FILE_FORMAT_OPTIONS, type NewFileFormat } from '../../newFileTemplates';
+import { useI18n } from '../../i18n';
 
 export interface FileMenuPopoverProps {
   hostMode: EditorHostMode;
@@ -47,20 +48,21 @@ export const FileMenuPopover: React.FC<FileMenuPopoverProps> = ({
   onCloseMenu,
   fileMenuItems,
 }) => {
+  const { t } = useI18n();
   const [showNewFormats, setShowNewFormats] = useState(false);
 
   const saveLabel =
     activeFormat === 'jsonl'
       ? hostMode === 'web'
-        ? 'Save / Download JSONL'
-        : 'Save JSONL'
+        ? t('fileMenu.saveDownloadJsonl')
+        : t('fileMenu.saveJsonl')
       : activeFormat === 'log' || activeFormat === 'text'
         ? hostMode === 'web'
-          ? 'Save / Download Log'
-          : 'Save Log'
+          ? t('fileMenu.saveDownloadLog')
+          : t('fileMenu.saveLog')
         : hostMode === 'web'
-          ? 'Save / Download CSV'
-          : 'Save CSV';
+          ? t('fileMenu.saveDownloadCsv')
+          : t('fileMenu.saveCsv');
 
   const saveDisabled = isReadOnly || (!dirtyCsv && hostMode === 'desktop');
 
@@ -88,11 +90,11 @@ export const FileMenuPopover: React.FC<FileMenuPopoverProps> = ({
             type="button"
             style={menuItemStyle}
             onClick={() => setShowNewFormats((v) => !v)}
-            title="New File (Ctrl+N for CSV)"
+            title={t('fileMenu.newFileTooltip')}
           >
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
               <FilePlus size={14} />
-              <span>New File</span>
+              <span>{t('fileMenu.newFile')}</span>
             </span>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10.5, opacity: 0.7 }}>
               <span>Ctrl+N</span>
@@ -140,7 +142,7 @@ export const FileMenuPopover: React.FC<FileMenuPopoverProps> = ({
         >
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
             <FolderOpen size={14} />
-            <span>Open File...</span>
+            <span>{t('fileMenu.openFile')}</span>
           </span>
         </button>
       )}
@@ -177,7 +179,7 @@ export const FileMenuPopover: React.FC<FileMenuPopoverProps> = ({
         >
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
             <SaveAll size={14} />
-            <span>Save As...</span>
+            <span>{t('fileMenu.saveAs')}</span>
           </span>
           <span style={{ fontSize: 10.5, opacity: 0.6 }}>Ctrl+Shift+S</span>
         </button>
@@ -193,7 +195,7 @@ export const FileMenuPopover: React.FC<FileMenuPopoverProps> = ({
         >
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
             <X size={14} />
-            <span>Close File</span>
+            <span>{t('fileMenu.closeFile')}</span>
           </span>
           <span style={{ fontSize: 10.5, opacity: 0.6 }}>Ctrl+W</span>
         </button>
@@ -213,7 +215,7 @@ export const FileMenuPopover: React.FC<FileMenuPopoverProps> = ({
       >
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
           <Undo2 size={14} />
-          <span>Undo</span>
+          <span>{t('fileMenu.undo')}</span>
         </span>
         <span style={{ fontSize: 10.5, opacity: 0.6 }}>Ctrl+Z</span>
       </button>
@@ -231,7 +233,7 @@ export const FileMenuPopover: React.FC<FileMenuPopoverProps> = ({
       >
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
           <Redo2 size={14} />
-          <span>Redo</span>
+          <span>{t('fileMenu.redo')}</span>
         </span>
         <span style={{ fontSize: 10.5, opacity: 0.6 }}>Ctrl+Y</span>
       </button>

@@ -15,6 +15,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
+import { useI18n } from '../../i18n';
 import type { HeaderContextMenuState } from '../types';
 
 export interface ColumnContextMenuProps {
@@ -68,6 +69,7 @@ export const ColumnContextMenu: React.FC<ColumnContextMenuProps> = ({
   onSort,
   onClose,
 }) => {
+  const { t } = useI18n();
   const { visCols, actualCols, colKeys, x, y, headerBounds } = menu;
   const isMulti = actualCols.length > 1;
   const firstActual = actualCols[0]!;
@@ -128,7 +130,7 @@ export const ColumnContextMenu: React.FC<ColumnContextMenuProps> = ({
       >
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
           <Pencil size={13} />
-          <span>タイトル編集</span>
+          <span>{t('ctx.editTitle')}</span>
         </span>
       </button>
 
@@ -142,7 +144,7 @@ export const ColumnContextMenu: React.FC<ColumnContextMenuProps> = ({
       >
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
           <Palette size={13} />
-          <span>スタイル</span>
+          <span>{t('ctx.style')}</span>
         </span>
       </button>
 
@@ -156,7 +158,7 @@ export const ColumnContextMenu: React.FC<ColumnContextMenuProps> = ({
       >
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
           <Copy size={13} />
-          <span>コピー</span>
+          <span>{t('ctx.copy')}</span>
         </span>
         <span style={{ fontSize: 10.5, opacity: 0.6 }}>Ctrl+C</span>
       </button>
@@ -172,7 +174,7 @@ export const ColumnContextMenu: React.FC<ColumnContextMenuProps> = ({
       >
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
           <ClipboardPaste size={13} />
-          <span>貼り付け (スタイルあり)</span>
+          <span>{t('ctx.pasteWithStyle')}</span>
         </span>
         <span style={{ fontSize: 10.5, opacity: 0.6 }}>Ctrl+V</span>
       </button>
@@ -188,7 +190,7 @@ export const ColumnContextMenu: React.FC<ColumnContextMenuProps> = ({
       >
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
           <ClipboardPaste size={13} />
-          <span>値のみ貼り付け</span>
+          <span>{t('ctx.pasteValuesOnly')}</span>
         </span>
         <span style={{ fontSize: 10.5, opacity: 0.6 }}>Ctrl+Shift+V</span>
       </button>
@@ -204,7 +206,7 @@ export const ColumnContextMenu: React.FC<ColumnContextMenuProps> = ({
       >
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
           <Trash2 size={13} />
-          <span>{isMulti ? `削除 (${actualCols.length}列)` : '削除'}</span>
+          <span>{isMulti ? t('ctx.deleteCols', { count: actualCols.length }) : t('ctx.delete')}</span>
         </span>
       </button>
 
@@ -219,7 +221,7 @@ export const ColumnContextMenu: React.FC<ColumnContextMenuProps> = ({
       >
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
           <EyeOff size={13} />
-          <span>{isMulti ? `列の非表示 (${actualCols.length}列)` : '列の非表示'}</span>
+          <span>{isMulti ? t('ctx.hideCols', { count: actualCols.length }) : t('ctx.hideCol')}</span>
         </span>
       </button>
 
@@ -234,7 +236,7 @@ export const ColumnContextMenu: React.FC<ColumnContextMenuProps> = ({
         >
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
             <Eye size={13} />
-            <span>非表示列を再表示 ({adjacentHidden.length})</span>
+            <span>{t('ctx.unhideCols', { count: adjacentHidden.length })}</span>
           </span>
         </button>
       )}
@@ -252,7 +254,7 @@ export const ColumnContextMenu: React.FC<ColumnContextMenuProps> = ({
       >
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
           <Columns2 size={13} />
-          <span>{isMulti ? `${actualCols.length}列を左に複製` : '列を左に複製'}</span>
+          <span>{isMulti ? t('ctx.dupColsLeft', { count: actualCols.length }) : t('ctx.dupColLeft')}</span>
         </span>
       </button>
 
@@ -267,7 +269,7 @@ export const ColumnContextMenu: React.FC<ColumnContextMenuProps> = ({
       >
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
           <Columns2 size={13} />
-          <span>{isMulti ? `${actualCols.length}列を右に複製` : '列を右に複製'}</span>
+          <span>{isMulti ? t('ctx.dupColsRight', { count: actualCols.length }) : t('ctx.dupColRight')}</span>
         </span>
       </button>
 
@@ -284,7 +286,7 @@ export const ColumnContextMenu: React.FC<ColumnContextMenuProps> = ({
       >
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
           <Plus size={13} />
-          <span>{isMulti ? `左に空白列挿入 (${actualCols.length}列)` : '左に空白列挿入'}</span>
+          <span>{isMulti ? t('ctx.insertColsLeft', { count: actualCols.length }) : t('ctx.insertColLeft')}</span>
         </span>
       </button>
 
@@ -299,7 +301,7 @@ export const ColumnContextMenu: React.FC<ColumnContextMenuProps> = ({
       >
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
           <Plus size={13} />
-          <span>{isMulti ? `右に空白列挿入 (${actualCols.length}列)` : '右に空白列挿入'}</span>
+          <span>{isMulti ? t('ctx.insertColsRight', { count: actualCols.length }) : t('ctx.insertColRight')}</span>
         </span>
       </button>
 
@@ -316,7 +318,7 @@ export const ColumnContextMenu: React.FC<ColumnContextMenuProps> = ({
       >
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
           <ArrowLeft size={13} />
-          <span>列を左にずらす</span>
+          <span>{t('ctx.shiftColLeft')}</span>
         </span>
       </button>
 
@@ -331,7 +333,7 @@ export const ColumnContextMenu: React.FC<ColumnContextMenuProps> = ({
       >
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
           <ArrowRight size={13} />
-          <span>列を右にずらす</span>
+          <span>{t('ctx.shiftColRight')}</span>
         </span>
       </button>
 
@@ -349,7 +351,7 @@ export const ColumnContextMenu: React.FC<ColumnContextMenuProps> = ({
       >
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
           <ArrowUpNarrowWide size={13} />
-          <span>昇順で並び替え (A→Z)</span>
+          <span>{t('ctx.sortAsc')}</span>
         </span>
       </button>
 
@@ -365,7 +367,7 @@ export const ColumnContextMenu: React.FC<ColumnContextMenuProps> = ({
       >
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
           <ArrowDownWideNarrow size={13} />
-          <span>降順で並び替え (Z→A)</span>
+          <span>{t('ctx.sortDesc')}</span>
         </span>
       </button>
 
@@ -380,7 +382,7 @@ export const ColumnContextMenu: React.FC<ColumnContextMenuProps> = ({
         >
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
             <X size={13} />
-            <span>並び替えを解除</span>
+            <span>{t('ctx.clearSort')}</span>
           </span>
         </button>
       )}

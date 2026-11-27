@@ -9,18 +9,11 @@ import {
   X,
 } from 'lucide-react';
 import { FoxTailIcon } from '../../icons/FoxTailIcon';
+import { useI18n } from '../../i18n';
 import type { TailLineEntry, TailLogLevel } from '../hooks/useLiveTail';
 
-const TAIL_LINE_LIMIT_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
-  { value: '10', label: '10 lines' },
-  { value: '20', label: '20 lines' },
-  { value: '30', label: '30 lines' },
-  { value: '40', label: '40 lines' },
-  { value: '50', label: '50 lines' },
-  { value: '100', label: '100 lines' },
-  { value: '150', label: '150 lines' },
-  { value: '200', label: '200 lines' },
-  { value: 'unlimited', label: 'No limit' },
+const TAIL_LINE_LIMIT_VALUES: ReadonlyArray<number | null> = [
+  10, 20, 30, 40, 50, 100, 150, 200, null,
 ];
 
 export interface LiveTailColumn {
@@ -95,6 +88,7 @@ export const LiveTailPanel: React.FC<LiveTailPanelProps> = ({
   onClear,
   onClose,
 }) => {
+  const { t } = useI18n();
   const [viewMode, setViewMode] = useState<'grid' | 'raw'>('grid');
   const [panelHeight, setPanelHeight] = useState<number>(220);
   const [isResizing, setIsResizing] = useState<boolean>(false);
@@ -174,7 +168,7 @@ export const LiveTailPanel: React.FC<LiveTailPanelProps> = ({
       <div
         role="separator"
         aria-orientation="horizontal"
-        title="Drag to resize Live Tail panel height"
+        title={t('tail.resizeTooltip')}
         onMouseDown={handleResizeStart}
         style={{
           height: 5,
@@ -213,16 +207,19 @@ export const LiveTailPanel: React.FC<LiveTailPanelProps> = ({
             }}
           />
           <FoxTailIcon size={14} />
-          <strong>Live Tail</strong>
+          <strong>{t('tail.title')}</strong>
           <span style={{ fontSize: 11, opacity: 0.7 }}>
-            ({lines.length} lines · {paused ? 'Paused' : 'Watching'})
+            {t('tail.statusSummary', {
+              count: lines.length,
+              status: paused ? t('tail.statusPaused') : t('tail.statusWatching'),
+            })}
           </span>
         </div>
 
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
           <select
-            aria-label="Live Tail line limit"
-            title="Maximum lines kept in Live Tail (oldest lines are removed from top)"
+            aria-label={t('tail.limitAria')}
+            title={t('tail.limitTooltip')}
             value={maxLines === null ? 'unlimited' : String(maxLines)}
             onChange={(e) => {
               const v = e.target.value;
@@ -240,35 +237,40 @@ export const LiveTailPanel: React.FC<LiveTailPanelProps> = ({
               marginRight: 2,
             }}
           >
-            {TAIL_LINE_LIMIT_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
+            {TAIL_LINE_LIMIT_VALUES.map((val) => {
+              const optVal = val === null ? 'unlimited' : String(val);
+              const optLabel =
+                val === null ? t('tail.limitUnlimited') : t('tail.limitLines', { count: val });
+              return (
+                <option key={optVal} value={optVal}>
+                  {optLabel}
+                </option>
+              );
+            })}
           </select>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2, marginRight: 4 }}>
             <button
               type="button"
-              title="Grid view (aligned with main grid columns & zoom)"
+              title={t('tail.gridViewTooltip')}
               onClick={() => setViewMode('grid')}
               style={modeBtnStyle(viewMode === 'grid')}
             >
               <Table2 size={11} />
-              <span>Grid</span>
+              <span>{t('tail.gridView')}</span>
             </button>
             <button
               type="button"
-              title="Raw view (unparsed log text)"
+              title={t('tail.rawViewTooltip')}
               onClick={() => setViewMode('raw')}
               style={modeBtnStyle(viewMode === 'raw')}
             >
               <AlignLeft size={11} />
-              <span>Raw</span>
+              <span>{t('tail.rawView')}</span>
             </button>
           </div>
           <button
             type="button"
-            title="Auto-scroll main grid to bottom as new lines arrive"
+            title={t('tail.followGridTooltip')}
             onClick={onToggleFollowGrid}
             style={{
               ...btnStyle,
@@ -284,30 +286,30 @@ export const LiveTailPanel: React.FC<LiveTailPanelProps> = ({
             }}
           >
             <ArrowDownToLine size={11} />
-            <span>Follow Grid</span>
+            <span>{t('tail.followGrid')}</span>
           </button>
           <button
             type="button"
-            title={paused ? 'Resume auto-scroll' : 'Pause auto-scroll'}
+            title={paused ? t('tail.resumeTooltip') : t('tail.pauseTooltip')}
             onClick={onTogglePaused}
             style={{ ...btnStyle, height: 22, padding: '0 7px', fontSize: 11 }}
           >
             {paused ? <Play size={11} /> : <Pause size={11} />}
-            <span>{paused ? 'Resume' : 'Pause'}</span>
+            <span>{paused ? t('tail.resume') : t('tail.pause')}</span>
           </button>
           <button
             type="button"
-            title="Clear Live Tail buffer"
+            title={t('tail.clearTooltip')}
             onClick={onClear}
             style={{ ...btnStyle, height: 22, padding: '0 7px', fontSize: 11 }}
           >
             <Trash2 size={11} />
-            <span>Clear</span>
+            <span>{t('common.clear')}</span>
           </button>
           <button
             type="button"
-            aria-label="Close Live Tail Panel"
-            title="Close Live Tail Panel"
+            aria-label={t('tail.closeAria')}
+            title={t('tail.closeAria')}
             onClick={onClose}
             style={{ ...btnStyle, height: 22, padding: '0 5px' }}
           >
@@ -328,7 +330,7 @@ export const LiveTailPanel: React.FC<LiveTailPanelProps> = ({
       >
         {lines.length === 0 ? (
           <div style={{ padding: '12px 14px', opacity: 0.6, fontSize: 12 }}>
-            Waiting for new log lines...
+            {t('tail.waiting')}
           </div>
         ) : viewMode === 'grid' && columns.length > 0 ? (
           <table

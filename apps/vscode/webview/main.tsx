@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import {
+  I18nProvider,
   MetaTextEditor,
   type EditorAppSettings,
   type MetaTextEditorHandle,
@@ -11,6 +12,7 @@ const VsCodeApp: React.FC = () => {
   const {
     adapter,
     onThemeMode,
+    onHostLanguage,
     onAppSettings,
     onHostCommand,
     respondCsvData,
@@ -23,9 +25,11 @@ const VsCodeApp: React.FC = () => {
   const [themeMode, setThemeMode] = useState<'light' | 'dark'>(() =>
     document.body.classList.contains('vscode-light') ? 'light' : 'dark',
   );
+  const [hostLanguage, setHostLanguage] = useState<string | undefined>(undefined);
   const [appSettings, setAppSettings] = useState<EditorAppSettings>({});
 
   useEffect(() => onThemeMode(setThemeMode), [onThemeMode]);
+  useEffect(() => onHostLanguage(setHostLanguage), [onHostLanguage]);
   useEffect(() => onAppSettings(setAppSettings), [onAppSettings]);
   useEffect(
     () =>
@@ -61,22 +65,24 @@ const VsCodeApp: React.FC = () => {
   );
 
   return (
-    <div style={{ width: '100vw', height: '100vh', overflow: 'hidden' }}>
-      <MetaTextEditor
-        ref={editorRef}
-        adapter={adapter}
-        hostMode="vscode"
-        themeMode={themeMode}
-        appSettings={appSettings}
-        onAppSettingsChange={(patch) => {
-          setAppSettings((prev) => ({ ...prev, ...patch }));
-          updateSettings(patch);
-        }}
-        onOpenSettings={openSettings}
-        onDocumentEdit={notifyEdit}
-        onStatusChange={notifyStatus}
-      />
-    </div>
+    <I18nProvider preference={appSettings.language} systemLanguage={hostLanguage}>
+      <div style={{ width: '100vw', height: '100vh', overflow: 'hidden' }}>
+        <MetaTextEditor
+          ref={editorRef}
+          adapter={adapter}
+          hostMode="vscode"
+          themeMode={themeMode}
+          appSettings={appSettings}
+          onAppSettingsChange={(patch) => {
+            setAppSettings((prev) => ({ ...prev, ...patch }));
+            updateSettings(patch);
+          }}
+          onOpenSettings={openSettings}
+          onDocumentEdit={notifyEdit}
+          onStatusChange={notifyStatus}
+        />
+      </div>
+    </I18nProvider>
   );
 };
 

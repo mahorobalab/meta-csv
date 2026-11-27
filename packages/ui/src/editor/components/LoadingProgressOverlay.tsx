@@ -1,6 +1,7 @@
 import React from 'react';
 import type { MetaTextFormat } from '@metatext-editor/schema';
 import type { ParseProgress } from '@metatext-editor/core';
+import { useI18n } from '../../i18n';
 
 export interface LoadingProgressOverlayProps {
   loadingProgress: ParseProgress;
@@ -14,7 +15,9 @@ export const LoadingProgressOverlay: React.FC<LoadingProgressOverlayProps> = ({
   activeFormat,
   isDark,
   toolbarFg,
-}) => (
+}) => {
+  const { t } = useI18n();
+  return (
   <div
     style={{
       position: 'absolute',
@@ -32,10 +35,13 @@ export const LoadingProgressOverlay: React.FC<LoadingProgressOverlayProps> = ({
   >
     <div style={{ fontSize: 14, fontWeight: 600 }}>
       {loadingProgress.phase === 'decoding'
-        ? 'Reading file...'
+        ? t('loading.reading')
         : loadingProgress.phase === 'parsing'
-          ? `Parsing ${activeFormat.toUpperCase()}... (${loadingProgress.rowsParsed.toLocaleString()} rows)`
-          : 'Finalizing grid...'}
+          ? t('loading.parsing', {
+              format: activeFormat.toUpperCase(),
+              rows: loadingProgress.rowsParsed.toLocaleString(),
+            })
+          : t('loading.finalizing')}
     </div>
     <div
       style={{
@@ -57,4 +63,5 @@ export const LoadingProgressOverlay: React.FC<LoadingProgressOverlayProps> = ({
     </div>
     <div style={{ fontSize: 12, opacity: 0.75 }}>{loadingProgress.percent}%</div>
   </div>
-);
+  );
+};

@@ -20,6 +20,7 @@ import {
 } from '@metatext-editor/core';
 import { BG_SWATCH_COLORS, TEXT_SWATCH_COLORS } from '../../ConditionalRulesModal';
 import type { EditorHostMode } from '../../SettingsAboutDialogs';
+import { useI18n } from '../../i18n';
 
 export interface StylePopoverProps {
   hostMode: EditorHostMode;
@@ -76,6 +77,7 @@ export const StylePopover: React.FC<StylePopoverProps> = ({
   onAutoFitRows,
   onOpenRulesModal,
 }) => {
+  const { t } = useI18n();
   const hasStyleTarget =
     isColumnSelectionMode || isRowSelectionMode || Boolean(selection.current);
   const firstColKey = selectedColumnKeys[0];
@@ -179,10 +181,10 @@ export const StylePopover: React.FC<StylePopoverProps> = ({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ fontWeight: 700, fontSize: 12 }}>
           {isColumnSelectionMode
-            ? 'Columns Style (.metatext.jsonc)'
+            ? t('style.columnsTitle')
             : isRowSelectionMode
-              ? 'Rows Style (.metatext.jsonc)'
-              : 'Cell Style (.metatext.jsonc)'}
+              ? t('style.rowsTitle')
+              : t('style.cellTitle')}
         </div>
         <button
           type="button"
@@ -194,14 +196,14 @@ export const StylePopover: React.FC<StylePopoverProps> = ({
             fontSize: 11,
             opacity: hasStyleTarget ? 1 : 0.45,
           }}
-          title="Clear all style overrides on selection"
+          title={t('style.clearTooltip')}
           onClick={() => {
             onApplyStyle(() => ({}), true);
             onCustomNumFmtChange('');
           }}
         >
           <X size={11} />
-          <span>Clear</span>
+          <span>{t('common.clear')}</span>
         </button>
       </div>
 
@@ -210,21 +212,21 @@ export const StylePopover: React.FC<StylePopoverProps> = ({
           type="button"
           disabled={!hasStyleTarget}
           style={{ ...btnStyle, padding: '3px 8px', opacity: hasStyleTarget ? 1 : 0.45 }}
-          title="Toggle Bold on selection"
+          title={t('style.boldTooltip')}
           onClick={() => onApplyStyle((s) => ({ ...s, bold: !s.bold }))}
         >
           <Bold size={13} />
-          <span>Bold</span>
+          <span>{t('common.bold')}</span>
         </button>
         <button
           type="button"
           disabled={!hasStyleTarget}
           style={{ ...btnStyle, padding: '3px 8px', opacity: hasStyleTarget ? 1 : 0.45 }}
-          title="Toggle Italic on selection"
+          title={t('style.italicTooltip')}
           onClick={() => onApplyStyle((s) => ({ ...s, italic: !s.italic }))}
         >
           <Italic size={13} />
-          <span>Italic</span>
+          <span>{t('common.italic')}</span>
         </button>
         <button
           type="button"
@@ -241,24 +243,22 @@ export const StylePopover: React.FC<StylePopoverProps> = ({
             opacity: hasStyleTarget ? 1 : 0.45,
           }}
           title={
-            isColumnSelectionMode
-              ? 'Toggle text wrapping for selected column(s)'
-              : 'Toggle text wrapping for selected cell(s) and auto-fit row height'
+            isColumnSelectionMode ? t('style.wrapColumnsTooltip') : t('style.wrapCellsTooltip')
           }
           onClick={toggleWrap}
         >
           <WrapText size={13} />
-          <span>Wrap</span>
+          <span>{t('common.wrap')}</span>
         </button>
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        <span style={{ fontSize: 11, opacity: 0.75 }}>Alignment</span>
+        <span style={{ fontSize: 11, opacity: 0.75 }}>{t('style.alignment')}</span>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
           {[
-            { value: 'left' as const, label: 'Align Left', Icon: AlignLeft },
-            { value: 'center' as const, label: 'Align Center', Icon: AlignCenter },
-            { value: 'right' as const, label: 'Align Right', Icon: AlignRight },
+            { value: 'left' as const, label: t('style.alignLeft'), Icon: AlignLeft },
+            { value: 'center' as const, label: t('style.alignCenter'), Icon: AlignCenter },
+            { value: 'right' as const, label: t('style.alignRight'), Icon: AlignRight },
           ].map(({ value, label, Icon }) => {
             const isSelected = activeAlign === value;
             return (
@@ -296,14 +296,14 @@ export const StylePopover: React.FC<StylePopoverProps> = ({
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <span style={{ fontSize: 11, opacity: 0.75 }}>Background Color</span>
+        <span style={{ fontSize: 11, opacity: 0.75 }}>{t('style.backgroundColor')}</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
           {BG_SWATCH_COLORS.map((sw) => (
             <button
               key={sw.label}
               type="button"
               disabled={!hasStyleTarget}
-              title={`Background: ${sw.label}`}
+              title={t('style.backgroundTooltip', { color: sw.label })}
               style={{
                 ...btnStyle,
                 width: 22,
@@ -321,14 +321,14 @@ export const StylePopover: React.FC<StylePopoverProps> = ({
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <span style={{ fontSize: 11, opacity: 0.75 }}>Text Color</span>
+        <span style={{ fontSize: 11, opacity: 0.75 }}>{t('style.textColor')}</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
           {TEXT_SWATCH_COLORS.map((sw) => (
             <button
               key={sw.label}
               type="button"
               disabled={!hasStyleTarget}
-              title={`Text Color: ${sw.label}`}
+              title={t('style.textColorTooltip', { color: sw.label })}
               style={{
                 ...btnStyle,
                 width: 22,
@@ -349,7 +349,7 @@ export const StylePopover: React.FC<StylePopoverProps> = ({
       {!isRowSelectionMode && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 11, opacity: 0.75 }}>Format (Number / Date)</span>
+            <span style={{ fontSize: 11, opacity: 0.75 }}>{t('style.formatTitle')}</span>
             {activeNumFmt && <code style={{ fontSize: 10.5, opacity: 0.8 }}>{activeNumFmt}</code>}
           </div>
           {[NUMBER_FORMAT_PRESETS, DATE_FORMAT_PRESETS].map((group, idx) => (
@@ -391,7 +391,7 @@ export const StylePopover: React.FC<StylePopoverProps> = ({
               type="text"
               disabled={!hasStyleTarget}
               value={customNumFmt}
-              placeholder={activeNumFmt || 'Custom e.g. #,##0, yyyy/mm/dd, mmm d, yyyy'}
+              placeholder={activeNumFmt || t('style.customFormatPlaceholder')}
               onChange={(e) => onCustomNumFmtChange(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && isCustomFmtValid) {
@@ -423,7 +423,7 @@ export const StylePopover: React.FC<StylePopoverProps> = ({
               }}
               onClick={() => applyNumFmt(customNumFmt)}
             >
-              Apply
+              {t('common.apply')}
             </button>
           </div>
         </div>
@@ -436,13 +436,13 @@ export const StylePopover: React.FC<StylePopoverProps> = ({
       >
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
           <Sparkles size={13} />
-          <span>Conditional Rules...</span>
+          <span>{t('style.conditionalRules')}</span>
         </span>
         <span style={{ opacity: 0.7 }}>
           {meta.rules !== undefined
             ? meta.rules.length
             : defaultHighlightRules.length > 0
-              ? `${defaultHighlightRules.length} (auto)`
+              ? t('style.autoCount', { count: defaultHighlightRules.length })
               : 0}
         </span>
       </button>

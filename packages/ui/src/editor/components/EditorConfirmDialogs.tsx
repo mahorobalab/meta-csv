@@ -1,5 +1,6 @@
 import React from 'react';
 import { EyeOff, Trash2 } from 'lucide-react';
+import { useI18n } from '../../i18n';
 import type {
   PendingDeleteColState,
   PendingDeleteRowsState,
@@ -39,6 +40,7 @@ export const EditorConfirmDialogs: React.FC<EditorConfirmDialogsProps> = ({
   onCancelHideCol,
   onConfirmHideCol,
 }) => {
+  const { t } = useI18n();
   const overlayStyle: React.CSSProperties = {
     position: 'fixed',
     inset: 0,
@@ -84,13 +86,13 @@ export const EditorConfirmDialogs: React.FC<EditorConfirmDialogsProps> = ({
           }}
           style={overlayStyle}
         >
-          <div role="dialog" aria-modal="true" aria-label="行の削除" style={cardStyle(380)}>
+          <div role="dialog" aria-modal="true" aria-label={t('confirm.deleteRowsTitle')} style={cardStyle(380)}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700 }}>
               <Trash2 size={15} style={{ color: '#ef4444' }} />
-              <span>行の削除</span>
+              <span>{t('confirm.deleteRowsTitle')}</span>
             </div>
             <div style={{ fontSize: 12.5, lineHeight: 1.6, opacity: 0.9 }}>
-              <strong>{pendingDeleteRows.label}</strong>を削除しますか？
+              {t('confirm.deleteMessage', { label: pendingDeleteRows.label })}
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
               <button
@@ -99,14 +101,14 @@ export const EditorConfirmDialogs: React.FC<EditorConfirmDialogsProps> = ({
                 style={{ ...btnStyle, padding: '4px 12px', height: 28 }}
                 onClick={onCancelDeleteRows}
               >
-                キャンセル
+                {t('common.cancel')}
               </button>
               <button
                 type="button"
                 style={dangerBtnStyle}
                 onClick={() => onConfirmDeleteRows(pendingDeleteRows)}
               >
-                削除する
+                {t('confirm.deleteConfirm')}
               </button>
             </div>
           </div>
@@ -120,13 +122,13 @@ export const EditorConfirmDialogs: React.FC<EditorConfirmDialogsProps> = ({
           }}
           style={overlayStyle}
         >
-          <div role="dialog" aria-modal="true" aria-label="列の削除" style={cardStyle(380)}>
+          <div role="dialog" aria-modal="true" aria-label={t('confirm.deleteColsTitle')} style={cardStyle(380)}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700 }}>
               <Trash2 size={15} style={{ color: '#ef4444' }} />
-              <span>列の削除</span>
+              <span>{t('confirm.deleteColsTitle')}</span>
             </div>
             <div style={{ fontSize: 12.5, lineHeight: 1.6, opacity: 0.9 }}>
-              <strong>{pendingDeleteCol.label}</strong>を削除しますか？
+              {t('confirm.deleteMessage', { label: pendingDeleteCol.label })}
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
               <button
@@ -135,14 +137,14 @@ export const EditorConfirmDialogs: React.FC<EditorConfirmDialogsProps> = ({
                 style={{ ...btnStyle, padding: '4px 12px', height: 28 }}
                 onClick={onCancelDeleteCol}
               >
-                キャンセル
+                {t('common.cancel')}
               </button>
               <button
                 type="button"
                 style={dangerBtnStyle}
                 onClick={() => onConfirmDeleteCol(pendingDeleteCol)}
               >
-                削除する
+                {t('confirm.deleteConfirm')}
               </button>
             </div>
           </div>
@@ -156,15 +158,15 @@ export const EditorConfirmDialogs: React.FC<EditorConfirmDialogsProps> = ({
           }}
           style={overlayStyle}
         >
-          <div role="dialog" aria-modal="true" aria-label="列の非表示" style={cardStyle(400)}>
+          <div role="dialog" aria-modal="true" aria-label={t('confirm.hideColTitle')} style={cardStyle(400)}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700 }}>
               <EyeOff size={15} />
-              <span>列の非表示</span>
+              <span>{t('confirm.hideColTitle')}</span>
             </div>
             <div style={{ fontSize: 12.5, lineHeight: 1.6, opacity: 0.9 }}>
-              <strong>{pendingHideCol.label}</strong>を非表示にします。
+              {t('confirm.hideColMessage', { label: pendingHideCol.label })}
               <br />
-              再表示は設定画面（Settings → File → Columns）から行ってください。
+              {t('confirm.hideColHint')}
             </div>
             <label
               style={{
@@ -181,7 +183,7 @@ export const EditorConfirmDialogs: React.FC<EditorConfirmDialogsProps> = ({
                 checked={pendingHideCol.dontShowAgain}
                 onChange={(e) => onChangeHideColDontShow(e.target.checked)}
               />
-              <span>次回から表示しない</span>
+              <span>{t('confirm.dontShowAgain')}</span>
             </label>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
               <button
@@ -189,7 +191,7 @@ export const EditorConfirmDialogs: React.FC<EditorConfirmDialogsProps> = ({
                 style={{ ...btnStyle, padding: '4px 12px', height: 28 }}
                 onClick={onCancelHideCol}
               >
-                キャンセル
+                {t('common.cancel')}
               </button>
               <button
                 type="button"
@@ -204,7 +206,7 @@ export const EditorConfirmDialogs: React.FC<EditorConfirmDialogsProps> = ({
                 }}
                 onClick={() => onConfirmHideCol(pendingHideCol)}
               >
-                非表示にする
+                {t('confirm.hideConfirm')}
               </button>
             </div>
           </div>

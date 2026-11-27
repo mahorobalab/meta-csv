@@ -1,0 +1,14 @@
+{
+  "extension.description": "JSONC サイドカーメタデータ (.metatext.jsonc) に対応した高速 CSV / TSV / JSONL / ログ エディタ＆ビューア",
+  "command.openWithEditor": "MetaText Editor: MetaText Editor で開く",
+  "config.language.description": "MetaText Editor の UI 表示言語（'auto' で VS Code の表示言語に追従します）。",
+  "config.defaultFontSize.description": ".metatext.jsonc で未指定のときに使うデフォルトのセル文字サイズ (px)。",
+  "config.defaultRowHeight.description": ".metatext.jsonc で未指定のときに使うデフォルトの行の高さ (px)。",
+  "config.defaultMarkerColor.description": "新しい行マーカーを追加するときのデフォルト色。",
+  "config.showRowNumbers.description": "左ガターに 1 始まりの行番号を表示します。",
+  "config.noHeaderColumnStyle.description": "1 行目がヘッダーでない場合の列名表示スタイル（'excel': A, B, C... / 'numbered': column 1, 2, 3...）。",
+  "config.sidecarVisibility.description": "エクスプローラーでの .metatext.jsonc サイドカーファイルの表示方法。",
+  "config.sidecarVisibility.nest": ".metatext.jsonc を親ファイルの下にネスト表示する（既定）。",
+  "config.sidecarVisibility.hide": "files.exclude を使ってエクスプローラーから完全に非表示にする。",
+  "config.sidecarVisibility.show": "エクスプローラーに通常の並列ファイルとして表示する。"
+}

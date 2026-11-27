@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ExternalLink, Info, Scale, X } from 'lucide-react';
+import { useI18n } from '../i18n';
 import type { AboutModalProps } from './types';
 
 interface OssLicenseEntry {
@@ -96,6 +97,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({
   themeMode,
   hostMode,
 }) => {
+  const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<'about' | 'licenses'>('about');
 
   useEffect(() => {
@@ -118,19 +120,19 @@ export const AboutModal: React.FC<AboutModalProps> = ({
 
   const envLabel =
     hostMode === 'vscode'
-      ? 'VS Code Extension'
+      ? t('about.envVscode')
       : hostMode === 'desktop'
-        ? 'Desktop App (Tauri)'
-        : 'Web / PWA Edition';
+        ? t('about.envDesktop')
+        : t('about.envWeb');
 
   const shortcuts: Array<[string, string]> = [
-    ['F2', 'Edit active cell (caret at end)'],
-    ['Tab / Enter', 'Move inside selection (Excel-style)'],
-    ['Ctrl+M / Ctrl+F2', 'Toggle row marker'],
-    ['Alt+F2 / Alt+Shift+F2', 'Jump to next / previous marker'],
-    ['Ctrl+Wheel / Ctrl+0', 'Zoom grid in/out / reset 100%'],
-    ['Ctrl+S', 'Save file'],
-    ['Ctrl+Z / Ctrl+Y', 'Undo / Redo'],
+    ['F2', t('about.shortcutEdit')],
+    ['Tab / Enter', t('about.shortcutMove')],
+    ['Ctrl+M / Ctrl+F2', t('about.shortcutMarker')],
+    ['Alt+F2 / Alt+Shift+F2', t('about.shortcutJumpMarker')],
+    ['Ctrl+Wheel / Ctrl+0', t('about.shortcutZoom')],
+    ['Ctrl+S', t('about.shortcutSave')],
+    ['Ctrl+Z / Ctrl+Y', t('about.shortcutUndo')],
   ];
 
   const tabBtnStyle = (selected: boolean): React.CSSProperties => ({
@@ -166,7 +168,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="About MetaText Editor"
+        aria-label={t('about.title')}
         style={{
           width: '100%',
           maxWidth: 460,
@@ -186,11 +188,11 @@ export const AboutModal: React.FC<AboutModalProps> = ({
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontWeight: 700 }}>
             <Info size={16} />
-            <span>About MetaText Editor</span>
+            <span>{t('about.title')}</span>
           </div>
           <button
             type="button"
-            aria-label="Close about"
+            aria-label={t('about.closeAria')}
             onClick={onClose}
             style={{
               border: 'none',
@@ -224,7 +226,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({
             onClick={() => setActiveTab('about')}
           >
             <Info size={13} />
-            <span>About</span>
+            <span>{t('about.tabAbout')}</span>
           </button>
           <button
             type="button"
@@ -234,7 +236,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({
             onClick={() => setActiveTab('licenses')}
           >
             <Scale size={13} />
-            <span>Open Source Licenses</span>
+            <span>{t('about.tabLicenses')}</span>
           </button>
         </div>
 
@@ -256,8 +258,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({
                 </span>
               </div>
               <div style={{ fontSize: 12, opacity: 0.78, marginTop: 4 }}>
-                High-performance CSV, TSV, JSONL &amp; Log editor &amp; viewer powered by{' '}
-                <code>.metatext.jsonc</code> sidecar metadata.
+                {t('about.description')}
               </div>
             </div>
 
@@ -273,7 +274,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({
               }}
             >
               <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 2 }}>
-                Keyboard Shortcuts
+                {t('about.shortcutsTitle')}
               </div>
               {shortcuts.map(([keys, desc]) => (
                 <div
@@ -329,14 +330,13 @@ export const AboutModal: React.FC<AboutModalProps> = ({
                   textDecoration: 'none',
                 }}
               >
-                <span>Website</span>
+                <span>{t('about.website')}</span>
                 <ExternalLink size={12} />
               </a>
             </div>
 
             <div style={{ fontSize: 11, opacity: 0.7, lineHeight: 1.5 }}>
-              Licensed under the MIT License · © 2026 MahorobaLab. The MetaText Editor name and
-              official icons are assets of MahorobaLab.
+              {t('about.licenseFooter')}
             </div>
           </>
         ) : (
@@ -351,7 +351,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({
             }}
           >
             <div style={{ fontSize: 11.5, opacity: 0.78, marginBottom: 2 }}>
-              MetaText Editor is built with the following open-source software:
+              {t('about.ossIntro')}
             </div>
             {OSS_LICENSES.map((pkg) => (
               <div

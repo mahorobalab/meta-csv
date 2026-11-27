@@ -1,5 +1,6 @@
 import React from 'react';
 import { ClipboardPaste, Copy, Palette, Plus, Trash2 } from 'lucide-react';
+import { useI18n } from '../../i18n';
 import type { RowContextMenuState } from '../types';
 
 export interface RowContextMenuProps {
@@ -35,6 +36,7 @@ export const RowContextMenu: React.FC<RowContextMenuProps> = ({
   onInsertBlank,
   onClose,
 }) => {
+  const { t } = useI18n();
   const { viewRows, dataRows, x, y } = menu;
   const isMulti = dataRows.length > 1;
   const firstViewRow = viewRows[0]!;
@@ -87,7 +89,7 @@ export const RowContextMenu: React.FC<RowContextMenuProps> = ({
       >
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
           <Palette size={13} />
-          <span>スタイル</span>
+          <span>{t('ctx.style')}</span>
         </span>
       </button>
 
@@ -101,7 +103,7 @@ export const RowContextMenu: React.FC<RowContextMenuProps> = ({
       >
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
           <Copy size={13} />
-          <span>コピー</span>
+          <span>{t('ctx.copy')}</span>
         </span>
         <span style={{ fontSize: 10.5, opacity: 0.6 }}>Ctrl+C</span>
       </button>
@@ -117,7 +119,7 @@ export const RowContextMenu: React.FC<RowContextMenuProps> = ({
       >
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
           <ClipboardPaste size={13} />
-          <span>貼り付け (スタイルあり)</span>
+          <span>{t('ctx.pasteWithStyle')}</span>
         </span>
         <span style={{ fontSize: 10.5, opacity: 0.6 }}>Ctrl+V</span>
       </button>
@@ -133,7 +135,7 @@ export const RowContextMenu: React.FC<RowContextMenuProps> = ({
       >
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
           <ClipboardPaste size={13} />
-          <span>値のみ貼り付け</span>
+          <span>{t('ctx.pasteValuesOnly')}</span>
         </span>
         <span style={{ fontSize: 10.5, opacity: 0.6 }}>Ctrl+Shift+V</span>
       </button>
@@ -149,7 +151,7 @@ export const RowContextMenu: React.FC<RowContextMenuProps> = ({
       >
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
           <Trash2 size={13} />
-          <span>{isMulti ? `削除 (${dataRows.length}行)` : '削除'}</span>
+          <span>{isMulti ? t('ctx.deleteRows', { count: dataRows.length }) : t('ctx.delete')}</span>
         </span>
       </button>
 
@@ -166,7 +168,7 @@ export const RowContextMenu: React.FC<RowContextMenuProps> = ({
       >
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
           <Copy size={13} />
-          <span>{isMulti ? `${dataRows.length}行を上に複製` : '行を上に複製'}</span>
+          <span>{isMulti ? t('ctx.dupRowsAbove', { count: dataRows.length }) : t('ctx.dupRowAbove')}</span>
         </span>
       </button>
 
@@ -181,7 +183,7 @@ export const RowContextMenu: React.FC<RowContextMenuProps> = ({
       >
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
           <Copy size={13} />
-          <span>{isMulti ? `${dataRows.length}行を下に複製` : '行を下に複製'}</span>
+          <span>{isMulti ? t('ctx.dupRowsBelow', { count: dataRows.length }) : t('ctx.dupRowBelow')}</span>
         </span>
       </button>
 
@@ -198,7 +200,7 @@ export const RowContextMenu: React.FC<RowContextMenuProps> = ({
       >
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
           <Plus size={13} />
-          <span>{isMulti ? `上に空白行挿入 (${dataRows.length}行)` : '上に空白行挿入'}</span>
+          <span>{isMulti ? t('ctx.insertRowsAbove', { count: dataRows.length }) : t('ctx.insertRowAbove')}</span>
         </span>
       </button>
 
@@ -213,7 +215,7 @@ export const RowContextMenu: React.FC<RowContextMenuProps> = ({
       >
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
           <Plus size={13} />
-          <span>{isMulti ? `下に空白行挿入 (${dataRows.length}行)` : '下に空白行挿入'}</span>
+          <span>{isMulti ? t('ctx.insertRowsBelow', { count: dataRows.length }) : t('ctx.insertRowBelow')}</span>
         </span>
       </button>
     </div>

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Minus, Plus } from 'lucide-react';
 import type { MetaTextFormat } from '@metatext-editor/schema';
+import { useI18n } from '../../i18n';
 
 const ZOOM_PRESETS = [0.6, 0.75, 0.9, 1, 1.25, 1.5, 1.75, 2, 2.5];
 
@@ -55,6 +56,7 @@ export const EditorStatusBar: React.FC<EditorStatusBarProps> = ({
   colCount,
   markerCount,
 }) => {
+  const { t } = useI18n();
   const [showPathTooltip, setShowPathTooltip] = useState(false);
   const [showZoomMenu, setShowZoomMenu] = useState(false);
   const zoomWrapRef = useRef<HTMLDivElement | null>(null);
@@ -185,22 +187,31 @@ export const EditorStatusBar: React.FC<EditorStatusBarProps> = ({
                 cursor: 'pointer',
               }}
             >
-              {selectedCellLineCount} lines (Inspect)
+              {t('status.linesInspect', { count: selectedCellLineCount })}
             </button>
           )}
           <span style={{ opacity: 0.85 }}>
             {visibleRowCount !== totalRowCount
-              ? `Rows=${visibleRowCount.toLocaleString()} / ${totalRowCount.toLocaleString()}, Cols=${colCount}`
-              : `Rows=${totalRowCount.toLocaleString()}, Cols=${colCount}`}
+              ? t('status.rowsFiltered', {
+                  visible: visibleRowCount.toLocaleString(),
+                  total: totalRowCount.toLocaleString(),
+                  cols: colCount,
+                })
+              : t('status.rowsTotal', {
+                  total: totalRowCount.toLocaleString(),
+                  cols: colCount,
+                })}
           </span>
-          {markerCount > 0 && <span style={{ opacity: 0.85 }}>Markers={markerCount}</span>}
+          {markerCount > 0 && (
+            <span style={{ opacity: 0.85 }}>{t('status.markers', { count: markerCount })}</span>
+          )}
 
           {/* Always-visible clickable zoom selector at bottom-right */}
           <div ref={zoomWrapRef} style={{ position: 'relative', display: 'inline-flex' }}>
             <button
               type="button"
-              title="Zoom level (click to change, Ctrl+Wheel, Ctrl+0 to reset)"
-              aria-label={`Zoom level ${zoomPercent}%`}
+              title={t('status.zoomTooltip')}
+              aria-label={t('status.zoomAria', { percent: zoomPercent })}
               onClick={() => setShowZoomMenu((v) => !v)}
               style={{
                 border: `1px solid ${showZoomMenu || zoomScale !== 1 ? '#3b82f6' : toolbarBorder}`,
@@ -251,7 +262,7 @@ export const EditorStatusBar: React.FC<EditorStatusBarProps> = ({
                 >
                   <button
                     type="button"
-                    title="Zoom out (-10%)"
+                    title={t('status.zoomOut')}
                     onClick={() => stepZoom(-0.1)}
                     style={{
                       display: 'inline-flex',
@@ -270,7 +281,7 @@ export const EditorStatusBar: React.FC<EditorStatusBarProps> = ({
                   </button>
                   <button
                     type="button"
-                    title="Reset to 100% (Ctrl+0)"
+                    title={t('status.zoomReset')}
                     onClick={() => {
                       onZoomChange(1);
                       setShowZoomMenu(false);
@@ -291,7 +302,7 @@ export const EditorStatusBar: React.FC<EditorStatusBarProps> = ({
                   </button>
                   <button
                     type="button"
-                    title="Zoom in (+10%)"
+                    title={t('status.zoomIn')}
                     onClick={() => stepZoom(0.1)}
                     style={{
                       display: 'inline-flex',
