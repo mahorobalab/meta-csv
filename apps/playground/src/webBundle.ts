@@ -8,8 +8,10 @@ import {
   isMetaTextZipFileName,
   validateBundleManifest,
   type FileSystemAdapter,
+  type HistoryAdapter,
   type MetaTextBundleManifest,
 } from '@metatext-editor/core';
+import { createWebBundleHistoryAdapter } from './webGitHistory';
 
 export interface ParsedWebBundle {
   bundleFileName: string;
@@ -151,46 +153,70 @@ export function triggerZipDownload(fileName: string, zipBytes: Uint8Array): void
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-export function createWebBundleAdapter(
+export interface WebBundleSession {
+  adapter: FileSystemAdapter;
+  historyAdapter: HistoryAdapter;
+  getHistoryEntries: () => Promise<Record<string, Uint8Array>>;
+}
+
+export function createWebBundleSession(
   file: File,
   onMetaLoaded?: (metaText: string) => void,
-): FileSystemAdapter {
+): WebBundleSession {
   let cached: ParsedWebBundle | null = null;
+  let loadPromise: Promise<ParsedWebBundle> | null = null;
 
-  return {
+  const ensureLoaded = async (): Promise<ParsedWebBundle> => {
+    if (cached) return cached;
+    if (!loadPromise) {
+      loadPromise = file.arrayBuffer().then((buf) => {
+        const parsed = parseMetaTextBundleWeb(new Uint8Array(buf), file.name);
+        cached = parsed;
+        onMetaLoaded?.(parsed.metaText);
+        return parsed;
+      });
+    }
+    return loadPromise;
+  };
+
+  const adapter: FileSystemAdapter = {
     async load() {
-      if (!cached) {
-        const rawBytes = new Uint8Array(await file.arrayBuffer());
-        cached = parseMetaTextBundleWeb(rawBytes, file.name);
-        onMetaLoaded?.(cached.metaText);
-      }
+      const bundle = await ensureLoaded();
       return {
-        fileName: cached.bundleFileName,
-        csvBytes: cached.dataBytes.slice(),
-        metaText: cached.metaText,
+        fileName: bundle.bundleFileName,
+        csvBytes: bundle.dataBytes.slice(),
+        metaText: bundle.metaText,
       };
     },
     async saveCsv(bytes: Uint8Array) {
+      const bundle = await ensureLoaded();
       const nextBytes = bytes.slice();
-      if (cached) {
-        cached = { ...cached, dataBytes: nextBytes };
-      }
+      bundle.dataBytes = nextBytes;
       const { bundleFileName, zipBytes } = buildMetaTextBundleWeb({
         fileName: file.name,
         dataBytes: nextBytes,
-        metaText: cached?.metaText ?? '',
-        existingManifest: cached?.manifest,
-        existingHistoryEntries: cached?.historyEntries,
-        includeHistory: Boolean(
-          cached && Object.keys(cached.historyEntries).length > 0,
-        ),
+        metaText: bundle.metaText,
+        existingManifest: bundle.manifest,
+        existingHistoryEntries: bundle.historyEntries,
+        includeHistory: Object.keys(bundle.historyEntries).length > 0,
       });
       triggerZipDownload(bundleFileName, zipBytes);
     },
     async saveMeta(text: string) {
       if (cached) {
-        cached = { ...cached, metaText: text };
+        cached.metaText = text;
       }
     },
+  };
+
+  const historyAdapter = createWebBundleHistoryAdapter(async () => {
+    const bundle = await ensureLoaded();
+    return bundle.historyEntries;
+  });
+
+  return {
+    adapter,
+    historyAdapter,
+    getHistoryEntries: async () => (await ensureLoaded()).historyEntries,
   };
 }

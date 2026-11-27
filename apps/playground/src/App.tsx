@@ -31,7 +31,7 @@ import {
 } from './datasets';
 import {
   buildMetaTextBundleWeb,
-  createWebBundleAdapter,
+  createWebBundleSession,
   triggerZipDownload,
 } from './webBundle';
 
@@ -119,6 +119,15 @@ export const App: React.FC = () => {
     }
   }, [themePref, showMetaPanel, appSettings]);
 
+  const bundleSession = useMemo(() => {
+    if (preset === 'custom' && customFile && isMetaTextZipFileName(customFile.name)) {
+      return createWebBundleSession(customFile, (loadedMeta) => {
+        setMetaText(loadedMeta);
+      });
+    }
+    return null;
+  }, [preset, customFile, newSeq]);
+
   const adapter = useMemo(() => {
     if (preset === 'spec') {
       return createMemoryAdapter({
@@ -156,12 +165,10 @@ export const App: React.FC = () => {
         metaText: tpl.metaText,
       });
     }
+    if (bundleSession) {
+      return bundleSession.adapter;
+    }
     if (customFile) {
-      if (isMetaTextZipFileName(customFile.name)) {
-        return createWebBundleAdapter(customFile, (loadedMeta) => {
-          setMetaText(loadedMeta);
-        });
-      }
       return createFileAdapter(customFile, customMetaText);
     }
     return createMemoryAdapter({
@@ -169,7 +176,7 @@ export const App: React.FC = () => {
       csvBytes: new TextEncoder().encode(SPEC_SETTING_CSV),
       metaText: SPEC_SETTING_META,
     });
-  }, [preset, customFile, customMetaText, newFormat, newSeq]);
+  }, [preset, customFile, customMetaText, newFormat, newSeq, bundleSession]);
 
   const openDroppedFiles = async (fileList: FileList | null) => {
     if (!fileList || fileList.length === 0) return;
@@ -530,14 +537,20 @@ export const App: React.FC = () => {
               ? `${info.fileName}${info.dirty ? ' *' : ''} — MetaText Editor`
               : 'MetaText Editor Web';
           }}
-          onExportBundle={async () => {
+          historyAdapter={bundleSession?.historyAdapter}
+          onExportBundle={async (opts) => {
             const currentBytes =
               editorRef.current?.serializeCurrentCsv() ?? (await adapter.load()).csvBytes;
+            const existingHistoryEntries =
+              opts.includeHistory && bundleSession
+                ? await bundleSession.getHistoryEntries()
+                : undefined;
             const { bundleFileName, zipBytes } = buildMetaTextBundleWeb({
               fileName: currentFileNameRef.current || 'untitled.csv',
               dataBytes: currentBytes,
               metaText,
-              includeHistory: false,
+              existingHistoryEntries,
+              includeHistory: opts.includeHistory,
             });
             triggerZipDownload(bundleFileName, zipBytes);
             return bundleFileName;
