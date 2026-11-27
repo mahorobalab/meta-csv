@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
-import { Check, Code2, Info, Settings } from 'lucide-react';
+import { Check, ChevronDown, Code2, Info, Settings } from 'lucide-react';
 import {
   AboutModal,
   MetaTextEditor,
+  NEW_FILE_FORMAT_OPTIONS,
   SettingsModal,
   resolveThemeMode,
   useSystemTheme,
@@ -40,6 +41,29 @@ export const App: React.FC = () => {
   const [showEmptyAbout, setShowEmptyAbout] = useState(false);
   const [showMetaPanel, setShowMetaPanel] = useState(false);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const [showWelcomeNewMenu, setShowWelcomeNewMenu] = useState(false);
+  const welcomeNewMenuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!showWelcomeNewMenu) return;
+    const onDocDown = (e: MouseEvent) => {
+      if (welcomeNewMenuRef.current && !welcomeNewMenuRef.current.contains(e.target as Node)) {
+        setShowWelcomeNewMenu(false);
+      }
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setShowWelcomeNewMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', onDocDown);
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => {
+      document.removeEventListener('mousedown', onDocDown);
+      window.removeEventListener('keydown', onKeyDown, true);
+    };
+  }, [showWelcomeNewMenu]);
 
   useEffect(() => {
     let unlisten: (() => void) | null = null;
@@ -356,20 +380,58 @@ export const App: React.FC = () => {
             }}
             onClick={() => void handleOpenFile()}
           >
-            ファイルを開く (CSV / JSONL / LOG)
+            ファイルを開く
           </button>
-          <button
-            type="button"
-            style={{
-              ...btnStyle,
-              padding: '8px 18px',
-              fontSize: 14,
-              fontWeight: 600,
-            }}
-            onClick={handleNewTab}
-          >
-            新規作成 (CSV)
-          </button>
+          <div ref={welcomeNewMenuRef} style={{ position: 'relative', display: 'inline-flex' }}>
+            <button
+              type="button"
+              style={{
+                ...btnStyle,
+                padding: '8px 16px',
+                fontSize: 14,
+                fontWeight: 600,
+              }}
+              onClick={() => setShowWelcomeNewMenu((v) => !v)}
+            >
+              <span>新規作成</span>
+              <ChevronDown size={14} />
+            </button>
+            {showWelcomeNewMenu && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 'calc(100% + 6px)',
+                  left: 0,
+                  zIndex: 80,
+                  width: 210,
+                  padding: 6,
+                  borderRadius: 8,
+                  background: isDark ? '#1f1f23' : '#ffffff',
+                  color: barFg,
+                  border: `1px solid ${border}`,
+                  boxShadow: '0 10px 28px rgba(0, 0, 0, 0.28)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 2,
+                }}
+              >
+                {NEW_FILE_FORMAT_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.format}
+                    type="button"
+                    style={menuRowStyle}
+                    onClick={() => {
+                      setShowWelcomeNewMenu(false);
+                      handleNewTab(opt.format);
+                    }}
+                  >
+                    <span style={{ fontWeight: 600 }}>{opt.label}</span>
+                    <span style={{ fontSize: 11, opacity: 0.65 }}>{opt.extension}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

@@ -14,6 +14,7 @@ interface EditorStatusPayload {
   totalRows?: number;
   visibleRows?: number;
   cols?: number;
+  zoomScale?: number;
   format?: string;
   readOnly?: boolean;
 }
@@ -35,7 +36,8 @@ class MetaTextEditorProvider implements vscode.CustomEditorProvider<MetaTextDocu
   public readonly onDidChangeCustomDocument = this._onDidChangeCustomDocument.event;
 
   private readonly panelsByDoc = new Map<string, vscode.WebviewPanel>();
-  private readonly statusByDoc = new Map<string, string>();
+  private readonly statusByDoc = new Map<string, { prefix: string; dims: string }>();
+  private readonly zoomByDoc = new Map<string, number>();
   private readonly pendingCsvRequests = new Map<
     number,
     { resolve: (bytes: Buffer) => void; reject: (err: Error) => void }
@@ -47,10 +49,17 @@ class MetaTextEditorProvider implements vscode.CustomEditorProvider<MetaTextDocu
     private readonly statusBarItem: vscode.StatusBarItem,
   ) {}
 
+  private formatStatusBarText(docKey: string): string | undefined {
+    const info = this.statusByDoc.get(docKey);
+    if (!info) return undefined;
+    const zoomPct = Math.round((this.zoomByDoc.get(docKey) ?? 1) * 100);
+    return `${info.prefix}: ${zoomPct}% ${info.dims}`;
+  }
+
   private refreshStatusBarForActivePanel(): void {
     for (const [docKey, panel] of this.panelsByDoc.entries()) {
       if (panel.active) {
-        const text = this.statusByDoc.get(docKey);
+        const text = this.formatStatusBarText(docKey);
         if (text) {
           this.statusBarItem.text = text;
           this.statusBarItem.show();
@@ -61,6 +70,38 @@ class MetaTextEditorProvider implements vscode.CustomEditorProvider<MetaTextDocu
       }
     }
     this.statusBarItem.hide();
+  }
+
+  public async promptZoomSelection(): Promise<void> {
+    let activePanel: vscode.WebviewPanel | undefined;
+    let currentZoom = 1;
+    for (const [docKey, panel] of this.panelsByDoc.entries()) {
+      if (panel.active) {
+        activePanel = panel;
+        currentZoom = this.zoomByDoc.get(docKey) ?? 1;
+        break;
+      }
+    }
+    if (!activePanel) return;
+
+    const presets = [0.6, 0.75, 0.9, 1, 1.25, 1.5, 1.75, 2, 2.5];
+    const items = presets.map((scale) => {
+      const pct = Math.round(scale * 100);
+      return {
+        label: `${pct}%`,
+        description: Math.abs(scale - currentZoom) < 0.005 ? 'Current' : scale === 1 ? 'Default' : undefined,
+        scale,
+      };
+    });
+    const picked = await vscode.window.showQuickPick(items, {
+      placeHolder: `Select MetaText Editor zoom level (current: ${Math.round(currentZoom * 100)}%) — Ctrl+Wheel, Ctrl+0`,
+    });
+    if (!picked) return;
+    await activePanel.webview.postMessage({
+      type: 'hostCommand',
+      command: 'setZoom',
+      scale: picked.scale,
+    });
   }
 
   async openCustomDocument(uri: vscode.Uri): Promise<MetaTextDocument> {
@@ -228,17 +269,23 @@ class MetaTextEditorProvider implements vscode.CustomEditorProvider<MetaTextDocu
           const totalRows = Number(st.totalRows ?? 0);
           const visibleRows = Number(st.visibleRows ?? totalRows);
           const cols = Number(st.cols ?? 0);
+          if (typeof st.zoomScale === 'number' && Number.isFinite(st.zoomScale)) {
+            this.zoomByDoc.set(docKey, st.zoomScale);
+          }
           if (cols > 0) {
             const tags: string[] = [];
             if (st.format && st.format !== 'csv') tags.push(st.format.toUpperCase());
             if (st.readOnly) tags.push('RO');
             const prefix = tags.length > 0 ? `MetaText Editor [${tags.join(' · ')}]` : 'MetaText Editor';
-            const text =
+            const dims =
               visibleRows !== totalRows
-                ? `${prefix}: Rows=${visibleRows.toLocaleString()}/${totalRows.toLocaleString()}, Cols=${cols}`
-                : `${prefix}: Rows=${totalRows.toLocaleString()}, Cols=${cols}`;
-            this.statusByDoc.set(docKey, text);
-            if (webviewPanel.active) {
+                ? `Rows=${visibleRows.toLocaleString()}/${totalRows.toLocaleString()}, Cols=${cols}`
+                : `Rows=${totalRows.toLocaleString()}, Cols=${cols}`;
+            this.statusByDoc.set(docKey, { prefix, dims });
+          }
+          if (webviewPanel.active) {
+            const text = this.formatStatusBarText(docKey);
+            if (text) {
               this.statusBarItem.text = text;
               this.statusBarItem.show();
             }
@@ -403,7 +450,8 @@ function getNonce(): string {
 
 export function activate(context: vscode.ExtensionContext): void {
   const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
-  statusBarItem.tooltip = 'MetaText Editor active table dimensions';
+  statusBarItem.tooltip = 'MetaText Editor: Click to change zoom (Ctrl+Wheel, Ctrl+0)';
+  statusBarItem.command = 'metatext.selectZoom';
   context.subscriptions.push(statusBarItem);
 
   const provider = new MetaTextEditorProvider(context, statusBarItem);
@@ -413,6 +461,12 @@ export function activate(context: vscode.ExtensionContext): void {
         retainContextWhenHidden: true,
       },
       supportsMultipleEditorsPerDocument: false,
+    }),
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('metatext.selectZoom', async () => {
+      await provider.promptZoomSelection();
     }),
   );
 

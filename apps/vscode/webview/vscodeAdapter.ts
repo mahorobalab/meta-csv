@@ -27,8 +27,9 @@ function bytesToBase64(bytes: Uint8Array): string {
 }
 
 export interface HostCommand {
-  command: 'undo' | 'redo' | 'reload' | 'hostSaved' | 'requestCsvData';
+  command: 'undo' | 'redo' | 'reload' | 'hostSaved' | 'requestCsvData' | 'setZoom';
   requestId?: number;
+  scale?: number;
 }
 
 export interface VsCodeAdapterBundle {
@@ -99,7 +100,7 @@ export function createVsCodeAdapter(): VsCodeAdapterBundle {
       settingsListeners.forEach((cb) => cb(msg.appSettings));
     } else if (msg.type === 'hostCommand') {
       commandListeners.forEach((cb) =>
-        cb({ command: msg.command, requestId: msg.requestId }),
+        cb({ command: msg.command, requestId: msg.requestId, scale: msg.scale }),
       );
     }
   });

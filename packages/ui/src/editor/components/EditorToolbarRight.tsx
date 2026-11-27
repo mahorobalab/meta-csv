@@ -10,14 +10,12 @@ export interface EditorToolbarRightProps {
   isReadOnly: boolean;
   activeFormat: MetaTextFormat;
   openMenu: 'none' | 'file' | 'edit' | 'unlock';
-  zoomScale: number;
   zebraEnabled: boolean;
   showCellInspector: boolean;
   onToggleUnlockPopover: () => void;
   onLockReadOnly: () => void;
   onUnlockEditing: () => void;
   onCloseMenu: () => void;
-  onResetZoom: () => void;
   onToggleZebra: () => void;
   onToggleCellInspector: () => void;
   onOpenSettings: () => void;
@@ -31,14 +29,12 @@ export const EditorToolbarRight: React.FC<EditorToolbarRightProps> = ({
   isReadOnly,
   activeFormat,
   openMenu,
-  zoomScale,
   zebraEnabled,
   showCellInspector,
   onToggleUnlockPopover,
   onLockReadOnly,
   onUnlockEditing,
   onCloseMenu,
-  onResetZoom,
   onToggleZebra,
   onToggleCellInspector,
   onOpenSettings,
@@ -97,21 +93,6 @@ export const EditorToolbarRight: React.FC<EditorToolbarRightProps> = ({
       >
         {isReadOnly ? <Lock size={12} /> : <Unlock size={12} />}
         <span>{isReadOnly ? 'Read-Only' : 'Unlocked'}</span>
-      </button>
-    )}
-    {zoomScale !== 1 && (
-      <button
-        type="button"
-        title="Reset zoom to 100% (Ctrl+0 / Ctrl+Wheel)"
-        onClick={onResetZoom}
-        style={{
-          ...btnStyle,
-          padding: '3px 7px',
-          fontSize: 11.5,
-          fontWeight: 600,
-        }}
-      >
-        {Math.round(zoomScale * 100)}%
       </button>
     )}
     <button

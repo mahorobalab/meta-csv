@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { FileSpreadsheet, Moon, Plus, X } from 'lucide-react';
+import { NEW_FILE_FORMAT_OPTIONS, type NewFileFormat } from '@metatext-editor/ui';
 import type { DesktopTab } from '../hooks/useDesktopTabs';
 import { formatBytesShort } from '../utils/pathUtils';
 
@@ -13,7 +14,7 @@ export interface DesktopTabBarProps {
   border: string;
   onActivateTab: (tabId: string) => void;
   onCloseTab: (tabId: string) => void;
-  onNewTab: () => void;
+  onNewTab: (format?: NewFileFormat) => void;
 }
 
 export const DesktopTabBar: React.FC<DesktopTabBarProps> = ({
@@ -27,7 +28,53 @@ export const DesktopTabBar: React.FC<DesktopTabBarProps> = ({
   onActivateTab,
   onCloseTab,
   onNewTab,
-}) => (
+}) => {
+  const [newMenuPos, setNewMenuPos] = useState<{ left: number; top: number } | null>(null);
+  const plusBtnRef = useRef<HTMLButtonElement | null>(null);
+  const newMenuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!newMenuPos) return;
+    const onDocDown = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (
+        newMenuRef.current &&
+        !newMenuRef.current.contains(target) &&
+        plusBtnRef.current &&
+        !plusBtnRef.current.contains(target)
+      ) {
+        setNewMenuPos(null);
+      }
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setNewMenuPos(null);
+      }
+    };
+    document.addEventListener('mousedown', onDocDown);
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => {
+      document.removeEventListener('mousedown', onDocDown);
+      window.removeEventListener('keydown', onKeyDown, true);
+    };
+  }, [newMenuPos]);
+
+  const toggleNewMenu = () => {
+    if (newMenuPos) {
+      setNewMenuPos(null);
+      return;
+    }
+    const rect = plusBtnRef.current?.getBoundingClientRect();
+    if (!rect) {
+      onNewTab('csv');
+      return;
+    }
+    const left = Math.min(rect.left, Math.max(8, window.innerWidth - 188));
+    setNewMenuPos({ left, top: rect.bottom + 2 });
+  };
+
+  return (
   <div
     role="tablist"
     aria-label="Open Files"
@@ -143,10 +190,11 @@ export const DesktopTabBar: React.FC<DesktopTabBarProps> = ({
     })}
 
     <button
+      ref={plusBtnRef}
       type="button"
       aria-label="New File Tab"
-      title="New File (Ctrl+N)"
-      onClick={onNewTab}
+      title="New File (select format)"
+      onClick={toggleNewMenu}
       style={{
         display: 'inline-flex',
         alignItems: 'center',
@@ -156,12 +204,62 @@ export const DesktopTabBar: React.FC<DesktopTabBarProps> = ({
         border: 'none',
         background: 'transparent',
         color: barFg,
-        opacity: 0.75,
+        opacity: newMenuPos ? 1 : 0.75,
         cursor: 'pointer',
         flexShrink: 0,
       }}
     >
       <Plus size={14} />
     </button>
+
+    {newMenuPos && (
+      <div
+        ref={newMenuRef}
+        style={{
+          position: 'fixed',
+          left: newMenuPos.left,
+          top: newMenuPos.top,
+          zIndex: 120,
+          width: 180,
+          padding: 4,
+          borderRadius: 6,
+          background: tabActiveBg,
+          color: barFg,
+          border: `1px solid ${border}`,
+          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.28)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 2,
+        }}
+      >
+        {NEW_FILE_FORMAT_OPTIONS.map((opt) => (
+          <button
+            key={opt.format}
+            type="button"
+            onClick={() => {
+              setNewMenuPos(null);
+              onNewTab(opt.format);
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '5px 8px',
+              borderRadius: 4,
+              border: 'none',
+              background: 'transparent',
+              color: barFg,
+              fontSize: 12,
+              cursor: 'pointer',
+              textAlign: 'left',
+            }}
+          >
+            <span style={{ fontWeight: 500 }}>{opt.label}</span>
+            <span style={{ fontSize: 10.5, opacity: 0.6 }}>{opt.extension}</span>
+          </button>
+        ))}
+      </div>
+    )}
   </div>
-);
+  );
+};

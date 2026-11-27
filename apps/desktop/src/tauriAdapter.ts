@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import type { CsvFilePayload, FileSystemAdapter } from '@metatext-editor/core';
+import { createNewFileTemplate, type NewFileFormat } from '@metatext-editor/ui';
 
 function extractFileName(filePath: string): string {
   const parts = filePath.split(/[\\/]/);
@@ -78,22 +79,14 @@ export function createTauriAdapter(initialPath: string): DesktopFileSystemAdapte
   };
 }
 
-const DEFAULT_NEW_CSV = [',,,,', ',,,,', ',,,,', ',,,,', ',,,,'].join('\r\n');
-const DEFAULT_NEW_META = `{
-  "version": "0.1",
-  "format": "csv",
-  "csv": {
-    "hasHeader": false
-  }
-}
-`;
-
 export function createUntitledDesktopAdapter(
   onSaveAsRequested: (bytes: Uint8Array, metaText: string) => Promise<boolean>,
   onSaveAsStreamRequested?: (chunks: Iterable<Uint8Array>, metaText: string) => Promise<boolean>,
+  format: NewFileFormat = 'csv',
 ): DesktopFileSystemAdapter {
+  const template = createNewFileTemplate(format);
   let currentPath: string | null = null;
-  let metaText = DEFAULT_NEW_META;
+  let metaText = template.metaText;
 
   return {
     setFilePath(nextPath: string): void {
@@ -113,8 +106,8 @@ export function createUntitledDesktopAdapter(
         };
       }
       return {
-        fileName: 'untitled.csv',
-        csvBytes: new TextEncoder().encode(DEFAULT_NEW_CSV),
+        fileName: template.fileName,
+        csvBytes: new TextEncoder().encode(template.content),
         metaText,
       };
     },

@@ -418,6 +418,7 @@ export const MetaTextEditor = React.forwardRef<MetaTextEditorHandle, MetaTextEdi
     dirtyCsv,
     fileBytes,
     markerCount: markers.length,
+    zoomScale,
     dataVersion,
     searchQuery,
     viewRowIndices,
@@ -696,6 +697,7 @@ export const MetaTextEditor = React.forwardRef<MetaTextEditorHandle, MetaTextEdi
     selection,
     setSelection,
     zoomScale,
+    setZoomScale,
     filterQuery,
     filterContextRows,
     collapseColKey,
@@ -882,7 +884,6 @@ export const MetaTextEditor = React.forwardRef<MetaTextEditorHandle, MetaTextEdi
         onRemoveMarker={handleRemoveMarker}
         onClearAllMarkers={handleClearAllMarkers}
         getRowPreview={getRowPreview}
-        zoomScale={zoomScale}
         zebraEnabled={zebraEnabled}
         showCellInspector={showCellInspector}
         onLockReadOnly={() => {
@@ -897,7 +898,6 @@ export const MetaTextEditor = React.forwardRef<MetaTextEditorHandle, MetaTextEdi
           setOpenMenu('none');
           setStatusMsg('Editing unlocked (saved to .metatext.jsonc)');
         }}
-        onResetZoom={() => setZoomScale(1)}
         onToggleZebra={() => patchMeta(['table', 'zebraStriping'], !zebraEnabled)}
         onToggleCellInspector={() => setShowCellInspector((s) => !s)}
         onOpenSettings={() => {
@@ -1249,7 +1249,7 @@ export const MetaTextEditor = React.forwardRef<MetaTextEditorHandle, MetaTextEdi
           showCellInspector={showCellInspector}
           onOpenCellInspector={() => setShowCellInspector(true)}
           zoomScale={zoomScale}
-          onResetZoom={() => setZoomScale(1)}
+          onZoomChange={setZoomScale}
           visibleRowCount={viewRowIndices.length}
           totalRowCount={rowsRef.current.length}
           colCount={csvData?.headers.length ?? 0}

@@ -1,6 +1,88 @@
-import React, { useEffect } from 'react';
-import { ExternalLink, Info, X } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { ExternalLink, Info, Scale, X } from 'lucide-react';
 import type { AboutModalProps } from './types';
+
+interface OssLicenseEntry {
+  name: string;
+  license: string;
+  url: string;
+  note?: string;
+}
+
+const OSS_LICENSES: OssLicenseEntry[] = [
+  {
+    name: 'React / React DOM',
+    license: 'MIT',
+    url: 'https://github.com/facebook/react',
+    note: 'UI component library',
+  },
+  {
+    name: '@glideapps/glide-data-grid',
+    license: 'MIT',
+    url: 'https://github.com/glideapps/glide-data-grid',
+    note: 'High-performance Canvas data grid',
+  },
+  {
+    name: 'PapaParse',
+    license: 'MIT',
+    url: 'https://github.com/mholt/PapaParse',
+    note: 'CSV/TSV parser and serializer',
+  },
+  {
+    name: 'jsonc-parser',
+    license: 'MIT',
+    url: 'https://github.com/microsoft/node-jsonc-parser',
+    note: 'Comment-preserving JSONC parser & editor',
+  },
+  {
+    name: 'numfmt',
+    license: 'MIT',
+    url: 'https://github.com/borgar/numfmt',
+    note: 'Spreadsheet number & date formatting',
+  },
+  {
+    name: 'Lucide React',
+    license: 'ISC',
+    url: 'https://github.com/lucide-icons/lucide',
+    note: 'Icon set',
+  },
+  {
+    name: 'Lodash',
+    license: 'MIT',
+    url: 'https://github.com/lodash/lodash',
+    note: 'Utility helpers',
+  },
+  {
+    name: 'Marked',
+    license: 'MIT',
+    url: 'https://github.com/markedjs/marked',
+    note: 'Markdown parser (Glide Data Grid peer)',
+  },
+  {
+    name: 'Tauri',
+    license: 'MIT / Apache-2.0',
+    url: 'https://github.com/tauri-apps/tauri',
+    note: 'Desktop application framework',
+  },
+  {
+    name: 'Serde / serde_json',
+    license: 'MIT / Apache-2.0',
+    url: 'https://github.com/serde-rs/serde',
+    note: 'Rust serialization framework (Desktop)',
+  },
+  {
+    name: 'arboard',
+    license: 'MIT / Apache-2.0',
+    url: 'https://github.com/1Password/arboard',
+    note: 'Cross-platform native clipboard (Desktop)',
+  },
+  {
+    name: 'Vite',
+    license: 'MIT',
+    url: 'https://github.com/vitejs/vite',
+    note: 'Frontend build tool',
+  },
+];
 
 export const AboutModal: React.FC<AboutModalProps> = ({
   open,
@@ -8,8 +90,11 @@ export const AboutModal: React.FC<AboutModalProps> = ({
   themeMode,
   hostMode,
 }) => {
+  const [activeTab, setActiveTab] = useState<'about' | 'licenses'>('about');
+
   useEffect(() => {
     if (!open) return;
+    setActiveTab('about');
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
@@ -42,6 +127,20 @@ export const AboutModal: React.FC<AboutModalProps> = ({
     ['Ctrl+Z / Ctrl+Y', 'Undo / Redo'],
   ];
 
+  const tabBtnStyle = (selected: boolean): React.CSSProperties => ({
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 5,
+    padding: '5px 10px',
+    fontSize: 12,
+    fontWeight: selected ? 600 : 500,
+    borderRadius: 5,
+    border: `1px solid ${selected ? '#3b82f6' : 'transparent'}`,
+    background: selected ? (isDark ? 'rgba(59,130,246,0.18)' : '#dbeafe') : 'transparent',
+    color: selected ? (isDark ? '#93c5fd' : '#1d4ed8') : fg,
+    cursor: 'pointer',
+  });
+
   return (
     <div
       onMouseDown={(e) => {
@@ -64,7 +163,8 @@ export const AboutModal: React.FC<AboutModalProps> = ({
         aria-label="About MetaText Editor"
         style={{
           width: '100%',
-          maxWidth: 440,
+          maxWidth: 460,
+          maxHeight: '82vh',
           borderRadius: 10,
           background: bg,
           color: fg,
@@ -100,102 +200,209 @@ export const AboutModal: React.FC<AboutModalProps> = ({
           </button>
         </div>
 
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <strong style={{ fontSize: 16 }}>MetaText Editor</strong>
-            <span
-              style={{
-                fontSize: 11,
-                padding: '2px 7px',
-                borderRadius: 999,
-                background: mutedBg,
-                border: `1px solid ${border}`,
-              }}
-            >
-              v0.1.0 · {envLabel}
-            </span>
-          </div>
-          <div style={{ fontSize: 12, opacity: 0.78, marginTop: 4 }}>
-            High-performance CSV, TSV, JSONL &amp; Log editor &amp; viewer powered by{' '}
-            <code>.metatext.jsonc</code> sidecar metadata.
-          </div>
-        </div>
-
+        {/* Tabs */}
         <div
+          role="tablist"
           style={{
-            padding: 10,
-            borderRadius: 6,
-            background: mutedBg,
-            border: `1px solid ${border}`,
             display: 'flex',
-            flexDirection: 'column',
-            gap: 5,
+            gap: 6,
+            borderBottom: `1px solid ${border}`,
+            paddingBottom: 8,
           }}
         >
-          <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 2 }}>Keyboard Shortcuts</div>
-          {shortcuts.map(([keys, desc]) => (
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'about'}
+            style={tabBtnStyle(activeTab === 'about')}
+            onClick={() => setActiveTab('about')}
+          >
+            <Info size={13} />
+            <span>About</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'licenses'}
+            style={tabBtnStyle(activeTab === 'licenses')}
+            onClick={() => setActiveTab('licenses')}
+          >
+            <Scale size={13} />
+            <span>Open Source Licenses</span>
+          </button>
+        </div>
+
+        {activeTab === 'about' ? (
+          <>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <strong style={{ fontSize: 16 }}>MetaText Editor</strong>
+                <span
+                  style={{
+                    fontSize: 11,
+                    padding: '2px 7px',
+                    borderRadius: 999,
+                    background: mutedBg,
+                    border: `1px solid ${border}`,
+                  }}
+                >
+                  v0.1.0 · {envLabel}
+                </span>
+              </div>
+              <div style={{ fontSize: 12, opacity: 0.78, marginTop: 4 }}>
+                High-performance CSV, TSV, JSONL &amp; Log editor &amp; viewer powered by{' '}
+                <code>.metatext.jsonc</code> sidecar metadata.
+              </div>
+            </div>
+
             <div
-              key={keys}
               style={{
+                padding: 10,
+                borderRadius: 6,
+                background: mutedBg,
+                border: `1px solid ${border}`,
                 display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                fontSize: 11.5,
+                flexDirection: 'column',
+                gap: 5,
               }}
             >
-              <span style={{ opacity: 0.85 }}>{desc}</span>
-              <code
+              <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 2 }}>
+                Keyboard Shortcuts
+              </div>
+              {shortcuts.map(([keys, desc]) => (
+                <div
+                  key={keys}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    fontSize: 11.5,
+                  }}
+                >
+                  <span style={{ opacity: 0.85 }}>{desc}</span>
+                  <code
+                    style={{
+                      fontFamily: "'Consolas', monospace",
+                      padding: '1px 5px',
+                      borderRadius: 4,
+                      background: bg,
+                      border: `1px solid ${border}`,
+                    }}
+                  >
+                    {keys}
+                  </code>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, fontSize: 12 }}>
+              <a
+                href="https://github.com/mahorobalab/metatext-editor"
+                target="_blank"
+                rel="noopener noreferrer"
                 style={{
-                  fontFamily: "'Consolas', monospace",
-                  padding: '1px 5px',
-                  borderRadius: 4,
-                  background: bg,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  color: '#3b82f6',
+                  textDecoration: 'none',
+                }}
+              >
+                <span>GitHub</span>
+                <ExternalLink size={12} />
+              </a>
+              <a
+                href="https://mahorobalab.github.io/metatext-editor/"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  color: '#3b82f6',
+                  textDecoration: 'none',
+                }}
+              >
+                <span>Website</span>
+                <ExternalLink size={12} />
+              </a>
+            </div>
+
+            <div style={{ fontSize: 11, opacity: 0.7, lineHeight: 1.5 }}>
+              Licensed under the MIT License · © 2026 MahorobaLab. The MetaText Editor name and
+              official icons are assets of MahorobaLab.
+            </div>
+          </>
+        ) : (
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 6,
+              overflowY: 'auto',
+              maxHeight: 340,
+              paddingRight: 2,
+            }}
+          >
+            <div style={{ fontSize: 11.5, opacity: 0.78, marginBottom: 2 }}>
+              MetaText Editor is built with the following open-source software:
+            </div>
+            {OSS_LICENSES.map((pkg) => (
+              <div
+                key={pkg.name}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 8,
+                  padding: '7px 10px',
+                  borderRadius: 6,
+                  background: mutedBg,
                   border: `1px solid ${border}`,
                 }}
               >
-                {keys}
-              </code>
-            </div>
-          ))}
-        </div>
-
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, fontSize: 12 }}>
-          <a
-            href="https://github.com/mahorobalab/metatext-editor"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-              color: '#3b82f6',
-              textDecoration: 'none',
-            }}
-          >
-            <span>GitHub</span>
-            <ExternalLink size={12} />
-          </a>
-          <a
-            href="https://mahorobalab.github.io/metatext-editor/"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-              color: '#3b82f6',
-              textDecoration: 'none',
-            }}
-          >
-            <span>Website</span>
-            <ExternalLink size={12} />
-          </a>
-        </div>
-
-        <div style={{ fontSize: 11, opacity: 0.7, lineHeight: 1.5 }}>
-          Licensed under the MIT License · © 2026 MahorobaLab. The MetaText Editor name and official
-          icons are assets of MahorobaLab.
-        </div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <a
+                      href={pkg.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        fontWeight: 600,
+                        fontSize: 12,
+                        color: isDark ? '#93c5fd' : '#2563eb',
+                        textDecoration: 'none',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                      }}
+                    >
+                      <span>{pkg.name}</span>
+                      <ExternalLink size={11} />
+                    </a>
+                  </div>
+                  {pkg.note && (
+                    <div style={{ fontSize: 11, opacity: 0.72, marginTop: 1 }}>{pkg.note}</div>
+                  )}
+                </div>
+                <span
+                  style={{
+                    fontSize: 10.5,
+                    fontWeight: 600,
+                    padding: '2px 7px',
+                    borderRadius: 999,
+                    background: bg,
+                    border: `1px solid ${border}`,
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                  }}
+                >
+                  {pkg.license}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

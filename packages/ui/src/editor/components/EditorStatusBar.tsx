@@ -1,5 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Minus, Plus } from 'lucide-react';
 import type { MetaTextFormat } from '@metatext-editor/schema';
+
+const ZOOM_PRESETS = [0.6, 0.75, 0.9, 1, 1.25, 1.5, 1.75, 2, 2.5];
 
 export interface EditorStatusBarProps {
   isDark: boolean;
@@ -20,7 +23,7 @@ export interface EditorStatusBarProps {
   showCellInspector: boolean;
   onOpenCellInspector: () => void;
   zoomScale: number;
-  onResetZoom: () => void;
+  onZoomChange: (nextScale: number) => void;
   visibleRowCount: number;
   totalRowCount: number;
   colCount: number;
@@ -46,13 +49,43 @@ export const EditorStatusBar: React.FC<EditorStatusBarProps> = ({
   showCellInspector,
   onOpenCellInspector,
   zoomScale,
-  onResetZoom,
+  onZoomChange,
   visibleRowCount,
   totalRowCount,
   colCount,
   markerCount,
 }) => {
   const [showPathTooltip, setShowPathTooltip] = useState(false);
+  const [showZoomMenu, setShowZoomMenu] = useState(false);
+  const zoomWrapRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!showZoomMenu) return;
+    const onDocDown = (e: MouseEvent) => {
+      if (zoomWrapRef.current && !zoomWrapRef.current.contains(e.target as Node)) {
+        setShowZoomMenu(false);
+      }
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        setShowZoomMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', onDocDown);
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => {
+      document.removeEventListener('mousedown', onDocDown);
+      window.removeEventListener('keydown', onKeyDown, true);
+    };
+  }, [showZoomMenu]);
+
+  const zoomPercent = Math.round(zoomScale * 100);
+  const stepZoom = (delta: number) => {
+    const next = Math.round(Math.max(0.6, Math.min(2.5, zoomScale + delta)) * 100) / 100;
+    onZoomChange(next);
+  };
 
   return (
     <div
@@ -135,7 +168,6 @@ export const EditorStatusBar: React.FC<EditorStatusBarProps> = ({
             display: 'inline-flex',
             alignItems: 'center',
             gap: 10,
-            opacity: 0.85,
             whiteSpace: 'nowrap',
           }}
         >
@@ -156,30 +188,180 @@ export const EditorStatusBar: React.FC<EditorStatusBarProps> = ({
               {selectedCellLineCount} lines (Inspect)
             </button>
           )}
-          {zoomScale !== 1 && (
-            <button
-              type="button"
-              title="Reset zoom to 100% (Ctrl+0)"
-              onClick={onResetZoom}
-              style={{
-                border: `1px solid ${toolbarBorder}`,
-                borderRadius: 4,
-                background: 'transparent',
-                color: toolbarFg,
-                fontSize: 11,
-                padding: '0 6px',
-                cursor: 'pointer',
-              }}
-            >
-              {Math.round(zoomScale * 100)}%
-            </button>
-          )}
-          <span>
+          <span style={{ opacity: 0.85 }}>
             {visibleRowCount !== totalRowCount
               ? `Rows=${visibleRowCount.toLocaleString()} / ${totalRowCount.toLocaleString()}, Cols=${colCount}`
               : `Rows=${totalRowCount.toLocaleString()}, Cols=${colCount}`}
           </span>
-          {markerCount > 0 && <span>Markers={markerCount}</span>}
+          {markerCount > 0 && <span style={{ opacity: 0.85 }}>Markers={markerCount}</span>}
+
+          {/* Always-visible clickable zoom selector at bottom-right */}
+          <div ref={zoomWrapRef} style={{ position: 'relative', display: 'inline-flex' }}>
+            <button
+              type="button"
+              title="Zoom level (click to change, Ctrl+Wheel, Ctrl+0 to reset)"
+              aria-label={`Zoom level ${zoomPercent}%`}
+              onClick={() => setShowZoomMenu((v) => !v)}
+              style={{
+                border: `1px solid ${showZoomMenu || zoomScale !== 1 ? '#3b82f6' : toolbarBorder}`,
+                borderRadius: 4,
+                background: showZoomMenu
+                  ? isDark
+                    ? 'rgba(59, 130, 246, 0.22)'
+                    : '#dbeafe'
+                  : 'transparent',
+                color: toolbarFg,
+                fontSize: 11,
+                fontWeight: zoomScale !== 1 ? 600 : 500,
+                padding: '0 6px',
+                height: 18,
+                cursor: 'pointer',
+                minWidth: 42,
+              }}
+            >
+              {zoomPercent}%
+            </button>
+
+            {showZoomMenu && (
+              <div
+                style={{
+                  position: 'absolute',
+                  bottom: 'calc(100% + 6px)',
+                  right: 0,
+                  zIndex: 90,
+                  width: 156,
+                  padding: 8,
+                  borderRadius: 7,
+                  background: isDark ? '#1f1f23' : '#ffffff',
+                  color: toolbarFg,
+                  border: `1px solid ${toolbarBorder}`,
+                  boxShadow: '0 8px 24px rgba(0, 0, 0, 0.32)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 6,
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 4,
+                  }}
+                >
+                  <button
+                    type="button"
+                    title="Zoom out (-10%)"
+                    onClick={() => stepZoom(-0.1)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: 24,
+                      height: 22,
+                      borderRadius: 4,
+                      border: `1px solid ${toolbarBorder}`,
+                      background: isDark ? '#27272c' : '#f8fafc',
+                      color: toolbarFg,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <Minus size={12} />
+                  </button>
+                  <button
+                    type="button"
+                    title="Reset to 100% (Ctrl+0)"
+                    onClick={() => {
+                      onZoomChange(1);
+                      setShowZoomMenu(false);
+                    }}
+                    style={{
+                      flex: 1,
+                      height: 22,
+                      borderRadius: 4,
+                      border: `1px solid ${toolbarBorder}`,
+                      background: isDark ? '#27272c' : '#f8fafc',
+                      color: toolbarFg,
+                      fontSize: 11.5,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {zoomPercent}%
+                  </button>
+                  <button
+                    type="button"
+                    title="Zoom in (+10%)"
+                    onClick={() => stepZoom(0.1)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: 24,
+                      height: 22,
+                      borderRadius: 4,
+                      border: `1px solid ${toolbarBorder}`,
+                      background: isDark ? '#27272c' : '#f8fafc',
+                      color: toolbarFg,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <Plus size={12} />
+                  </button>
+                </div>
+
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, 1fr)',
+                    gap: 4,
+                  }}
+                >
+                  {ZOOM_PRESETS.map((preset) => {
+                    const pct = Math.round(preset * 100);
+                    const isCurrent = Math.abs(zoomScale - preset) < 0.005;
+                    return (
+                      <button
+                        key={pct}
+                        type="button"
+                        onClick={() => {
+                          onZoomChange(preset);
+                          setShowZoomMenu(false);
+                        }}
+                        style={{
+                          height: 22,
+                          borderRadius: 4,
+                          border: `1px solid ${isCurrent ? '#3b82f6' : toolbarBorder}`,
+                          background: isCurrent
+                            ? isDark
+                              ? 'rgba(59, 130, 246, 0.25)'
+                              : '#dbeafe'
+                            : 'transparent',
+                          color: isCurrent ? (isDark ? '#93c5fd' : '#1d4ed8') : toolbarFg,
+                          fontSize: 11,
+                          fontWeight: isCurrent ? 700 : 500,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {pct}%
+                      </button>
+                    );
+                  })}
+                </div>
+                <div
+                  style={{
+                    fontSize: 10.5,
+                    opacity: 0.65,
+                    textAlign: 'center',
+                    paddingTop: 2,
+                    borderTop: `1px solid ${toolbarBorder}`,
+                  }}
+                >
+                  Ctrl+Wheel, Ctrl+0
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

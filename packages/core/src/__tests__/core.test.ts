@@ -625,4 +625,12 @@ describe('@metatext-editor/core', () => {
     const sjis = new Uint8Array([0x82, 0xa0, 0x82, 0xa2, 0x0d, 0x0a]);
     expect(detectEncoding(sjis)).toBe('shift-jis');
   });
+
+  it('preserves empty comma-delimited rows for new 100x100 blank sheets', () => {
+    const blankSheet = Array.from({ length: 100 }, () => ','.repeat(99)).join('\r\n');
+    const parsed = parseCsvBytes(new TextEncoder().encode(blankSheet), { hasHeader: false });
+    expect(parsed.rows.length).toBe(100);
+    expect(parsed.headers.length).toBe(100);
+    expect(parsed.rows[0]!.length).toBe(100);
+  });
 });

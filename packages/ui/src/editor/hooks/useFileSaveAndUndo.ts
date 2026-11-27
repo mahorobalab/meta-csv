@@ -9,6 +9,7 @@ import {
   type ParsedCsvData,
 } from '@metatext-editor/core';
 import type { EditorHostMode } from '../../SettingsAboutDialogs';
+import type { NewFileFormat } from '../../newFileTemplates';
 
 export interface UseFileSaveAndUndoParams {
   adapter: FileSystemAdapter;
@@ -23,7 +24,7 @@ export interface UseFileSaveAndUndoParams {
   rowsRef: React.MutableRefObject<string[][]>;
   metaTextRef: React.MutableRefObject<string | null>;
   historyRef: React.MutableRefObject<UndoRedoHistory>;
-  onNewFile?: () => void;
+  onNewFile?: (format?: NewFileFormat) => void;
   onSaveAs?: (bytes: Uint8Array, metaText: string) => Promise<boolean | void> | boolean | void;
   onSaveAsStream?: (
     chunks: Iterable<Uint8Array>,
@@ -153,17 +154,20 @@ export function useFileSaveAndUndo({
     setStatusMsg,
   ]);
 
-  const handleNewFileAction = useCallback(() => {
-    if (!onNewFile) return;
-    if (
-      hostMode !== 'desktop' &&
-      dirtyCsv &&
-      !window.confirm('Discard unsaved changes and create a new file?')
-    ) {
-      return;
-    }
-    onNewFile();
-  }, [onNewFile, hostMode, dirtyCsv]);
+  const handleNewFileAction = useCallback(
+    (format?: NewFileFormat) => {
+      if (!onNewFile) return;
+      if (
+        hostMode !== 'desktop' &&
+        dirtyCsv &&
+        !window.confirm('Discard unsaved changes and create a new file?')
+      ) {
+        return;
+      }
+      onNewFile(format);
+    },
+    [onNewFile, hostMode, dirtyCsv],
+  );
 
   const handleCloseFileAction = useCallback(() => {
     if (!onCloseFile) return;

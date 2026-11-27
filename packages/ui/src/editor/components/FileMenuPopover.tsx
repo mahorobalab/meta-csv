@@ -1,7 +1,8 @@
-import React from 'react';
-import { FilePlus, FolderOpen, Redo2, Save, SaveAll, Undo2, X } from 'lucide-react';
+import React, { useState } from 'react';
+import { ChevronDown, ChevronRight, FilePlus, FolderOpen, Redo2, Save, SaveAll, Undo2, X } from 'lucide-react';
 import type { MetaTextFormat } from '@metatext-editor/schema';
 import type { EditorHostMode } from '../../SettingsAboutDialogs';
+import { NEW_FILE_FORMAT_OPTIONS, type NewFileFormat } from '../../newFileTemplates';
 
 export interface FileMenuPopoverProps {
   hostMode: EditorHostMode;
@@ -14,7 +15,7 @@ export interface FileMenuPopoverProps {
   hasCsvData: boolean;
   canUndo: boolean;
   canRedo: boolean;
-  onNewFile?: () => void;
+  onNewFile?: (format?: NewFileFormat) => void;
   onOpenFile?: () => void;
   onSaveAs?: () => void;
   onCloseFile?: () => void;
@@ -46,6 +47,8 @@ export const FileMenuPopover: React.FC<FileMenuPopoverProps> = ({
   onCloseMenu,
   fileMenuItems,
 }) => {
+  const [showNewFormats, setShowNewFormats] = useState(false);
+
   const saveLabel =
     activeFormat === 'jsonl'
       ? hostMode === 'web'
@@ -80,20 +83,51 @@ export const FileMenuPopover: React.FC<FileMenuPopoverProps> = ({
       }}
     >
       {onNewFile && (
-        <button
-          type="button"
-          style={menuItemStyle}
-          onClick={() => {
-            onCloseMenu();
-            onNewFile();
-          }}
-        >
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
-            <FilePlus size={14} />
-            <span>New File</span>
-          </span>
-          <span style={{ fontSize: 10.5, opacity: 0.6 }}>Ctrl+N</span>
-        </button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <button
+            type="button"
+            style={menuItemStyle}
+            onClick={() => setShowNewFormats((v) => !v)}
+            title="New File (Ctrl+N for CSV)"
+          >
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+              <FilePlus size={14} />
+              <span>New File</span>
+            </span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10.5, opacity: 0.7 }}>
+              <span>Ctrl+N</span>
+              {showNewFormats ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+            </span>
+          </button>
+          {showNewFormats && (
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 2,
+                marginLeft: 16,
+                paddingLeft: 8,
+                borderLeft: `1px solid ${toolbarBorder}`,
+              }}
+            >
+              {NEW_FILE_FORMAT_OPTIONS.map((opt) => (
+                <button
+                  key={opt.format}
+                  type="button"
+                  style={{ ...menuItemStyle, padding: '4px 8px' }}
+                  onClick={() => {
+                    setShowNewFormats(false);
+                    onCloseMenu();
+                    onNewFile(opt.format);
+                  }}
+                >
+                  <span>{opt.label}</span>
+                  <span style={{ fontSize: 10.5, opacity: 0.6 }}>{opt.extension}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       )}
       {onOpenFile && (
         <button

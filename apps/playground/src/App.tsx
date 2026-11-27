@@ -2,10 +2,12 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, Code2, ExternalLink, FileSpreadsheet } from 'lucide-react';
 import {
   MetaTextEditor,
+  createNewFileTemplate,
   resolveThemeMode,
   useSystemTheme,
   type EditorAppSettings,
   type EditorStatusInfo,
+  type NewFileFormat,
   type ThemePreference,
 } from '@metatext-editor/ui';
 import {
@@ -70,6 +72,7 @@ export const App: React.FC = () => {
   const [metaText, setMetaText] = useState<string>(SPEC_SETTING_META);
   const [customFile, setCustomFile] = useState<File | null>(null);
   const [customMetaText, setCustomMetaText] = useState<string | null>(null);
+  const [newFormat, setNewFormat] = useState<NewFileFormat>('csv');
   const [newSeq, setNewSeq] = useState<number>(0);
   const [isDraggingFile, setIsDraggingFile] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -122,10 +125,11 @@ export const App: React.FC = () => {
       });
     }
     if (preset === 'new') {
+      const tpl = createNewFileTemplate(newFormat);
       return createMemoryAdapter({
-        fileName: 'untitled.csv',
-        csvBytes: new TextEncoder().encode([',,,,', ',,,,', ',,,,', ',,,,', ',,,,'].join('\r\n')),
-        metaText: '{\n  "version": "0.1",\n  "format": "csv",\n  "csv": { "hasHeader": false }\n}\n',
+        fileName: tpl.fileName,
+        csvBytes: new TextEncoder().encode(tpl.content),
+        metaText: tpl.metaText,
       });
     }
     if (customFile) {
@@ -136,7 +140,7 @@ export const App: React.FC = () => {
       csvBytes: new TextEncoder().encode(SPEC_SETTING_CSV),
       metaText: SPEC_SETTING_META,
     });
-  }, [preset, customFile, customMetaText, newSeq]);
+  }, [preset, customFile, customMetaText, newFormat, newSeq]);
 
   const openDroppedFiles = async (fileList: FileList | null) => {
     if (!fileList || fileList.length === 0) return;
@@ -397,8 +401,10 @@ export const App: React.FC = () => {
           onAppSettingsChange={(patch) =>
             setAppSettings((prev) => ({ ...prev, ...patch }))
           }
-          onNewFile={() => {
-            setMetaText('{\n  "version": "0.1",\n  "format": "csv",\n  "csv": { "hasHeader": false }\n}\n');
+          onNewFile={(format: NewFileFormat = 'csv') => {
+            const tpl = createNewFileTemplate(format);
+            setNewFormat(format);
+            setMetaText(tpl.metaText);
             setPreset('new');
             setNewSeq((s) => s + 1);
           }}

@@ -4,6 +4,7 @@ import type { MetaTextFormat } from '@metatext-editor/schema';
 import type { EditorAppSettings, EditorHostMode } from '../SettingsAboutDialogs';
 import type { ThemePreference } from '../theme';
 import type { NativeClipboardBridge } from '../columnClipboard';
+import type { NewFileFormat } from '../newFileTemplates';
 
 export interface EditorViewSnapshot {
   scrollCol: number;
@@ -25,6 +26,7 @@ export interface MetaTextEditorHandle {
   redo: () => void;
   reload: () => void;
   markClean: () => void;
+  setZoomScale: (scale: number) => void;
   captureViewSnapshot: () => EditorViewSnapshot;
 }
 
@@ -35,6 +37,7 @@ export interface EditorStatusInfo {
   visibleRows: number;
   cols: number;
   markerCount: number;
+  zoomScale?: number;
   fileBytes?: number;
   format?: MetaTextFormat;
   readOnly?: boolean;
@@ -55,7 +58,7 @@ export interface MetaTextEditorProps {
   appSettings?: EditorAppSettings;
   onAppSettingsChange?: (patch: Partial<EditorAppSettings>) => void;
   onOpenSettings?: () => void;
-  onNewFile?: () => void;
+  onNewFile?: (format?: NewFileFormat) => void;
   onOpenFile?: () => void;
   onSaveAs?: (bytes: Uint8Array, metaText: string) => Promise<boolean | void> | boolean | void;
   onSaveAsStream?: (

@@ -50,6 +50,11 @@ const VsCodeApp: React.FC = () => {
               respondCsvData(cmd.requestId, ed.serializeCurrentCsv());
             }
             break;
+          case 'setZoom':
+            if (typeof cmd.scale === 'number') {
+              ed.setZoomScale(cmd.scale);
+            }
+            break;
         }
       }),
     [onHostCommand, respondCsvData],

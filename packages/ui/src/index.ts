@@ -7,6 +7,13 @@ export {
 } from './MetaTextEditor';
 export type { NativeClipboardBridge } from './columnClipboard';
 export {
+  NEW_FILE_FORMAT_OPTIONS,
+  createNewFileTemplate,
+  type NewFileFormat,
+  type NewFileFormatOption,
+  type NewFileTemplate,
+} from './newFileTemplates';
+export {
   SettingsModal,
   AboutModal,
   type EditorAppSettings,

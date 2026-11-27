@@ -1,12 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { open, save } from '@tauri-apps/plugin-dialog';
-import type {
-  EditorAppSettings,
-  EditorStatusInfo,
-  EditorViewSnapshot,
-  MetaTextEditorHandle,
-  ThemePreference,
+import {
+  createNewFileTemplate,
+  type EditorAppSettings,
+  type EditorStatusInfo,
+  type EditorViewSnapshot,
+  type MetaTextEditorHandle,
+  type NewFileFormat,
+  type ThemePreference,
 } from '@metatext-editor/ui';
 import {
   createTauriAdapter,
@@ -173,9 +175,10 @@ export function useDesktopTabs() {
   const saveTabAs = useCallback(
     async (tabId: string, bytes: Uint8Array, metaText: string): Promise<boolean> => {
       const currentTab = tabsRef.current.find((t) => t.id === tabId);
+      const fallbackName = currentTab?.fileName || 'untitled.csv';
       const defaultPath =
         currentTab?.filePath ??
-        (lastDirRef.current ? `${lastDirRef.current}\\untitled.csv` : 'untitled.csv');
+        (lastDirRef.current ? `${lastDirRef.current}\\${fallbackName}` : fallbackName);
       const selected = await save({ defaultPath, filters: SAVE_DIALOG_FILTERS });
       if (typeof selected !== 'string' || selected.length === 0) return false;
 
@@ -198,9 +201,10 @@ export function useDesktopTabs() {
       metaText: string,
     ): Promise<boolean> => {
       const currentTab = tabsRef.current.find((t) => t.id === tabId);
+      const fallbackName = currentTab?.fileName || 'untitled.csv';
       const defaultPath =
         currentTab?.filePath ??
-        (lastDirRef.current ? `${lastDirRef.current}\\untitled.csv` : 'untitled.csv');
+        (lastDirRef.current ? `${lastDirRef.current}\\${fallbackName}` : fallbackName);
       const selected = await save({ defaultPath, filters: SAVE_DIALOG_FILTERS });
       if (typeof selected !== 'string' || selected.length === 0) return false;
 
@@ -268,25 +272,30 @@ export function useDesktopTabs() {
     [updateLastDirectory, applyMemoryBudget],
   );
 
-  const handleNewTab = useCallback(() => {
-    const id = `tab-${nextTabIdRef.current++}`;
-    const adapter = createUntitledDesktopAdapter(
-      (bytes, metaText) => saveTabAs(id, bytes, metaText),
-      (chunks, metaText) => saveTabAsStream(id, chunks, metaText),
-    );
-    const tab: DesktopTab = {
-      id,
-      filePath: null,
-      fileName: 'untitled.csv',
-      dirty: false,
-      adapter,
-      sleeping: false,
-      lastAccessedAt: Date.now(),
-      fileBytes: 0,
-    };
-    setTabs((prev) => applyMemoryBudget([...prev, tab], id));
-    setActiveTabId(id);
-  }, [saveTabAs, saveTabAsStream, applyMemoryBudget]);
+  const handleNewTab = useCallback(
+    (format: NewFileFormat = 'csv') => {
+      const id = `tab-${nextTabIdRef.current++}`;
+      const template = createNewFileTemplate(format);
+      const adapter = createUntitledDesktopAdapter(
+        (bytes, metaText) => saveTabAs(id, bytes, metaText),
+        (chunks, metaText) => saveTabAsStream(id, chunks, metaText),
+        format,
+      );
+      const tab: DesktopTab = {
+        id,
+        filePath: null,
+        fileName: template.fileName,
+        dirty: false,
+        adapter,
+        sleeping: false,
+        lastAccessedAt: Date.now(),
+        fileBytes: 0,
+      };
+      setTabs((prev) => applyMemoryBudget([...prev, tab], id));
+      setActiveTabId(id);
+    },
+    [saveTabAs, saveTabAsStream, applyMemoryBudget],
+  );
 
   const closeTab = useCallback(
     (tabId: string, skipConfirm = false) => {

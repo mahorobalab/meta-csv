@@ -15,6 +15,7 @@ export interface UseViewSnapshotRestoreParams {
   selection: GridSelection;
   setSelection: React.Dispatch<React.SetStateAction<GridSelection>>;
   zoomScale: number;
+  setZoomScale: React.Dispatch<React.SetStateAction<number>>;
   filterQuery: string;
   filterContextRows: number;
   collapseColKey: string;
@@ -40,6 +41,7 @@ export function useViewSnapshotRestore({
   selection,
   setSelection,
   zoomScale,
+  setZoomScale,
   filterQuery,
   filterContextRows,
   collapseColKey,
@@ -73,6 +75,9 @@ export function useViewSnapshotRestore({
       markClean: () => {
         setDirtyCsv(false);
       },
+      setZoomScale: (scale: number) => {
+        setZoomScale(Math.round(Math.max(0.6, Math.min(2.5, scale)) * 100) / 100);
+      },
       captureViewSnapshot: (): EditorViewSnapshot => ({
         scrollCol: visibleRegionRef.current.x,
         scrollRow: visibleRegionRef.current.y,
@@ -98,6 +103,7 @@ export function useViewSnapshotRestore({
       visibleRegionRef,
       selection,
       zoomScale,
+      setZoomScale,
       filterQuery,
       filterContextRows,
       collapseColKey,

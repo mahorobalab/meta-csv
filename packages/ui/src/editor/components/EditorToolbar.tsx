@@ -11,6 +11,7 @@ import type {
 } from '@metatext-editor/schema';
 import type { ParsedCsvData, resolveCellStyle } from '@metatext-editor/core';
 import type { EditorHostMode } from '../../SettingsAboutDialogs';
+import type { NewFileFormat } from '../../newFileTemplates';
 import { MarkerControls } from '../../MarkerControls';
 import { EditorSearchBox } from './EditorSearchBox';
 import { EditorToolbarRight } from './EditorToolbarRight';
@@ -37,7 +38,7 @@ export interface EditorToolbarProps {
   rows: string[][];
   canUndo: boolean;
   canRedo: boolean;
-  onNewFile?: () => void;
+  onNewFile?: (format?: NewFileFormat) => void;
   onOpenFile?: () => void;
   onSaveAs?: () => void;
   onCloseFile?: () => void;
@@ -73,12 +74,10 @@ export interface EditorToolbarProps {
   onRemoveMarker: (dataRow: number) => void;
   onClearAllMarkers: () => void;
   getRowPreview: (dataRow: number) => string;
-  zoomScale: number;
   zebraEnabled: boolean;
   showCellInspector: boolean;
   onLockReadOnly: () => void;
   onUnlockEditing: () => void;
-  onResetZoom: () => void;
   onToggleZebra: () => void;
   onToggleCellInspector: () => void;
   onOpenSettings: () => void;
@@ -216,14 +215,12 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = (p) => (
       isReadOnly={p.isReadOnly}
       activeFormat={p.activeFormat}
       openMenu={p.openMenu}
-      zoomScale={p.zoomScale}
       zebraEnabled={p.zebraEnabled}
       showCellInspector={p.showCellInspector}
       onToggleUnlockPopover={() => p.setOpenMenu((m) => (m === 'unlock' ? 'none' : 'unlock'))}
       onLockReadOnly={p.onLockReadOnly}
       onUnlockEditing={p.onUnlockEditing}
       onCloseMenu={() => p.setOpenMenu('none')}
-      onResetZoom={p.onResetZoom}
       onToggleZebra={p.onToggleZebra}
       onToggleCellInspector={p.onToggleCellInspector}
       onOpenSettings={p.onOpenSettings}

@@ -18,6 +18,7 @@ export interface UseEditorSearchAndStatusParams {
   dirtyCsv: boolean;
   fileBytes: number;
   markerCount: number;
+  zoomScale: number;
   dataVersion: number;
   searchQuery: string;
   viewRowIndices: Int32Array;
@@ -40,6 +41,7 @@ export function useEditorSearchAndStatus({
   dirtyCsv,
   fileBytes,
   markerCount,
+  zoomScale,
   dataVersion,
   searchQuery,
   viewRowIndices,
@@ -132,6 +134,7 @@ export function useEditorSearchAndStatus({
       visibleRows: csvData ? viewRowIndices.length : 0,
       cols: csvData ? csvData.headers.length : 0,
       markerCount,
+      zoomScale,
       fileBytes,
       format: activeFormat,
       readOnly: isReadOnly,
@@ -145,6 +148,7 @@ export function useEditorSearchAndStatus({
     csvData,
     viewRowIndices.length,
     markerCount,
+    zoomScale,
     fileBytes,
     activeFormat,
     isReadOnly,

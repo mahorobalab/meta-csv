@@ -1,37 +1,28 @@
 
-・Style ESCで閉じるように
-・マーカーアイコンの右に「Marker」テキスト
-・マーカーとSearchの位置を逆に
-・D%Dでオープン、デスクトップ版とWeb版 → デスクトップ版は、新規タブ、Web版は、編集が入っていたら確認ダイアログ VS Codeは、おまかせでいいはず
+・新規作成 → ファイルの種類選べるように プルダウン出る デスクトップ版、Web版
 
-・新規で何もない画面出る 100x100 のセルが出るようにする
-・Filterの幅広すぎ 2/3 位に
-・拡大率がマウスホイールだけだと気が付かないのでステータスバー右下に100％ クリックで変更可能に
-・Web版は、local strage に .metatext.jsonc 保存 パッケージのときに一緒に
 
-・何も開いてない時の説明の文字がデカくてダサい、もう少し小さめに
-・アバウトにオープンソースライセンス
+・VS Code で .metatext.jsonc の非表示設定は作れるか確認
+・ログ用末尾監視
+    画面分割？
 
 ・多言語化
 
-・WebLP ダサすぎる問題、いかにもAI モノトーンでビジネスっぽく
 
-・exe の名称は、MetaTextEditor.exe にする VS Code Extensionも？ 
+・exe の名称は、MetaTextEditor.exe にする？ VS Code Extensionも？ 
 ・リリース
+    ・VS Code マーケットプレイス、 MS Store, BOOTH版
     MSIX
         npm install @microsoft/winappcli --save-dev
-    ・VS Marketplaces CSV,TSV,Log,jsonl ヒットするよう調整
+        ・VS Marketplaces CSV,TSV,Log,jsonl ヒットするよう調整
 ・ビルド
     一発で publishしたい
 ・アップデート
     ・BOOTH版、MH-updates使えるか
 
-
-・ログ用末尾監視
 ・型バリデーション
 ・入力補完
 ・条件付き書式
-
 
 ・ README.mdに追記
     • Installation / Download セクション:
@@ -39,9 +30,15 @@
 	• GitHub Releases でのバイナリ配布は行わない旨を明記。
 
 PLAN
-    ・アンドゥ Ctrl+Z 実装 → metatext-editor\docs\plan\history-gix-plan.md のとき対応
     docs\plan\history-gix-plan.md
+        ・Undo Ctrl+Z 実装 → metatext-editor\docs\plan\history-gix-plan.md のとき対応
+        ・履歴ファイルは作らない設定も作る Undoはできるように
     docs\plan\packaging-metatext-zip-plan.md
+        ・Web版は、local strage に .metatext.jsonc 保存 パッケージのときに一緒に
+
+・Web LP ダサすぎる問題、いかにもAI モノトーンでビジネスっぽく
+・MH-Portal に載せる ヘルプリンク
+
 
 -- 保留 --
 
@@ -128,7 +125,16 @@ PLAN
 ・選択セル内移動、Tab 右 一番右→左下、Enter 下 一番下 → セルない範囲の右上 ※ Excelに合わせる 
 ・F2でセル内編集 ※ Excelに合わせる 今はマーカーになってる？ マーカー編集とは、テキストが全部選択じゃなくてカーソルが一番後ろに入った状態になること
 ・meta-csv の記述がまだ結構残ってる → Ctrl+Shift+F → metatext-editor
-
+・Style ESCで閉じるように
+・マーカーアイコンの右に「Marker」テキスト
+・マーカーとSearchの位置を逆に
+・D%Dでオープン、デスクトップ版とWeb版 → デスクトップ版は、新規タブ、Web版は、編集が入っていたら確認ダイアログ VS Codeは、おまかせでいいはず
+・新規で何もない画面出る 100x100 のセルが出るようにする
+・Filterの幅広すぎ 2/3 位に
+・拡大率がマウスホイールだけだと気が付かないのでステータスバー右下に100％表示 
+    クリックで変更可能に VS Code版は上にでてクリックすると100％に戻るけど選べるようにする ステータスバーでいけるならステータスバー
+・何も開いてない時の画面    ボタンラベルは、「ファイルを開く」、「新規作成」
+・アバウトにオープンソースライセンス表示 タブで分ける
 
 ----------------------------------------
 Gemin talk

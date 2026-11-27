@@ -159,7 +159,7 @@ export function parseCsvBytes(
     let rowCounter = 0;
     Papa.parse<string[]>(text, {
       delimiter,
-      skipEmptyLines: 'greedy',
+      skipEmptyLines: true,
       step: (results) => {
         const r = results.data;
         if (r.length > colCount) colCount = r.length;
@@ -179,7 +179,7 @@ export function parseCsvBytes(
   } else {
     const parsed = Papa.parse<string[]>(text, {
       delimiter,
-      skipEmptyLines: 'greedy',
+      skipEmptyLines: true,
     });
     for (let i = 0; i < parsed.data.length; i++) {
       const r = parsed.data[i]!;

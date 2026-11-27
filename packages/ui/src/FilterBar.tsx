@@ -150,9 +150,9 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           position: 'relative',
           display: 'inline-flex',
           alignItems: 'center',
-          flex: '1 1 260px',
-          minWidth: 180,
-          maxWidth: 540,
+          flex: '1 1 200px',
+          minWidth: 160,
+          maxWidth: 360,
         }}
       >
         <input
