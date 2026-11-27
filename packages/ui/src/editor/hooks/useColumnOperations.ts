@@ -1,7 +1,14 @@
 import { useCallback } from 'react';
 import { CompactSelection, type GridSelection } from '@glideapps/glide-data-grid';
 import type { MetaTextDocument, MetaTextFormat } from '@metatext-editor/schema';
-import { patchMetaJsonc, type ParsedCsvData } from '@metatext-editor/core';
+import {
+  UndoRedoHistory,
+  patchMetaJsonc,
+  type ColumnSnapshot,
+  type EditCommand,
+  type ParsedCsvData,
+} from '@metatext-editor/core';
+import type { MetaSaveOptions } from './useDocumentLoader';
 import type { CopiedColumnPayload, NativeClipboardBridge } from '../../columnClipboard';
 import type {
   EditingHeaderColState,
@@ -22,6 +29,7 @@ export interface UseColumnOperationsParams {
   meta: MetaTextDocument;
   metaTextRef: React.MutableRefObject<string | null>;
   rowsRef: React.MutableRefObject<string[][]>;
+  historyRef: React.MutableRefObject<UndoRedoHistory>;
   copiedColumnRef: React.MutableRefObject<CopiedColumnPayload | null>;
   isReadOnly: boolean;
   activeFormat: MetaTextFormat;
@@ -40,8 +48,8 @@ export interface UseColumnOperationsParams {
   shouldConfirmHideColumn: boolean;
   getDefaultColumnTitle: (actualCol: number) => string;
   appendRowsToOrder: (appendedDataRows: number[]) => void;
-  patchMeta: (path: (string | number)[], value: unknown) => void;
-  scheduleMetaSave: (nextText: string) => void;
+  patchMeta: (path: (string | number)[], value: unknown, options?: MetaSaveOptions) => void;
+  scheduleMetaSave: (nextText: string, options?: MetaSaveOptions) => void;
   setDirtyCsv: (dirty: boolean) => void;
   setDataVersion: React.Dispatch<React.SetStateAction<number>>;
   setStatusMsg: (msg: string) => void;
@@ -55,6 +63,7 @@ export function useColumnOperations({
   meta,
   metaTextRef,
   rowsRef,
+  historyRef,
   copiedColumnRef,
   isReadOnly,
   activeFormat,
@@ -156,6 +165,8 @@ export function useColumnOperations({
 
     if (csvData.dialect.hasHeader && !isReadOnly && activeFormat === 'csv') {
       if (!trimmed || trimmed === csvData.headers[actualCol]) return;
+      const prevMetaText = metaTextRef.current ?? '';
+      const beforeHeader = csvData.headers[actualCol] ?? '';
       const nextHeaders = [...csvData.headers];
       const nextKeys = [...csvData.columnKeys];
       const otherKeys = nextKeys.filter((_, i) => i !== actualCol);
@@ -163,12 +174,29 @@ export function useColumnOperations({
       nextHeaders[actualCol] = trimmed;
       nextKeys[actualCol] = uniqueKey;
 
+      const steps: EditCommand[] = [
+        {
+          type: 'renameCol',
+          colIndex: actualCol,
+          beforeHeader,
+          afterHeader: trimmed,
+          beforeKey: colKey,
+          afterKey: uniqueKey,
+        },
+      ];
       if (colKey !== uniqueKey && meta.columns?.[colKey]) {
-        let text = metaTextRef.current ?? '';
+        let text = prevMetaText;
         text = patchMetaJsonc(text, ['columns', uniqueKey], meta.columns[colKey]);
         text = patchMetaJsonc(text, ['columns', colKey], undefined);
-        scheduleMetaSave(text);
+        scheduleMetaSave(text, { skipHistory: true });
+        if (text !== prevMetaText) {
+          steps.push({ type: 'metaChange', beforeMetaText: prevMetaText, afterMetaText: text });
+        }
       }
+      historyRef.current.push(
+        steps.length === 1 ? steps[0]! : { type: 'composite', steps },
+        `Rename column to "${trimmed}"`,
+      );
 
       setCsvData({ ...csvData, headers: nextHeaders, columnKeys: nextKeys });
       setDirtyCsv(true);
@@ -186,6 +214,7 @@ export function useColumnOperations({
     activeFormat,
     meta.columns,
     metaTextRef,
+    historyRef,
     scheduleMetaSave,
     setCsvData,
     setDirtyCsv,
@@ -202,6 +231,7 @@ export function useColumnOperations({
     meta,
     metaTextRef,
     rowsRef,
+    historyRef,
     copiedColumnRef,
     isReadOnly,
     autoWidths,
@@ -224,7 +254,16 @@ export function useColumnOperations({
         setStatusMsg('Cannot delete all remaining columns');
         return;
       }
-      const removeSet = new Set(actualCols);
+      const prevMetaText = metaTextRef.current ?? '';
+      const sortedAsc = Array.from(new Set(actualCols)).sort((a, b) => a - b);
+      const snapshots: ColumnSnapshot[] = sortedAsc.map((colIdx) => ({
+        index: colIdx,
+        header: csvData.headers[colIdx] ?? '',
+        key: csvData.columnKeys[colIdx] ?? String(colIdx),
+        width: autoWidths[colIdx] ?? 140,
+        values: rowsRef.current.map((row) => row[colIdx] ?? ''),
+      }));
+      const removeSet = new Set(sortedAsc);
       const nextHeaders = csvData.headers.filter((_, i) => !removeSet.has(i));
       const nextKeys = csvData.dialect.hasHeader
         ? csvData.columnKeys.filter((_, i) => !removeSet.has(i))
@@ -233,7 +272,7 @@ export function useColumnOperations({
             (_, i) => String(i),
           );
       const nextWidths = autoWidths.filter((_, i) => !removeSet.has(i));
-      const sortedDesc = [...actualCols].sort((a, b) => b - a);
+      const sortedDesc = [...sortedAsc].reverse();
       for (let r = 0; r < rowsRef.current.length; r++) {
         const row = rowsRef.current[r]!;
         for (const colIdx of sortedDesc) {
@@ -241,8 +280,11 @@ export function useColumnOperations({
         }
       }
 
+      const steps: EditCommand[] = [
+        { type: 'deleteCols', cols: snapshots, reindexKeys: !csvData.dialect.hasHeader },
+      ];
       if (csvData.dialect.hasHeader) {
-        let text = metaTextRef.current ?? '';
+        let text = prevMetaText;
         let changed = false;
         for (const k of colKeys) {
           if (meta.columns?.[k]) {
@@ -250,8 +292,17 @@ export function useColumnOperations({
             changed = true;
           }
         }
-        if (changed) scheduleMetaSave(text);
+        if (changed) {
+          scheduleMetaSave(text, { skipHistory: true });
+          if (text !== prevMetaText) {
+            steps.push({ type: 'metaChange', beforeMetaText: prevMetaText, afterMetaText: text });
+          }
+        }
       }
+      historyRef.current.push(
+        steps.length === 1 ? steps[0]! : { type: 'composite', steps },
+        sortedAsc.length > 1 ? `Delete ${sortedAsc.length} columns` : 'Delete column',
+      );
 
       setCsvData({ ...csvData, headers: nextHeaders, columnKeys: nextKeys });
       setAutoWidths(nextWidths);
@@ -269,6 +320,7 @@ export function useColumnOperations({
       isReadOnly,
       autoWidths,
       rowsRef,
+      historyRef,
       meta.columns,
       metaTextRef,
       scheduleMetaSave,
@@ -432,19 +484,40 @@ export function useColumnOperations({
       const nextWidths = [...autoWidths];
       nextWidths.splice(insertIdx, 0, ...dupWidths);
 
+      const prevMetaText = metaTextRef.current ?? '';
+      const copiedPerRow: string[][] = new Array(rowsRef.current.length);
       for (let r = 0; r < rowsRef.current.length; r++) {
         const row = rowsRef.current[r]!;
         const copiedVals = actualCols.map((ac) => row[ac] ?? '');
+        copiedPerRow[r] = copiedVals;
         row.splice(insertIdx, 0, ...copiedVals);
       }
 
+      const steps: EditCommand[] = [
+        {
+          type: 'insertCols',
+          index: insertIdx,
+          headers: dupHeaders,
+          keys: dupKeys,
+          widths: dupWidths,
+          values: copiedPerRow,
+          reindexKeys: !csvData.dialect.hasHeader,
+        },
+      ];
       if (metaCopies.length > 0) {
-        let text = metaTextRef.current ?? '';
+        let text = prevMetaText;
         for (const item of metaCopies) {
           text = patchMetaJsonc(text, ['columns', item.newKey], item.cfg);
         }
-        scheduleMetaSave(text);
+        scheduleMetaSave(text, { skipHistory: true });
+        if (text !== prevMetaText) {
+          steps.push({ type: 'metaChange', beforeMetaText: prevMetaText, afterMetaText: text });
+        }
       }
+      historyRef.current.push(
+        steps.length === 1 ? steps[0]! : { type: 'composite', steps },
+        `Duplicate ${actualCols.length} column${actualCols.length === 1 ? '' : 's'} ${side}`,
+      );
 
       setCsvData({ ...csvData, headers: nextHeaders, columnKeys: nextKeys });
       setAutoWidths(nextWidths);
@@ -461,6 +534,7 @@ export function useColumnOperations({
       autoWidths,
       meta.columns,
       rowsRef,
+      historyRef,
       metaTextRef,
       scheduleMetaSave,
       setCsvData,
@@ -513,6 +587,18 @@ export function useColumnOperations({
         rowsRef.current[r]!.splice(insertIdx, 0, ...emptyCells);
       }
 
+      historyRef.current.push(
+        {
+          type: 'insertCols',
+          index: insertIdx,
+          headers: blankHeaders,
+          keys: blankKeys,
+          widths: blankWidths,
+          reindexKeys: !csvData.dialect.hasHeader,
+        },
+        `Insert ${count} blank column${count === 1 ? '' : 's'} ${side}`,
+      );
+
       setCsvData({ ...csvData, headers: nextHeaders, columnKeys: nextKeys });
       setAutoWidths(nextWidths);
       setDirtyCsv(true);
@@ -525,6 +611,7 @@ export function useColumnOperations({
       isReadOnly,
       autoWidths,
       rowsRef,
+      historyRef,
       setCsvData,
       setAutoWidths,
       setDirtyCsv,
@@ -543,6 +630,7 @@ export function useColumnOperations({
       if (direction === -1 && startCol <= 0) return;
       if (direction === 1 && endCol >= totalCols - 1) return;
 
+      const prevMetaText = metaTextRef.current ?? '';
       const nextHeaders = rotateArrayBlock(csvData.headers, startCol, endCol, direction);
       const nextKeys = csvData.dialect.hasHeader
         ? rotateArrayBlock(csvData.columnKeys, startCol, endCol, direction)
@@ -565,10 +653,19 @@ export function useColumnOperations({
         }
       }
 
+      const steps: EditCommand[] = [
+        {
+          type: 'shiftCols',
+          startCol,
+          endCol,
+          direction,
+          hasHeader: csvData.dialect.hasHeader,
+        },
+      ];
       if (!csvData.dialect.hasHeader && meta.columns) {
         const oldConfigs = Array.from({ length: totalCols }, (_, i) => meta.columns?.[String(i)]);
         const rotatedConfigs = rotateArrayBlock(oldConfigs, startCol, endCol, direction);
-        let text = metaTextRef.current ?? '';
+        let text = prevMetaText;
         let changed = false;
         for (let i = 0; i < totalCols; i++) {
           if (oldConfigs[i] !== rotatedConfigs[i]) {
@@ -576,8 +673,17 @@ export function useColumnOperations({
             changed = true;
           }
         }
-        if (changed) scheduleMetaSave(text);
+        if (changed) {
+          scheduleMetaSave(text, { skipHistory: true });
+          if (text !== prevMetaText) {
+            steps.push({ type: 'metaChange', beforeMetaText: prevMetaText, afterMetaText: text });
+          }
+        }
       }
+      historyRef.current.push(
+        steps.length === 1 ? steps[0]! : { type: 'composite', steps },
+        direction < 0 ? 'Move column(s) left' : 'Move column(s) right',
+      );
 
       setCsvData({ ...csvData, headers: nextHeaders, columnKeys: nextKeys });
       setAutoWidths(nextWidths);
@@ -601,6 +707,7 @@ export function useColumnOperations({
       isReadOnly,
       autoWidths,
       rowsRef,
+      historyRef,
       meta.columns,
       metaTextRef,
       scheduleMetaSave,

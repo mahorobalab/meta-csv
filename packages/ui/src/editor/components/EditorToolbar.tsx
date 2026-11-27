@@ -79,11 +79,14 @@ export interface EditorToolbarProps {
   showTailPanel: boolean;
   zebraEnabled: boolean;
   showCellInspector: boolean;
+  showHistoryPanel: boolean;
+  savingSnapshot?: boolean;
   onLockReadOnly: () => void;
   onUnlockEditing: () => void;
   onToggleTailPanel: () => void;
   onToggleZebra: () => void;
   onToggleCellInspector: () => void;
+  onToggleHistoryPanel: () => void;
   onOpenSettings: () => void;
   onOpenAbout: () => void;
   isColumnSelectionMode: boolean;
@@ -225,6 +228,8 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = (p) => {
       showTailPanel={p.showTailPanel}
       zebraEnabled={p.zebraEnabled}
       showCellInspector={p.showCellInspector}
+      showHistoryPanel={p.showHistoryPanel}
+      savingSnapshot={p.savingSnapshot}
       onToggleUnlockPopover={() => p.setOpenMenu((m) => (m === 'unlock' ? 'none' : 'unlock'))}
       onLockReadOnly={p.onLockReadOnly}
       onUnlockEditing={p.onUnlockEditing}
@@ -232,6 +237,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = (p) => {
       onToggleTailPanel={p.onToggleTailPanel}
       onToggleZebra={p.onToggleZebra}
       onToggleCellInspector={p.onToggleCellInspector}
+      onToggleHistoryPanel={p.onToggleHistoryPanel}
       onOpenSettings={p.onOpenSettings}
       onOpenAbout={p.onOpenAbout}
     />

@@ -1,4 +1,12 @@
-import type { CsvFilePayload, FileAppendResult, FileSystemAdapter } from '@metatext-editor/core';
+import type {
+  CsvFilePayload,
+  FileAppendResult,
+  FileSystemAdapter,
+  HistoryAdapter,
+  HistoryRestorePayload,
+  HistorySnapshotMeta,
+  SaveSnapshotInput,
+} from '@metatext-editor/core';
 import type { EditorAppSettings, EditorStatusInfo } from '@metatext-editor/ui';
 
 interface VsCodeApi {
@@ -34,6 +42,7 @@ export interface HostCommand {
 
 export interface VsCodeAdapterBundle {
   adapter: FileSystemAdapter;
+  historyAdapter: HistoryAdapter;
   onThemeMode: (cb: (mode: 'light' | 'dark') => void) => () => void;
   onHostLanguage: (cb: (lang: string) => void) => () => void;
   onAppSettings: (cb: (settings: EditorAppSettings) => void) => () => void;
@@ -56,6 +65,10 @@ export function createVsCodeAdapter(): VsCodeAdapterBundle {
   const pendingAppends = new Map<
     number,
     { resolve: (res: FileAppendResult) => void; reject: (err: Error) => void }
+  >();
+  const pendingHistory = new Map<
+    number,
+    { resolve: (res: unknown) => void; reject: (err: Error) => void }
   >();
   let pendingLoad: {
     resolve: (payload: CsvFilePayload) => void;
@@ -120,6 +133,40 @@ export function createVsCodeAdapter(): VsCodeAdapterBundle {
         pendingAppends.delete(msg.requestId);
         p.reject(new Error(String(msg.message ?? 'Append read failed')));
       }
+    } else if (msg.type === 'historyListResult') {
+      const p = pendingHistory.get(msg.requestId);
+      if (p) {
+        pendingHistory.delete(msg.requestId);
+        p.resolve(msg.snapshots ?? []);
+      }
+    } else if (msg.type === 'historyUsageResult') {
+      const p = pendingHistory.get(msg.requestId);
+      if (p) {
+        pendingHistory.delete(msg.requestId);
+        p.resolve(Number(msg.usageBytes ?? 0));
+      }
+    } else if (msg.type === 'historySaveResult') {
+      const p = pendingHistory.get(msg.requestId);
+      if (p) {
+        pendingHistory.delete(msg.requestId);
+        p.resolve(msg.snapshot ?? null);
+      }
+    } else if (msg.type === 'historyRestoreResult') {
+      const p = pendingHistory.get(msg.requestId);
+      if (p) {
+        pendingHistory.delete(msg.requestId);
+        p.resolve({
+          id: String(msg.id ?? ''),
+          dataBytes: typeof msg.dataBase64 === 'string' ? base64ToBytes(msg.dataBase64) : undefined,
+          metaText: String(msg.metaText ?? ''),
+        } satisfies HistoryRestorePayload);
+      }
+    } else if (msg.type === 'historyError') {
+      const p = pendingHistory.get(msg.requestId);
+      if (p) {
+        pendingHistory.delete(msg.requestId);
+        p.reject(new Error(String(msg.message ?? 'History operation failed')));
+      }
     } else if (msg.type === 'themeChanged') {
       themeListeners.forEach((cb) => cb(msg.themeMode));
     } else if (msg.type === 'configChanged' && msg.appSettings) {
@@ -172,8 +219,64 @@ export function createVsCodeAdapter(): VsCodeAdapterBundle {
     },
   };
 
+  const historyAdapter: HistoryAdapter = {
+    readsSavedFileDirectly: true,
+
+    saveSnapshot(input: SaveSnapshotInput): Promise<HistorySnapshotMeta | null> {
+      const requestId = reqSeq++;
+      return new Promise((resolve, reject) => {
+        pendingHistory.set(requestId, {
+          resolve: (v) => resolve(v as HistorySnapshotMeta | null),
+          reject,
+        });
+        vscode.postMessage({
+          type: 'historySave',
+          requestId,
+          message: input.message,
+          includeDataFromDisk: Boolean(input.includeDataFromDisk || input.dataBytes),
+          metaText: input.metaText,
+          policy: input.policy,
+        });
+      });
+    },
+
+    listSnapshots(limit?: number): Promise<HistorySnapshotMeta[]> {
+      const requestId = reqSeq++;
+      return new Promise((resolve, reject) => {
+        pendingHistory.set(requestId, {
+          resolve: (v) => resolve(v as HistorySnapshotMeta[]),
+          reject,
+        });
+        vscode.postMessage({ type: 'historyList', requestId, limit });
+      });
+    },
+
+    restoreSnapshot(id: string): Promise<HistoryRestorePayload> {
+      const requestId = reqSeq++;
+      return new Promise((resolve, reject) => {
+        pendingHistory.set(requestId, {
+          resolve: (v) => resolve(v as HistoryRestorePayload),
+          reject,
+        });
+        vscode.postMessage({ type: 'historyRestore', requestId, id });
+      });
+    },
+
+    getStorageUsageBytes(): Promise<number> {
+      const requestId = reqSeq++;
+      return new Promise((resolve, reject) => {
+        pendingHistory.set(requestId, {
+          resolve: (v) => resolve(Number(v ?? 0)),
+          reject,
+        });
+        vscode.postMessage({ type: 'historyUsage', requestId });
+      });
+    },
+  };
+
   return {
     adapter,
+    historyAdapter,
     onThemeMode(cb) {
       themeListeners.add(cb);
       return () => themeListeners.delete(cb);

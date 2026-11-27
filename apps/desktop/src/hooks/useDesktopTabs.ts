@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { open, save } from '@tauri-apps/plugin-dialog';
+import type { HistoryAdapter } from '@metatext-editor/core';
 import {
   createNewFileTemplate,
   type EditorAppSettings,
@@ -16,6 +17,7 @@ import {
   saveFileStreamViaTauri,
   type DesktopFileSystemAdapter,
 } from '../tauriAdapter';
+import { createTauriHistoryAdapter } from '../tauriHistoryAdapter';
 import {
   extractFileName,
   getParentDirectory,
@@ -35,6 +37,7 @@ export interface DesktopTab {
   fileName: string;
   dirty: boolean;
   adapter: DesktopFileSystemAdapter;
+  historyAdapter: HistoryAdapter;
   sleeping: boolean;
   lastAccessedAt: number;
   fileBytes: number;
@@ -254,6 +257,9 @@ export function useDesktopTabs() {
               fileName: extractFileName(p),
               dirty: false,
               adapter: createTauriAdapter(p),
+              historyAdapter: createTauriHistoryAdapter(
+                () => tabsRef.current.find((t) => t.id === id)?.filePath ?? p,
+              ),
               sleeping: !isTargetActive,
               lastAccessedAt: isTargetActive ? now + paths.length : now + i,
               fileBytes: 0,
@@ -287,6 +293,9 @@ export function useDesktopTabs() {
         fileName: template.fileName,
         dirty: false,
         adapter,
+        historyAdapter: createTauriHistoryAdapter(
+          () => tabsRef.current.find((t) => t.id === id)?.filePath ?? null,
+        ),
         sleeping: false,
         lastAccessedAt: Date.now(),
         fileBytes: 0,
@@ -351,6 +360,11 @@ export function useDesktopTabs() {
           zebraStriping: settings.zebraStriping,
           confirmHideColumn: settings.confirmHideColumn,
           reopenLastFiles: settings.reopenLastFiles,
+          historyEnabled: settings.historyEnabled,
+          historyRetentionMode: settings.historyRetentionMode,
+          historyMaxCount: settings.historyMaxCount,
+          historyMaxTotalSizeMb: settings.historyMaxTotalSizeMb,
+          historyMaxDataFileSizeMb: settings.historyMaxDataFileSizeMb,
         });
       }
 

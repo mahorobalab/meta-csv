@@ -19,11 +19,21 @@
         "viewType": "metatext.editor",
         "displayName": "MetaText Editor",
         "selector": [
-          { "filenamePattern": "*.csv" },
-          { "filenamePattern": "*.tsv" },
-          { "filenamePattern": "*.jsonl" },
-          { "filenamePattern": "*.ndjson" },
-          { "filenamePattern": "*.log" }
+          {
+            "filenamePattern": "*.csv"
+          },
+          {
+            "filenamePattern": "*.tsv"
+          },
+          {
+            "filenamePattern": "*.jsonl"
+          },
+          {
+            "filenamePattern": "*.ndjson"
+          },
+          {
+            "filenamePattern": "*.log"
+          }
         ],
         "priority": "option"
       }
@@ -46,12 +56,16 @@
     "languages": [
       {
         "id": "jsonc",
-        "extensions": [".metatext.jsonc"]
+        "extensions": [
+          ".metatext.jsonc"
+        ]
       }
     ],
     "jsonValidation": [
       {
-        "fileMatch": ["*.metatext.jsonc"],
+        "fileMatch": [
+          "*.metatext.jsonc"
+        ],
         "url": "./schemas/metatext.schema.json"
       }
     ],
@@ -60,7 +74,17 @@
       "properties": {
         "metatext.language": {
           "type": "string",
-          "enum": ["auto", "en", "ja", "zh-cn", "zh-tw", "ko", "de", "fr", "es"],
+          "enum": [
+            "auto",
+            "en",
+            "ja",
+            "zh-cn",
+            "zh-tw",
+            "ko",
+            "de",
+            "fr",
+            "es"
+          ],
           "default": "auto",
           "description": "%config.language.description%"
         },
@@ -80,7 +104,13 @@
         },
         "metatext.defaultMarkerColor": {
           "type": "string",
-          "enum": ["amber", "rose", "emerald", "sky", "violet"],
+          "enum": [
+            "amber",
+            "rose",
+            "emerald",
+            "sky",
+            "violet"
+          ],
           "default": "amber",
           "description": "%config.defaultMarkerColor.description%"
         },
@@ -91,13 +121,20 @@
         },
         "metatext.noHeaderColumnStyle": {
           "type": "string",
-          "enum": ["excel", "numbered"],
+          "enum": [
+            "excel",
+            "numbered"
+          ],
           "default": "excel",
           "description": "%config.noHeaderColumnStyle.description%"
         },
         "metatext.sidecarVisibility": {
           "type": "string",
-          "enum": ["nest", "hide", "show"],
+          "enum": [
+            "nest",
+            "hide",
+            "show"
+          ],
           "enumDescriptions": [
             "%config.sidecarVisibility.nest%",
             "%config.sidecarVisibility.hide%",
@@ -114,12 +151,13 @@
     "build:webview": "vite build",
     "build": "pnpm run build:ext && pnpm run build:webview",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.webview.json --noEmit",
-    "test": "echo \"no tests in vscode\""
+    "test": "vitest run --root ."
   },
   "dependencies": {
     "@metatext-editor/core": "workspace:*",
     "@metatext-editor/schema": "workspace:*",
     "@metatext-editor/ui": "workspace:*",
+    "isomorphic-git": "^1.44.19",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
@@ -130,6 +168,7 @@
     "@types/vscode": "^1.85.0",
     "@vitejs/plugin-react": "^4.3.4",
     "esbuild": "^0.25.12",
-    "vite": "^6.2.2"
+    "vite": "^6.2.2",
+    "vitest": "^5.1.2"
   }
 }

@@ -7,3 +7,5 @@ export * from './view';
 export * from './filter';
 export * from './format';
 export * from './history';
+export * from './historyAdapter';
+export * from './cellDiff';

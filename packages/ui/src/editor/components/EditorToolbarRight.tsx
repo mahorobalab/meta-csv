@@ -1,5 +1,5 @@
 import React from 'react';
-import { FileText, Info, Lock, Settings, Unlock } from 'lucide-react';
+import { FileText, History, Info, Lock, Settings, Unlock } from 'lucide-react';
 import type { MetaTextFormat } from '@metatext-editor/schema';
 import { FoxTailIcon } from '../../icons/FoxTailIcon';
 import { ZebraRowsIcon } from '../../icons/ZebraRowsIcon';
@@ -16,6 +16,8 @@ export interface EditorToolbarRightProps {
   showTailPanel: boolean;
   zebraEnabled: boolean;
   showCellInspector: boolean;
+  showHistoryPanel: boolean;
+  savingSnapshot?: boolean;
   onToggleUnlockPopover: () => void;
   onLockReadOnly: () => void;
   onUnlockEditing: () => void;
@@ -23,6 +25,7 @@ export interface EditorToolbarRightProps {
   onToggleTailPanel: () => void;
   onToggleZebra: () => void;
   onToggleCellInspector: () => void;
+  onToggleHistoryPanel: () => void;
   onOpenSettings: () => void;
   onOpenAbout: () => void;
 }
@@ -38,6 +41,8 @@ export const EditorToolbarRight: React.FC<EditorToolbarRightProps> = ({
   showTailPanel,
   zebraEnabled,
   showCellInspector,
+  showHistoryPanel,
+  savingSnapshot = false,
   onToggleUnlockPopover,
   onLockReadOnly,
   onUnlockEditing,
@@ -45,6 +50,7 @@ export const EditorToolbarRight: React.FC<EditorToolbarRightProps> = ({
   onToggleTailPanel,
   onToggleZebra,
   onToggleCellInspector,
+  onToggleHistoryPanel,
   onOpenSettings,
   onOpenAbout,
 }) => {
@@ -161,6 +167,43 @@ export const EditorToolbarRight: React.FC<EditorToolbarRightProps> = ({
       onClick={onToggleCellInspector}
     >
       <FileText size={14} />
+    </button>
+    <button
+      type="button"
+      aria-label="History panel"
+      title={
+        savingSnapshot
+          ? 'Saving snapshot...'
+          : showHistoryPanel
+            ? 'Hide History panel'
+            : 'Show History panel'
+      }
+      style={{
+        ...btnStyle,
+        padding: '3px 6px',
+        borderColor: savingSnapshot
+          ? '#f59e0b'
+          : showHistoryPanel
+            ? '#3b82f6'
+            : toolbarBorder,
+        background: savingSnapshot
+          ? isDark
+            ? 'rgba(245, 158, 11, 0.22)'
+            : 'rgba(245, 158, 11, 0.16)'
+          : showHistoryPanel
+            ? isDark
+              ? 'rgba(59, 130, 246, 0.2)'
+              : 'rgba(59, 130, 246, 0.12)'
+            : btnStyle.background,
+        color: savingSnapshot
+          ? isDark
+            ? '#fbbf24'
+            : '#d97706'
+          : btnStyle.color,
+      }}
+      onClick={onToggleHistoryPanel}
+    >
+      <History size={14} />
     </button>
     <button
       type="button"

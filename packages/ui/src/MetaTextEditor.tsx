@@ -74,9 +74,11 @@ import { RowResizeOverlay } from './editor/components/RowResizeOverlay';
 import { LoadingProgressOverlay } from './editor/components/LoadingProgressOverlay';
 import { GridCornerAndHeaderInput } from './editor/components/GridCornerAndHeaderInput';
 import { CellInspectorDrawer } from './editor/components/CellInspectorDrawer';
+import { HistorySidePanel } from './editor/components/HistorySidePanel';
 import { LiveTailPanel } from './editor/components/LiveTailPanel';
 import { EditorStatusBar } from './editor/components/EditorStatusBar';
 import { EditorConfirmDialogs } from './editor/components/EditorConfirmDialogs';
+import { useSnapshotHistory } from './editor/hooks/useSnapshotHistory';
 
 export type {
   EditorStatusInfo,
@@ -113,9 +115,21 @@ export const MetaTextEditor = React.forwardRef<MetaTextEditorHandle, MetaTextEdi
       externalMetaText,
       onMetaTextChange,
       nativeClipboard,
+      historyAdapter,
+      showHistoryPanel: controlledShowHistoryPanel,
+      onToggleHistoryPanel: controlledToggleHistoryPanel,
     },
     ref,
   ) {
+  const [internalShowHistoryPanel, setInternalShowHistoryPanel] = useState(false);
+  const showHistoryPanel = controlledShowHistoryPanel ?? internalShowHistoryPanel;
+  const handleToggleHistoryPanel = useCallback(() => {
+    if (controlledToggleHistoryPanel) {
+      controlledToggleHistoryPanel();
+    } else {
+      setInternalShowHistoryPanel((s) => !s);
+    }
+  }, [controlledToggleHistoryPanel]);
   const [fileName, setFileName] = useState<string>('');
   const [csvData, setCsvData] = useState<ParsedCsvData | null>(null);
   const [meta, setMeta] = useState<MetaTextDocument>({ version: DEFAULT_META_VERSION });
@@ -533,6 +547,7 @@ export const MetaTextEditor = React.forwardRef<MetaTextEditorHandle, MetaTextEdi
     meta,
     metaTextRef,
     rowsRef,
+    historyRef,
     copiedColumnRef,
     isReadOnly,
     activeFormat,
@@ -575,6 +590,7 @@ export const MetaTextEditor = React.forwardRef<MetaTextEditorHandle, MetaTextEdi
     meta,
     metaTextRef,
     rowsRef,
+    historyRef,
     copiedRowsRef,
     pendingJumpAfterInsertRef,
     gridRef,
@@ -617,6 +633,7 @@ export const MetaTextEditor = React.forwardRef<MetaTextEditorHandle, MetaTextEdi
     meta,
     metaTextRef,
     rowsRef,
+    historyRef,
     copiedCellsRef,
     isF2EditTriggerRef,
     gridRef,
@@ -661,6 +678,37 @@ export const MetaTextEditor = React.forwardRef<MetaTextEditorHandle, MetaTextEdi
     [onCellContextMenu, openCellContextMenu],
   );
 
+  // Shadow Git snapshot history (Layer 2)
+  const {
+    policy: historyPolicy,
+    snapshots,
+    loadingSnapshots,
+    savingSnapshot,
+    activeSnapshotId,
+    storageUsageBytes,
+    diffBySnapshotId,
+    loadingDiffId,
+    refreshSnapshots,
+    recordSaveSnapshotAsync,
+    restoreSnapshotToView,
+    computeSnapshotDiffWithCurrent,
+  } = useSnapshotHistory({
+    historyAdapter,
+    appSettings,
+    fileName,
+    csvData,
+    setCsvData,
+    setAutoWidths,
+    rowsRef,
+    metaTextRef,
+    isReadOnly,
+    scheduleMetaSave,
+    setDirtyCsv,
+    setDataVersion,
+    setStatusMsg,
+    showHistoryPanel,
+  });
+
   // File save / Save As / New / Close / Undo / Redo
   const {
     serializeCurrentCsv,
@@ -670,12 +718,17 @@ export const MetaTextEditor = React.forwardRef<MetaTextEditorHandle, MetaTextEdi
     handleCloseFileAction,
     applyUndoLocal,
     applyRedoLocal,
+    jumpToHistoryCursor,
     handleUndo,
     handleRedo,
   } = useFileSaveAndUndo({
     adapter,
     hostMode,
     csvData,
+    setCsvData,
+    autoWidths,
+    setAutoWidths,
+    scheduleMetaSave,
     fileName,
     isReadOnly,
     dirtyCsv,
@@ -690,6 +743,9 @@ export const MetaTextEditor = React.forwardRef<MetaTextEditorHandle, MetaTextEdi
     onSaveAsStream,
     onCloseFile,
     onDocumentEdit,
+    onAfterSaveSnapshot: recordSaveSnapshotAsync,
+    maxSnapshotDataBytes: historyPolicy.maxDataFileSizeMb * 1024 * 1024,
+    skipSnapshotBytesCapture: Boolean(historyAdapter?.readsSavedFileDirectly),
   });
 
   const { applyPendingViewRestore } = useViewSnapshotRestore({
@@ -931,6 +987,8 @@ export const MetaTextEditor = React.forwardRef<MetaTextEditorHandle, MetaTextEdi
         showTailPanel={showTailPanel}
         zebraEnabled={zebraEnabled}
         showCellInspector={showCellInspector}
+        showHistoryPanel={showHistoryPanel}
+        savingSnapshot={savingSnapshot}
         onLockReadOnly={() => {
           setOpenMenu('none');
           setIsReadOnly(true);
@@ -946,6 +1004,7 @@ export const MetaTextEditor = React.forwardRef<MetaTextEditorHandle, MetaTextEdi
         onToggleTailPanel={toggleTailPanel}
         onToggleZebra={() => patchMeta(['table', 'zebraStriping'], !zebraEnabled)}
         onToggleCellInspector={() => setShowCellInspector((s) => !s)}
+        onToggleHistoryPanel={handleToggleHistoryPanel}
         onOpenSettings={() => {
           setOpenMenu('none');
           setShowSettingsModal(true);
@@ -1011,8 +1070,10 @@ export const MetaTextEditor = React.forwardRef<MetaTextEditorHandle, MetaTextEdi
         />
       )}
 
+      {/* Main horizontal area: Grid + optional right-side History panel */}
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden' }}>
       {/* Grid container */}
-      <div ref={gridContainerRef} style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+      <div ref={gridContainerRef} style={{ flex: 1, minWidth: 0, minHeight: 0, position: 'relative' }}>
         {showProgressOverlay && loadingProgress && (
           <LoadingProgressOverlay
             loadingProgress={loadingProgress}
@@ -1241,6 +1302,35 @@ export const MetaTextEditor = React.forwardRef<MetaTextEditorHandle, MetaTextEdi
           onStartDrag={setRowResizeDrag}
           onAutoFitRow={(dataRow, cols) => autoFitRows([dataRow], cols)}
         />
+      </div>
+
+      {/* Optional right-side History panel (exclusive with host Meta JSONC panel) */}
+      {showHistoryPanel && (
+        <HistorySidePanel
+          isDark={isDark}
+          toolbarBg={toolbarBg}
+          toolbarBorder={toolbarBorder}
+          toolbarFg={toolbarFg}
+          actionEntries={historyRef.current.getEntries()}
+          actionCursor={historyRef.current.getCursor()}
+          onJumpToActionCursor={(cursor) => {
+            jumpToHistoryCursor(cursor);
+          }}
+          hasSnapshotBackend={Boolean(historyAdapter && filePath)}
+          historyRecordingEnabled={historyPolicy.enabled}
+          snapshots={snapshots}
+          loadingSnapshots={loadingSnapshots}
+          savingSnapshot={savingSnapshot}
+          activeSnapshotId={activeSnapshotId}
+          storageUsageBytes={storageUsageBytes}
+          diffBySnapshotId={diffBySnapshotId}
+          loadingDiffId={loadingDiffId}
+          onRefreshSnapshots={() => void refreshSnapshots()}
+          onRestoreSnapshot={(snap) => void restoreSnapshotToView(snap)}
+          onToggleSnapshotDiff={(snap) => void computeSnapshotDiffWithCurrent(snap)}
+          onClose={handleToggleHistoryPanel}
+        />
+      )}
       </div>
 
       {/* Optional Cell Inspector Drawer (for reading full multiline cells & stack traces) */}

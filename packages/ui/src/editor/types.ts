@@ -1,5 +1,5 @@
 import type React from 'react';
-import type { FileSystemAdapter } from '@metatext-editor/core';
+import type { FileSystemAdapter, HistoryAdapter } from '@metatext-editor/core';
 import type { MetaTextFormat } from '@metatext-editor/schema';
 import type { EditorAppSettings, EditorHostMode } from '../SettingsAboutDialogs';
 import type { ThemePreference } from '../theme';
@@ -76,6 +76,12 @@ export interface MetaTextEditorProps {
   onMetaTextChange?: (text: string) => void;
   /** Optional native clipboard bridge (Desktop Tauri uses OS clipboard without browser permission prompts) */
   nativeClipboard?: NativeClipboardBridge;
+  /** Optional Shadow Git history adapter for persistent snapshots */
+  historyAdapter?: HistoryAdapter;
+  /** Optional controlled visibility for the right-side History panel (for exclusive toggle with host meta panel) */
+  showHistoryPanel?: boolean;
+  /** Optional controlled toggle handler for the right-side History panel */
+  onToggleHistoryPanel?: () => void;
 }
 
 export interface HeaderContextMenuState {

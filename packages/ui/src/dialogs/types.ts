@@ -21,6 +21,11 @@ export interface EditorAppSettings {
   confirmHideColumn?: boolean;
   reopenLastFiles?: boolean;
   sidecarVisibility?: 'nest' | 'hide' | 'show';
+  historyEnabled?: boolean;
+  historyRetentionMode?: 'count' | 'sizeMb';
+  historyMaxCount?: number;
+  historyMaxTotalSizeMb?: number;
+  historyMaxDataFileSizeMb?: number;
 }
 
 export interface FileLayoutSettingsProps {

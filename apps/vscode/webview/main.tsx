@@ -11,6 +11,7 @@ import { createVsCodeAdapter } from './vscodeAdapter';
 const VsCodeApp: React.FC = () => {
   const {
     adapter,
+    historyAdapter,
     onThemeMode,
     onHostLanguage,
     onAppSettings,
@@ -70,6 +71,8 @@ const VsCodeApp: React.FC = () => {
         <MetaTextEditor
           ref={editorRef}
           adapter={adapter}
+          historyAdapter={historyAdapter}
+          filePath="vscode-document"
           hostMode="vscode"
           themeMode={themeMode}
           appSettings={appSettings}

@@ -7,10 +7,14 @@ import {
 } from '@glideapps/glide-data-grid';
 import type { CellStyle, MetaTextDocument } from '@metatext-editor/schema';
 import {
+  UndoRedoHistory,
   patchMetaJsonc,
   resolveCellStyle,
+  type CellChange,
+  type EditCommand,
   type ParsedCsvData,
 } from '@metatext-editor/core';
+import type { MetaSaveOptions } from './useDocumentLoader';
 import type { NativeClipboardBridge } from '../../columnClipboard';
 import type {
   CellContextMenuState,
@@ -37,6 +41,7 @@ export interface UseCellOperationsParams {
   meta: MetaTextDocument;
   metaTextRef: React.MutableRefObject<string | null>;
   rowsRef: React.MutableRefObject<string[][]>;
+  historyRef: React.MutableRefObject<UndoRedoHistory>;
   copiedCellsRef: React.MutableRefObject<CopiedCellsPayload | null>;
   isF2EditTriggerRef: React.MutableRefObject<boolean>;
   gridRef: React.RefObject<DataEditorRef | null>;
@@ -55,7 +60,7 @@ export interface UseCellOperationsParams {
   setCellContextMenu: React.Dispatch<React.SetStateAction<CellContextMenuState | null>>;
   setEditingHeaderCol: React.Dispatch<React.SetStateAction<EditingHeaderColState | null>>;
   appendRowsToOrder: (appendedDataRows: number[]) => void;
-  scheduleMetaSave: (nextText: string) => void;
+  scheduleMetaSave: (nextText: string, options?: MetaSaveOptions) => void;
   setDirtyCsv: (dirty: boolean) => void;
   setDataVersion: React.Dispatch<React.SetStateAction<number>>;
   setStatusMsg: (msg: string) => void;
@@ -69,6 +74,7 @@ export function useCellOperations({
   meta,
   metaTextRef,
   rowsRef,
+  historyRef,
   copiedCellsRef,
   isF2EditTriggerRef,
   gridRef,
@@ -237,10 +243,18 @@ export function useCellOperations({
       const targetHeight = isSingleToMulti ? range.height : srcRows;
       const targetWidth = isSingleToMulti ? range.width : srcCols;
 
+      const prevMetaText = metaTextRef.current ?? '';
+      const steps: EditCommand[] = [];
+      const prevColCount = csvData.columnKeys.length;
+      const prevRowCount = rowsRef.current.length;
+
       // Expand columns if paste extends past the rightmost visible column
       const nextHeaders = [...csvData.headers];
       const nextKeys = [...csvData.columnKeys];
       const nextWidths = [...autoWidths];
+      const addedHeaders: string[] = [];
+      const addedKeys: string[] = [];
+      const addedWidths: number[] = [];
       let colsExpanded = false;
       const targetActualCols: number[] = [];
 
@@ -253,9 +267,13 @@ export function useCellOperations({
           const name = csvData.dialect.hasHeader
             ? makeUniqueColumnKey(`column_${idx + 1}`, nextKeys)
             : String(idx);
-          nextHeaders.push(csvData.dialect.hasHeader ? name : '');
+          const h = csvData.dialect.hasHeader ? name : '';
+          nextHeaders.push(h);
           nextKeys.push(name);
           nextWidths.push(140);
+          addedHeaders.push(h);
+          addedKeys.push(name);
+          addedWidths.push(140);
           colsExpanded = true;
           for (let r = 0; r < rowsRef.current.length; r++) {
             rowsRef.current[r]!.push('');
@@ -263,10 +281,21 @@ export function useCellOperations({
           targetActualCols.push(idx);
         }
       }
+      if (colsExpanded) {
+        steps.push({
+          type: 'insertCols',
+          index: prevColCount,
+          headers: addedHeaders,
+          keys: addedKeys,
+          widths: addedWidths,
+          reindexKeys: !csvData.dialect.hasHeader,
+        });
+      }
 
       // Expand rows if paste extends past bottom row
       const targetDataRows: number[] = [];
       const newlyAppendedRows: number[] = [];
+      const appendedRowCopies: string[][] = [];
       for (let r = 0; r < targetHeight; r++) {
         const vr = range.y + r;
         if (vr < viewRowIndices.length) {
@@ -277,12 +306,19 @@ export function useCellOperations({
           const idx = rowsRef.current.length - 1;
           targetDataRows.push(idx);
           newlyAppendedRows.push(idx);
+          appendedRowCopies.push([...newRow]);
         }
       }
       if (newlyAppendedRows.length > 0) {
         appendRowsToOrder(newlyAppendedRows);
+        steps.push({
+          type: 'insertRows',
+          index: prevRowCount,
+          rows: appendedRowCopies,
+        });
       }
 
+      const cellChanges: CellChange[] = [];
       for (let r = 0; r < targetHeight; r++) {
         const dr = targetDataRows[r]!;
         const dstRow = rowsRef.current[dr];
@@ -290,9 +326,16 @@ export function useCellOperations({
         const srcRow = isSingleToMulti ? parsed.matrix[0]! : parsed.matrix[r]!;
         for (let c = 0; c < targetWidth; c++) {
           const ac = targetActualCols[c]!;
+          const before = dstRow[ac] ?? '';
           const val = isSingleToMulti ? (srcRow[0] ?? '') : (srcRow[c] ?? '');
-          dstRow[ac] = val;
+          if (before !== val) {
+            dstRow[ac] = val;
+            cellChanges.push({ dataRow: dr, col: ac, before, after: val });
+          }
         }
+      }
+      if (cellChanges.length > 0) {
+        steps.push({ type: 'editCells', changes: cellChanges });
       }
 
       if (colsExpanded) {
@@ -301,7 +344,7 @@ export function useCellOperations({
       }
 
       if (withStyle && parsed.styles && parsed.styles.length > 0) {
-        let text = metaTextRef.current ?? '';
+        let text = prevMetaText;
         let patchedAny = false;
         const maxStyledCells = 500;
         let styledCount = 0;
@@ -320,8 +363,18 @@ export function useCellOperations({
           }
         }
         if (patchedAny) {
-          scheduleMetaSave(text);
+          scheduleMetaSave(text, { skipHistory: true });
+          if (text !== prevMetaText) {
+            steps.push({ type: 'metaChange', beforeMetaText: prevMetaText, afterMetaText: text });
+          }
         }
+      }
+
+      if (steps.length > 0) {
+        historyRef.current.push(
+          steps.length === 1 ? steps[0]! : { type: 'composite', steps },
+          `Paste ${targetHeight} × ${targetWidth} cell${targetHeight * targetWidth === 1 ? '' : 's'}`,
+        );
       }
 
       setDirtyCsv(true);
@@ -342,6 +395,7 @@ export function useCellOperations({
       visibleColIndices,
       viewRowIndices,
       rowsRef,
+      historyRef,
       appendRowsToOrder,
       setCsvData,
       setAutoWidths,

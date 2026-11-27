@@ -1,3 +1,8 @@
+mod history;
+
+use history::{
+    GixHistoryRepository, HistoryRestoreMeta, HistoryRetentionPolicy, HistorySnapshotMeta,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -50,6 +55,16 @@ struct AppSettings {
     last_opened_files: Option<Vec<String>>,
     #[serde(default)]
     last_active_file: Option<String>,
+    #[serde(default)]
+    history_enabled: Option<bool>,
+    #[serde(default)]
+    history_retention_mode: Option<String>,
+    #[serde(default)]
+    history_max_count: Option<u32>,
+    #[serde(default)]
+    history_max_total_size_mb: Option<u32>,
+    #[serde(default)]
+    history_max_data_file_size_mb: Option<u32>,
 }
 
 fn default_theme() -> String {
@@ -73,6 +88,11 @@ impl Default for AppSettings {
             reopen_last_files: None,
             last_opened_files: None,
             last_active_file: None,
+            history_enabled: None,
+            history_retention_mode: None,
+            history_max_count: None,
+            history_max_total_size_mb: None,
+            history_max_data_file_size_mb: None,
         }
     }
 }
@@ -230,6 +250,11 @@ fn update_app_settings(
     reopen_last_files: Option<bool>,
     last_opened_files: Option<Vec<String>>,
     last_active_file: Option<String>,
+    history_enabled: Option<bool>,
+    history_retention_mode: Option<String>,
+    history_max_count: Option<u32>,
+    history_max_total_size_mb: Option<u32>,
+    history_max_data_file_size_mb: Option<u32>,
 ) -> Result<AppSettings, String> {
     let updated = {
         let mut data = state
@@ -290,6 +315,23 @@ fn update_app_settings(
         }
         if let Some(active) = last_active_file {
             data.last_active_file = if active.is_empty() { None } else { Some(active) };
+        }
+        if let Some(he) = history_enabled {
+            data.history_enabled = Some(he);
+        }
+        if let Some(mode) = history_retention_mode {
+            if matches!(mode.as_str(), "count" | "sizeMb") {
+                data.history_retention_mode = Some(mode);
+            }
+        }
+        if let Some(mc) = history_max_count {
+            data.history_max_count = Some(mc.clamp(1, 500));
+        }
+        if let Some(ms) = history_max_total_size_mb {
+            data.history_max_total_size_mb = Some(ms.clamp(1, 2048));
+        }
+        if let Some(md) = history_max_data_file_size_mb {
+            data.history_max_data_file_size_mb = Some(md.clamp(0, 1024));
         }
         data.clone()
     };
@@ -594,6 +636,83 @@ fn write_clipboard_html(html: String, alt_text: String) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+async fn history_save_snapshot(
+    file_path: String,
+    message: String,
+    include_data: bool,
+    meta_text: String,
+    policy: HistoryRetentionPolicy,
+) -> Result<Option<HistorySnapshotMeta>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let target = Path::new(&file_path);
+        let repo = GixHistoryRepository::for_file(target);
+        repo.save_snapshot_from_file(target, &message, include_data, &meta_text, &policy)
+    })
+    .await
+    .map_err(|e| format!("History task join error: {e}"))?
+}
+
+#[tauri::command]
+async fn history_list_snapshots(
+    file_path: String,
+    limit: Option<usize>,
+) -> Result<Vec<HistorySnapshotMeta>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let repo = GixHistoryRepository::for_file(Path::new(&file_path));
+        repo.list_snapshots(limit)
+    })
+    .await
+    .map_err(|e| format!("History task join error: {e}"))?
+}
+
+#[tauri::command]
+async fn history_restore_snapshot_meta(
+    file_path: String,
+    id: String,
+) -> Result<HistoryRestoreMeta, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let repo = GixHistoryRepository::for_file(Path::new(&file_path));
+        repo.restore_snapshot_meta(&id)
+    })
+    .await
+    .map_err(|e| format!("History task join error: {e}"))?
+}
+
+#[tauri::command]
+async fn history_restore_snapshot_data(
+    file_path: String,
+    id: String,
+) -> Result<Response, String> {
+    let bytes = tauri::async_runtime::spawn_blocking(move || {
+        let repo = GixHistoryRepository::for_file(Path::new(&file_path));
+        repo.restore_snapshot_data(&id)
+    })
+    .await
+    .map_err(|e| format!("History task join error: {e}"))??;
+    Ok(Response::new(bytes))
+}
+
+#[tauri::command]
+async fn history_storage_usage(file_path: String) -> Result<u64, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let repo = GixHistoryRepository::for_file(Path::new(&file_path));
+        repo.storage_usage_bytes()
+    })
+    .await
+    .map_err(|e| format!("History task join error: {e}"))
+}
+
+#[tauri::command]
+async fn history_clear(file_path: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let repo = GixHistoryRepository::for_file(Path::new(&file_path));
+        repo.clear()
+    })
+    .await
+    .map_err(|e| format!("History task join error: {e}"))?
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -655,7 +774,13 @@ pub fn run() {
             save_meta_text,
             read_clipboard_text,
             write_clipboard_text,
-            write_clipboard_html
+            write_clipboard_html,
+            history_save_snapshot,
+            history_list_snapshots,
+            history_restore_snapshot_meta,
+            history_restore_snapshot_data,
+            history_storage_usage,
+            history_clear
         ])
         .run(tauri::generate_context!())
         .expect("error while running MetaText Editor desktop application");

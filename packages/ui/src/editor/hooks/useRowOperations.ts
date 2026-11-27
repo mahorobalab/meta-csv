@@ -6,7 +6,15 @@ import {
   type Item,
 } from '@glideapps/glide-data-grid';
 import type { MetaTextDocument, RowMarker } from '@metatext-editor/schema';
-import { patchMetaJsonc, type ParsedCsvData } from '@metatext-editor/core';
+import {
+  UndoRedoHistory,
+  patchMetaJsonc,
+  type CellChange,
+  type EditCommand,
+  type ParsedCsvData,
+  type RowSnapshot,
+} from '@metatext-editor/core';
+import type { MetaSaveOptions } from './useDocumentLoader';
 import {
   readClipboardForRowPaste,
   writeRowsToClipboard,
@@ -27,6 +35,7 @@ export interface UseRowOperationsParams {
   meta: MetaTextDocument;
   metaTextRef: React.MutableRefObject<string | null>;
   rowsRef: React.MutableRefObject<string[][]>;
+  historyRef: React.MutableRefObject<UndoRedoHistory>;
   copiedRowsRef: React.MutableRefObject<CopiedRowsPayload | null>;
   pendingJumpAfterInsertRef: React.MutableRefObject<{ dataRow: number; count: number } | null>;
   gridRef: React.RefObject<DataEditorRef | null>;
@@ -42,13 +51,13 @@ export interface UseRowOperationsParams {
   setRowContextMenu: React.Dispatch<React.SetStateAction<RowContextMenuState | null>>;
   setPendingDeleteRows: React.Dispatch<React.SetStateAction<PendingDeleteRowsState | null>>;
   markers: RowMarker[];
-  persistMarkers: (next: RowMarker[]) => void;
+  persistMarkers: (next: RowMarker[], options?: MetaSaveOptions) => void;
   insertRowsIntoOrder: (insertDataIdx: number, count: number, insertViewPos: number) => void;
   removeRowsFromOrder: (removedDesc: number[]) => void;
   appendRowsToOrder: (appendedDataRows: number[]) => void;
   debouncedFilterQuery: string;
   onlyMarked: boolean;
-  scheduleMetaSave: (nextText: string) => void;
+  scheduleMetaSave: (nextText: string, options?: MetaSaveOptions) => void;
   setDirtyCsv: (dirty: boolean) => void;
   setDataVersion: React.Dispatch<React.SetStateAction<number>>;
   setStatusMsg: (msg: string) => void;
@@ -62,6 +71,7 @@ export function useRowOperations({
   meta,
   metaTextRef,
   rowsRef,
+  historyRef,
   copiedRowsRef,
   pendingJumpAfterInsertRef,
   gridRef,
@@ -190,27 +200,50 @@ export function useRowOperations({
         return;
       }
 
-      const maxCols = Math.max(csvData.columnKeys.length, ...parsed.matrix.map((r) => r.length));
+      const prevMetaText = metaTextRef.current ?? '';
+      const steps: EditCommand[] = [];
+      const prevColCount = csvData.columnKeys.length;
+      const prevRowCount = rowsRef.current.length;
+
+      const maxCols = Math.max(prevColCount, ...parsed.matrix.map((r) => r.length));
       const nextHeaders = [...csvData.headers];
       const nextKeys = [...csvData.columnKeys];
       const nextWidths = [...autoWidths];
+      const addedHeaders: string[] = [];
+      const addedKeys: string[] = [];
+      const addedWidths: number[] = [];
       let colsExpanded = false;
       while (nextKeys.length < maxCols) {
         const idx = nextKeys.length;
         const name = csvData.dialect.hasHeader
           ? makeUniqueColumnKey(`column_${idx + 1}`, nextKeys)
           : String(idx);
-        nextHeaders.push(csvData.dialect.hasHeader ? name : '');
+        const h = csvData.dialect.hasHeader ? name : '';
+        nextHeaders.push(h);
         nextKeys.push(name);
         nextWidths.push(140);
+        addedHeaders.push(h);
+        addedKeys.push(name);
+        addedWidths.push(140);
         colsExpanded = true;
         for (let r = 0; r < rowsRef.current.length; r++) {
           rowsRef.current[r]!.push('');
         }
       }
+      if (colsExpanded) {
+        steps.push({
+          type: 'insertCols',
+          index: prevColCount,
+          headers: addedHeaders,
+          keys: addedKeys,
+          widths: addedWidths,
+          reindexKeys: !csvData.dialect.hasHeader,
+        });
+      }
 
       const targetDataRows: number[] = [];
       const newlyAppendedRows: number[] = [];
+      const appendedRowCopies: string[][] = [];
       for (let i = 0; i < parsed.matrix.length; i++) {
         const vr = startViewRow + i;
         if (vr < viewRowIndices.length) {
@@ -221,20 +254,35 @@ export function useRowOperations({
           const idx = rowsRef.current.length - 1;
           targetDataRows.push(idx);
           newlyAppendedRows.push(idx);
+          appendedRowCopies.push([...newRow]);
         }
       }
       if (newlyAppendedRows.length > 0) {
         appendRowsToOrder(newlyAppendedRows);
+        steps.push({
+          type: 'insertRows',
+          index: prevRowCount,
+          rows: appendedRowCopies,
+        });
       }
 
+      const cellChanges: CellChange[] = [];
       for (let i = 0; i < parsed.matrix.length; i++) {
         const dr = targetDataRows[i]!;
         const dst = rowsRef.current[dr];
         if (!dst) continue;
         const src = parsed.matrix[i]!;
         for (let c = 0; c < nextKeys.length; c++) {
-          dst[c] = c < src.length ? (src[c] ?? '') : '';
+          const before = dst[c] ?? '';
+          const after = c < src.length ? (src[c] ?? '') : '';
+          if (before !== after) {
+            dst[c] = after;
+            cellChanges.push({ dataRow: dr, col: c, before, after });
+          }
         }
+      }
+      if (cellChanges.length > 0) {
+        steps.push({ type: 'editCells', changes: cellChanges });
       }
 
       if (colsExpanded) {
@@ -243,7 +291,7 @@ export function useRowOperations({
       }
 
       if (withStyle && parsed.rowStyles && parsed.rowStyles.length > 0) {
-        let text = metaTextRef.current ?? '';
+        let text = prevMetaText;
         let patchedAny = false;
         for (let i = 0; i < Math.min(targetDataRows.length, 500); i++) {
           const st = parsed.rowStyles[i];
@@ -252,7 +300,23 @@ export function useRowOperations({
             patchedAny = true;
           }
         }
-        if (patchedAny) scheduleMetaSave(text);
+        if (patchedAny) {
+          scheduleMetaSave(text, { skipHistory: true });
+          if (text !== prevMetaText) {
+            steps.push({ type: 'metaChange', beforeMetaText: prevMetaText, afterMetaText: text });
+          }
+        }
+      }
+
+      if (steps.length > 0) {
+        const cmd: EditCommand =
+          steps.length === 1 ? steps[0]! : { type: 'composite', steps };
+        historyRef.current.push(
+          cmd,
+          withStyle
+            ? `Paste ${parsed.matrix.length} row(s) with style`
+            : `Paste ${parsed.matrix.length} row(s)`,
+        );
       }
 
       setDirtyCsv(true);
@@ -271,6 +335,7 @@ export function useRowOperations({
       nativeClipboard,
       autoWidths,
       rowsRef,
+      historyRef,
       viewRowIndices,
       appendRowsToOrder,
       setCsvData,
@@ -287,12 +352,18 @@ export function useRowOperations({
   const executeDeleteRows = useCallback(
     (dataRows: number[], label: string) => {
       if (!csvData || isReadOnly || dataRows.length === 0) return;
-      const uniqueDesc = Array.from(new Set(dataRows)).sort((a, b) => b - a);
+      const prevMetaText = metaTextRef.current ?? '';
+      const uniqueAsc = Array.from(new Set(dataRows)).sort((a, b) => a - b);
+      const uniqueDesc = [...uniqueAsc].reverse();
+      const deletedSnapshots: RowSnapshot[] = uniqueAsc
+        .filter((dr) => dr >= 0 && dr < rowsRef.current.length)
+        .map((dr) => ({ index: dr, row: [...(rowsRef.current[dr] ?? [])] }));
       const removedSet = new Set(uniqueDesc);
       for (const dr of uniqueDesc) {
         rowsRef.current.splice(dr, 1);
       }
       removeRowsFromOrder(uniqueDesc);
+      const steps: EditCommand[] = [{ type: 'deleteRows', rows: deletedSnapshots }];
       if (markers.length > 0) {
         const nextMarkers = markers
           .filter((m) => !removedSet.has(m.row))
@@ -303,8 +374,16 @@ export function useRowOperations({
             }
             return shift > 0 ? { ...m, row: m.row - shift } : m;
           });
-        persistMarkers(nextMarkers);
+        persistMarkers(nextMarkers, { skipHistory: true });
+        const afterMetaText = metaTextRef.current ?? '';
+        if (afterMetaText !== prevMetaText) {
+          steps.push({ type: 'metaChange', beforeMetaText: prevMetaText, afterMetaText });
+        }
       }
+      historyRef.current.push(
+        steps.length === 1 ? steps[0]! : { type: 'composite', steps },
+        uniqueDesc.length > 1 ? `Delete ${uniqueDesc.length} rows` : 'Delete row',
+      );
       setSelection({
         rows: CompactSelection.empty(),
         columns: CompactSelection.empty(),
@@ -317,7 +396,9 @@ export function useRowOperations({
     [
       csvData,
       isReadOnly,
+      metaTextRef,
       rowsRef,
+      historyRef,
       removeRowsFromOrder,
       markers,
       persistMarkers,
@@ -344,6 +425,7 @@ export function useRowOperations({
   const handleDuplicateRows = useCallback(
     (viewRows: number[], dataRows: number[], side: 'above' | 'below') => {
       if (!csvData || isReadOnly || dataRows.length === 0) return;
+      const prevMetaText = metaTextRef.current ?? '';
       const firstViewPos = viewRows.length > 0 ? Math.min(...viewRows) : 0;
       const lastViewPos = viewRows.length > 0 ? Math.max(...viewRows) : 0;
       const anchorDataRow =
@@ -357,11 +439,23 @@ export function useRowOperations({
       rowsRef.current.splice(insertIdx, 0, ...copies);
       insertRowsIntoOrder(insertIdx, copies.length, insertViewPos);
 
+      const steps: EditCommand[] = [
+        { type: 'insertRows', index: insertIdx, rows: copies.map((r) => [...r]) },
+      ];
       if (markers.length > 0 && markers.some((m) => m.row >= insertIdx)) {
         persistMarkers(
           markers.map((m) => (m.row >= insertIdx ? { ...m, row: m.row + copies.length } : m)),
+          { skipHistory: true },
         );
+        const afterMetaText = metaTextRef.current ?? '';
+        if (afterMetaText !== prevMetaText) {
+          steps.push({ type: 'metaChange', beforeMetaText: prevMetaText, afterMetaText });
+        }
       }
+      historyRef.current.push(
+        steps.length === 1 ? steps[0]! : { type: 'composite', steps },
+        `Duplicate ${copies.length} row${copies.length === 1 ? '' : 's'} ${side}`,
+      );
 
       setDirtyCsv(true);
       setDataVersion((v) => v + 1);
@@ -371,8 +465,10 @@ export function useRowOperations({
     [
       csvData,
       isReadOnly,
+      metaTextRef,
       viewRowIndices,
       rowsRef,
+      historyRef,
       insertRowsIntoOrder,
       markers,
       persistMarkers,
@@ -386,6 +482,7 @@ export function useRowOperations({
   const handleInsertBlankRows = useCallback(
     (viewRows: number[], dataRows: number[], side: 'above' | 'below') => {
       if (!csvData || isReadOnly || dataRows.length === 0) return;
+      const prevMetaText = metaTextRef.current ?? '';
       const count = dataRows.length;
       const firstViewPos = viewRows.length > 0 ? Math.min(...viewRows) : 0;
       const lastViewPos = viewRows.length > 0 ? Math.max(...viewRows) : 0;
@@ -403,11 +500,23 @@ export function useRowOperations({
       rowsRef.current.splice(insertIdx, 0, ...blanks);
       insertRowsIntoOrder(insertIdx, count, insertViewPos);
 
+      const steps: EditCommand[] = [
+        { type: 'insertRows', index: insertIdx, rows: blanks.map((r) => [...r]) },
+      ];
       if (markers.length > 0 && markers.some((m) => m.row >= insertIdx)) {
         persistMarkers(
           markers.map((m) => (m.row >= insertIdx ? { ...m, row: m.row + count } : m)),
+          { skipHistory: true },
         );
+        const afterMetaText = metaTextRef.current ?? '';
+        if (afterMetaText !== prevMetaText) {
+          steps.push({ type: 'metaChange', beforeMetaText: prevMetaText, afterMetaText });
+        }
       }
+      historyRef.current.push(
+        steps.length === 1 ? steps[0]! : { type: 'composite', steps },
+        `Insert ${count} blank row${count === 1 ? '' : 's'} ${side}`,
+      );
 
       const hasActiveFilter = debouncedFilterQuery.trim().length > 0 || onlyMarked;
       pendingJumpAfterInsertRef.current = { dataRow: insertIdx, count };
@@ -424,8 +533,10 @@ export function useRowOperations({
     [
       csvData,
       isReadOnly,
+      metaTextRef,
       viewRowIndices,
       rowsRef,
+      historyRef,
       insertRowsIntoOrder,
       markers,
       persistMarkers,

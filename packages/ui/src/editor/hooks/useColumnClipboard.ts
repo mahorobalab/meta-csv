@@ -1,6 +1,13 @@
 import { useCallback } from 'react';
 import type { MetaTextDocument } from '@metatext-editor/schema';
-import { patchMetaJsonc, type ParsedCsvData } from '@metatext-editor/core';
+import {
+  UndoRedoHistory,
+  patchMetaJsonc,
+  type CellChange,
+  type EditCommand,
+  type ParsedCsvData,
+} from '@metatext-editor/core';
+import type { MetaSaveOptions } from './useDocumentLoader';
 import {
   readClipboardForColumnPaste,
   writeColumnsToClipboard,
@@ -16,6 +23,7 @@ export interface UseColumnClipboardParams {
   meta: MetaTextDocument;
   metaTextRef: React.MutableRefObject<string | null>;
   rowsRef: React.MutableRefObject<string[][]>;
+  historyRef: React.MutableRefObject<UndoRedoHistory>;
   copiedColumnRef: React.MutableRefObject<CopiedColumnPayload | null>;
   isReadOnly: boolean;
   autoWidths: number[];
@@ -23,7 +31,7 @@ export interface UseColumnClipboardParams {
   viewRowIndices: Int32Array;
   getDefaultColumnTitle: (actualCol: number) => string;
   appendRowsToOrder: (appendedDataRows: number[]) => void;
-  scheduleMetaSave: (nextText: string) => void;
+  scheduleMetaSave: (nextText: string, options?: MetaSaveOptions) => void;
   setDirtyCsv: (dirty: boolean) => void;
   setDataVersion: React.Dispatch<React.SetStateAction<number>>;
   setStatusMsg: (msg: string) => void;
@@ -37,6 +45,7 @@ export function useColumnClipboard({
   meta,
   metaTextRef,
   rowsRef,
+  historyRef,
   copiedColumnRef,
   isReadOnly,
   autoWidths,
@@ -122,10 +131,18 @@ export function useColumnClipboard({
           parsed.matrix[0]?.[0] === csvData.headers[startActualCol]);
       const dataMatrix = hasExternalHeaderRow ? parsed.matrix.slice(1) : parsed.matrix;
 
+      const prevMetaText = metaTextRef.current ?? '';
+      const steps: EditCommand[] = [];
+      const prevColCount = csvData.columnKeys.length;
+      const prevRowCount = rowsRef.current.length;
+
       const pasteColCount = Math.max(1, ...dataMatrix.map((r) => r.length));
       const nextHeaders = [...csvData.headers];
       const nextKeys = [...csvData.columnKeys];
       const nextWidths = [...autoWidths];
+      const addedHeaders: string[] = [];
+      const addedKeys: string[] = [];
+      const addedWidths: number[] = [];
       let headersChanged = false;
 
       while (startActualCol + pasteColCount > nextKeys.length) {
@@ -133,13 +150,27 @@ export function useColumnClipboard({
         const name = csvData.dialect.hasHeader
           ? makeUniqueColumnKey(`column_${idx + 1}`, nextKeys)
           : String(idx);
-        nextHeaders.push(csvData.dialect.hasHeader ? name : '');
+        const h = csvData.dialect.hasHeader ? name : '';
+        nextHeaders.push(h);
         nextKeys.push(name);
         nextWidths.push(140);
+        addedHeaders.push(h);
+        addedKeys.push(name);
+        addedWidths.push(140);
         headersChanged = true;
         for (let r = 0; r < rowsRef.current.length; r++) {
           rowsRef.current[r]!.push('');
         }
+      }
+      if (addedHeaders.length > 0) {
+        steps.push({
+          type: 'insertCols',
+          index: prevColCount,
+          headers: addedHeaders,
+          keys: addedKeys,
+          widths: addedWidths,
+          reindexKeys: !csvData.dialect.hasHeader,
+        });
       }
 
       if (csvData.dialect.hasHeader && parsed.columns) {
@@ -148,11 +179,21 @@ export function useColumnClipboard({
           const srcTitle = parsed.columns[c]?.title?.trim();
           const curHeader = (nextHeaders[targetIdx] ?? '').trim();
           if (srcTitle && (curHeader === '' || /^column_\d+$/i.test(curHeader))) {
+            const beforeHeader = nextHeaders[targetIdx] ?? '';
+            const beforeKey = nextKeys[targetIdx] ?? String(targetIdx);
             const otherKeys = nextKeys.filter((_, idx) => idx !== targetIdx);
             const uniqueTitle = makeUniqueColumnKey(srcTitle, otherKeys);
             nextHeaders[targetIdx] = uniqueTitle;
             nextKeys[targetIdx] = uniqueTitle;
             headersChanged = true;
+            steps.push({
+              type: 'renameCol',
+              colIndex: targetIdx,
+              beforeHeader,
+              afterHeader: uniqueTitle,
+              beforeKey,
+              afterKey: uniqueTitle,
+            });
           }
         }
       }
@@ -160,16 +201,24 @@ export function useColumnClipboard({
       const rowsNeeded = dataMatrix.length;
       const existingVisible = viewRowIndices.length;
       const appendedDataRows: number[] = [];
+      const appendedCopies: string[][] = [];
       if (rowsNeeded > existingVisible) {
         const extra = rowsNeeded - existingVisible;
         for (let i = 0; i < extra; i++) {
           const newRow = Array.from({ length: nextKeys.length }, () => '');
           rowsRef.current.push(newRow);
           appendedDataRows.push(rowsRef.current.length - 1);
+          appendedCopies.push([...newRow]);
         }
         appendRowsToOrder(appendedDataRows);
+        steps.push({
+          type: 'insertRows',
+          index: prevRowCount,
+          rows: appendedCopies,
+        });
       }
 
+      const cellChanges: CellChange[] = [];
       for (let r = 0; r < rowsNeeded; r++) {
         const dataRowIdx =
           r < existingVisible ? viewRowIndices[r]! : appendedDataRows[r - existingVisible]!;
@@ -177,8 +226,17 @@ export function useColumnClipboard({
         if (!targetRow) continue;
         const srcRow = dataMatrix[r]!;
         for (let c = 0; c < srcRow.length; c++) {
-          targetRow[startActualCol + c] = srcRow[c] ?? '';
+          const colIdx = startActualCol + c;
+          const before = targetRow[colIdx] ?? '';
+          const after = srcRow[c] ?? '';
+          if (before !== after) {
+            targetRow[colIdx] = after;
+            cellChanges.push({ dataRow: dataRowIdx, col: colIdx, before, after });
+          }
         }
+      }
+      if (cellChanges.length > 0) {
+        steps.push({ type: 'editCells', changes: cellChanges });
       }
 
       if (headersChanged) {
@@ -187,7 +245,7 @@ export function useColumnClipboard({
       }
 
       if (withStyle && parsed.columns && parsed.columns.length > 0) {
-        let text = metaTextRef.current ?? '';
+        let text = prevMetaText;
         let patchedAny = false;
         for (let c = 0; c < pasteColCount; c++) {
           const colMetaSrc = parsed.columns[c];
@@ -215,8 +273,20 @@ export function useColumnClipboard({
           }
         }
         if (patchedAny) {
-          scheduleMetaSave(text);
+          scheduleMetaSave(text, { skipHistory: true });
+          if (text !== prevMetaText) {
+            steps.push({ type: 'metaChange', beforeMetaText: prevMetaText, afterMetaText: text });
+          }
         }
+      }
+
+      if (steps.length > 0) {
+        historyRef.current.push(
+          steps.length === 1 ? steps[0]! : { type: 'composite', steps },
+          withStyle
+            ? `Paste ${pasteColCount} column(s) with style`
+            : `Paste ${pasteColCount} column(s)`,
+        );
       }
 
       setDirtyCsv(true);
@@ -237,6 +307,7 @@ export function useColumnClipboard({
       viewRowIndices,
       autoWidths,
       rowsRef,
+      historyRef,
       appendRowsToOrder,
       setCsvData,
       setAutoWidths,

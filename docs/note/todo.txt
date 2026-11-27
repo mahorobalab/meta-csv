@@ -5,7 +5,9 @@ PLAN
         ・履歴ファイルは作らない設定も作る Undoはできるように
 
     docs\plan\packaging-metatext-zip-plan.md
-        ・Web版は、local strage に .metatext.jsonc 保存 パッケージのときに一緒に
+        ・Web版は、OPFS に .metatext.jsonc 保存 パッケージのときに一緒に
+        ・同じタイミングでWeb版もメタデータウィンドウと履歴 表示実装
+
 
         Gemini
         実装時のちょっとした注意点
@@ -17,6 +19,10 @@ PLAN
     → docs\plan\json.schemastore.org
     json.schemastore.org
 
+    https://mahorobalab.github.io/metatext-spec/
+    に
+    https://mahorobalab.github.io/metatext-editor/app/
+    追加
 
 ・リリース
     ・VS Code マーケットプレイス、 MS Store, BOOTH版

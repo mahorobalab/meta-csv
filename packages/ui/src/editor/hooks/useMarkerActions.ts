@@ -6,6 +6,7 @@ import {
 } from '@glideapps/glide-data-grid';
 import type { MarkerColor, MetaTextDocument, RowMarker } from '@metatext-editor/schema';
 import { MARKER_COLORS } from '../../MarkerControls';
+import type { MetaSaveOptions } from './useDocumentLoader';
 
 export interface UseMarkerActionsParams {
   meta: MetaTextDocument;
@@ -18,7 +19,7 @@ export interface UseMarkerActionsParams {
   setSelection: React.Dispatch<React.SetStateAction<GridSelection>>;
   gridRef: React.RefObject<DataEditorRef | null>;
   rowsRef: React.MutableRefObject<string[][]>;
-  patchMeta: (path: (string | number)[], value: unknown) => void;
+  patchMeta: (path: (string | number)[], value: unknown, options?: MetaSaveOptions) => void;
   setStatusMsg: (msg: string) => void;
 }
 
@@ -90,9 +91,9 @@ export function useMarkerActions({
     selectedDataRow !== undefined ? markerMap.get(selectedDataRow) : undefined;
 
   const persistMarkers = useCallback(
-    (next: RowMarker[]) => {
+    (next: RowMarker[], options?: MetaSaveOptions) => {
       const sorted = [...next].sort((a, b) => a.row - b.row);
-      patchMeta(['view', 'markers'], sorted.length > 0 ? sorted : undefined);
+      patchMeta(['view', 'markers'], sorted.length > 0 ? sorted : undefined, options);
     },
     [patchMeta],
   );

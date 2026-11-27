@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
-import { Check, ChevronDown, Code2, Info, Settings } from 'lucide-react';
+import { Check, ChevronDown, Code2, History, Info, Settings } from 'lucide-react';
 import {
   AboutModal,
   I18nProvider,
@@ -43,7 +43,9 @@ export const App: React.FC = () => {
 
   const [showEmptySettings, setShowEmptySettings] = useState(false);
   const [showEmptyAbout, setShowEmptyAbout] = useState(false);
-  const [showMetaPanel, setShowMetaPanel] = useState(false);
+  const [rightPanel, setRightPanel] = useState<'none' | 'meta' | 'history'>('none');
+  const showMetaPanel = rightPanel === 'meta';
+  const showHistoryPanel = rightPanel === 'history';
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [showWelcomeNewMenu, setShowWelcomeNewMenu] = useState(false);
   const welcomeNewMenuRef = useRef<HTMLDivElement | null>(null);
@@ -169,12 +171,27 @@ export const App: React.FC = () => {
 
   const fileMenuItems = (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <button type="button" style={menuRowStyle} onClick={() => setShowMetaPanel((s) => !s)}>
+      <button
+        type="button"
+        style={menuRowStyle}
+        onClick={() => setRightPanel((p) => (p === 'meta' ? 'none' : 'meta'))}
+      >
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
           <Code2 size={13} />
           <span>{showMetaPanel ? t('desktop.hideMetaPanel') : t('desktop.showMetaPanel')}</span>
         </span>
         {showMetaPanel && <Check size={13} />}
+      </button>
+      <button
+        type="button"
+        style={menuRowStyle}
+        onClick={() => setRightPanel((p) => (p === 'history' ? 'none' : 'history'))}
+      >
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+          <History size={13} />
+          <span>{showHistoryPanel ? 'Hide History panel' : 'Show History panel'}</span>
+        </span>
+        {showHistoryPanel && <Check size={13} />}
       </button>
     </div>
   );
@@ -193,7 +210,7 @@ export const App: React.FC = () => {
       <input
         type="checkbox"
         checked={showMetaPanel}
-        onChange={(e) => setShowMetaPanel(e.target.checked)}
+        onChange={(e) => setRightPanel(e.target.checked ? 'meta' : 'none')}
       />
     </label>
   );
@@ -295,6 +312,11 @@ export const App: React.FC = () => {
                     fileMenuItems={fileMenuItems}
                     settingsExtraSection={settingsExtraSection}
                     nativeClipboard={nativeClipboard}
+                    historyAdapter={tab.historyAdapter}
+                    showHistoryPanel={showHistoryPanel}
+                    onToggleHistoryPanel={() =>
+                      setRightPanel((p) => (p === 'history' ? 'none' : 'history'))
+                    }
                     externalMetaText={tab.metaText}
                     onMetaTextChange={(nextMeta) => handleTabMetaTextChange(tab.id, nextMeta)}
                     onStatusChange={(info) => handleTabStatusChange(tab.id, info)}
@@ -312,7 +334,7 @@ export const App: React.FC = () => {
               barFg={barFg}
               border={border}
               onChangeMetaText={(nextText) => handleMetaPanelEdit(activeTab, nextText)}
-              onClose={() => setShowMetaPanel(false)}
+              onClose={() => setRightPanel('none')}
             />
           )}
         </div>

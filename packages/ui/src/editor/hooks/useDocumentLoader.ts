@@ -12,6 +12,28 @@ import {
 import { parseTabularInWorker } from '../../parseInWorker';
 import type { EditorViewSnapshot } from '../types';
 
+export interface MetaSaveOptions {
+  skipHistory?: boolean;
+  label?: string;
+}
+
+function inferMetaHistoryLabel(path: Array<string | number>): string {
+  const root = String(path[0] ?? '');
+  const sub = String(path[1] ?? '');
+  const leaf = String(path[2] ?? '');
+  if (root === 'view' && sub === 'markers') return 'Update markers';
+  if (root === 'view' && sub === 'sort') return 'Change sort';
+  if (root === 'columns' && leaf === 'width') return 'Resize column';
+  if (root === 'columns' && leaf === 'visible') return 'Toggle column visibility';
+  if (root === 'columns' && leaf === 'label') return 'Rename column label';
+  if (root === 'columns') return 'Update column style';
+  if (root === 'rows') return 'Update row style';
+  if (root === 'cells' || root === 'ranges') return 'Update cell style';
+  if (root === 'rules') return 'Update conditional rules';
+  if (root === 'table') return 'Update table settings';
+  return 'Update metadata';
+}
+
 export interface UseDocumentLoaderParams {
   adapter: FileSystemAdapter;
   reloadTick: number;
@@ -252,7 +274,14 @@ export function useDocumentLoader({
   }, [externalMetaText, applyParsedMetaAndReparseIfNeeded, metaTextRef]);
 
   const scheduleMetaSave = useCallback(
-    (nextText: string) => {
+    (nextText: string, options?: MetaSaveOptions) => {
+      const prevText = metaTextRef.current ?? '';
+      if (!options?.skipHistory && prevText !== nextText) {
+        historyRef.current.push(
+          { type: 'metaChange', beforeMetaText: prevText, afterMetaText: nextText },
+          options?.label ?? 'Update metadata',
+        );
+      }
       applyParsedMetaAndReparseIfNeeded(nextText);
       onMetaTextChange?.(nextText);
 
@@ -263,13 +292,16 @@ export function useDocumentLoader({
         void adapter.saveMeta(nextText);
       }, 400);
     },
-    [adapter, applyParsedMetaAndReparseIfNeeded, onMetaTextChange],
+    [adapter, applyParsedMetaAndReparseIfNeeded, historyRef, metaTextRef, onMetaTextChange],
   );
 
   const patchMeta = useCallback(
-    (path: Array<string | number>, value: unknown) => {
+    (path: Array<string | number>, value: unknown, options?: MetaSaveOptions) => {
       const updated = patchMetaJsonc(metaTextRef.current, path, value);
-      scheduleMetaSave(updated);
+      scheduleMetaSave(updated, {
+        skipHistory: options?.skipHistory,
+        label: options?.label ?? inferMetaHistoryLabel(path),
+      });
     },
     [scheduleMetaSave, metaTextRef],
   );

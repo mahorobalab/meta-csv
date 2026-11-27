@@ -1,6 +1,11 @@
 import * as vscode from 'vscode';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+import type { HistoryRetentionPolicy } from '@metatext-editor/core';
+import {
+  DEFAULT_VSCODE_HISTORY_POLICY,
+  createNodeIsomorphicHistoryAdapter,
+} from './isomorphicHistory';
 
 type SidecarVisibilityMode = 'nest' | 'hide' | 'show';
 type LanguageSetting = 'auto' | 'en' | 'ja' | 'zh-cn' | 'zh-tw' | 'ko' | 'de' | 'fr' | 'es';
@@ -17,11 +22,11 @@ interface VsCodeAppSettings {
 
 const SIDECAR_EXCLUDE_GLOB = '**/*.metatext.jsonc';
 const SIDECAR_NESTING_PATTERNS: Record<string, string> = {
-  '*.csv': '${capture}.csv.metatext.jsonc',
-  '*.tsv': '${capture}.tsv.metatext.jsonc',
-  '*.jsonl': '${capture}.jsonl.metatext.jsonc',
-  '*.ndjson': '${capture}.ndjson.metatext.jsonc',
-  '*.log': '${capture}.log.metatext.jsonc',
+  '*.csv': '${capture}.csv.metatext.jsonc, ${capture}.csv.metatext.history',
+  '*.tsv': '${capture}.tsv.metatext.jsonc, ${capture}.tsv.metatext.history',
+  '*.jsonl': '${capture}.jsonl.metatext.jsonc, ${capture}.jsonl.metatext.history',
+  '*.ndjson': '${capture}.ndjson.metatext.jsonc, ${capture}.ndjson.metatext.history',
+  '*.log': '${capture}.log.metatext.jsonc, ${capture}.log.metatext.history',
 };
 
 interface EditorStatusPayload {
@@ -156,6 +161,22 @@ class MetaTextEditorProvider implements vscode.CustomEditorProvider<MetaTextDocu
     if (panel) {
       await panel.webview.postMessage({ type: 'hostCommand', command: 'hostSaved' });
     }
+    // Fire-and-forget background Shadow Git snapshot via isomorphic-git
+    void (async () => {
+      try {
+        const metaPath = `${document.uri.fsPath}.metatext.jsonc`;
+        const metaText = await fs.readFile(metaPath, 'utf-8').catch(() => '');
+        const historyAdapter = createNodeIsomorphicHistoryAdapter(document.uri.fsPath);
+        await historyAdapter.saveSnapshot({
+          message: `Saved ${path.basename(document.uri.fsPath)}`,
+          includeDataFromDisk: true,
+          metaText,
+          policy: DEFAULT_VSCODE_HISTORY_POLICY,
+        });
+      } catch {
+        // Never block or disturb user save
+      }
+    })();
   }
 
   async saveCustomDocumentAs(
@@ -254,6 +275,71 @@ class MetaTextEditorProvider implements vscode.CustomEditorProvider<MetaTextDocu
         case 'ready':
           await sendFilePayload();
           break;
+
+        case 'historyList': {
+          const requestId = Number(message.requestId ?? 0);
+          try {
+            const historyAdapter = createNodeIsomorphicHistoryAdapter(csvPath);
+            const [snapshots, usageBytes] = await Promise.all([
+              historyAdapter.listSnapshots(Number(message.limit ?? 50)),
+              historyAdapter.getStorageUsageBytes ? historyAdapter.getStorageUsageBytes() : Promise.resolve(0),
+            ]);
+            await webview.postMessage({ type: 'historyListResult', requestId, snapshots, usageBytes });
+          } catch (err) {
+            await webview.postMessage({ type: 'historyError', requestId, message: String(err) });
+          }
+          break;
+        }
+
+        case 'historySave': {
+          const requestId = Number(message.requestId ?? 0);
+          try {
+            const historyAdapter = createNodeIsomorphicHistoryAdapter(csvPath);
+            const policy = (message.policy ?? DEFAULT_VSCODE_HISTORY_POLICY) as HistoryRetentionPolicy;
+            const saved = await historyAdapter.saveSnapshot({
+              message: String(message.message ?? `Saved ${path.basename(csvPath)}`),
+              includeDataFromDisk: Boolean(message.includeDataFromDisk),
+              metaText: String(message.metaText ?? ''),
+              policy,
+            });
+            await webview.postMessage({ type: 'historySaveResult', requestId, snapshot: saved });
+          } catch (err) {
+            await webview.postMessage({ type: 'historyError', requestId, message: String(err) });
+          }
+          break;
+        }
+
+        case 'historyRestore': {
+          const requestId = Number(message.requestId ?? 0);
+          try {
+            const historyAdapter = createNodeIsomorphicHistoryAdapter(csvPath);
+            const payload = await historyAdapter.restoreSnapshot(String(message.id ?? ''));
+            await webview.postMessage({
+              type: 'historyRestoreResult',
+              requestId,
+              id: payload.id,
+              dataBase64: payload.dataBytes ? Buffer.from(payload.dataBytes).toString('base64') : undefined,
+              metaText: payload.metaText,
+            });
+          } catch (err) {
+            await webview.postMessage({ type: 'historyError', requestId, message: String(err) });
+          }
+          break;
+        }
+
+        case 'historyUsage': {
+          const requestId = Number(message.requestId ?? 0);
+          try {
+            const historyAdapter = createNodeIsomorphicHistoryAdapter(csvPath);
+            const usageBytes = historyAdapter.getStorageUsageBytes
+              ? await historyAdapter.getStorageUsageBytes()
+              : 0;
+            await webview.postMessage({ type: 'historyUsageResult', requestId, usageBytes });
+          } catch (err) {
+            await webview.postMessage({ type: 'historyError', requestId, message: String(err) });
+          }
+          break;
+        }
 
         case 'readAppend': {
           const requestId = Number(message.requestId ?? 0);

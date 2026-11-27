@@ -229,6 +229,104 @@ export const AppSettingsTab: React.FC<AppSettingsTabProps> = ({
         </label>
       )}
 
+      <hr style={{ border: 'none', borderTop: `1px solid ${border}`, margin: '2px 0' }} />
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <label
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 12,
+            cursor: 'pointer',
+            fontWeight: 600,
+          }}
+        >
+          <span>Save History (Shadow Git)</span>
+          <input
+            type="checkbox"
+            checked={appSettings.historyEnabled !== false}
+            onChange={(e) => onAppSettingsChange?.({ historyEnabled: e.target.checked })}
+          />
+        </label>
+
+        {appSettings.historyEnabled !== false && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingLeft: 8 }}>
+            <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+              <span style={{ opacity: 0.85 }}>Retention mode</span>
+              <select
+                value={appSettings.historyRetentionMode ?? 'count'}
+                onChange={(e) =>
+                  onAppSettingsChange?.({
+                    historyRetentionMode: e.target.value as 'count' | 'sizeMb',
+                  })
+                }
+                style={inputStyle}
+              >
+                <option value="count">Keep last N saves</option>
+                <option value="sizeMb">Limit total size (MB)</option>
+              </select>
+            </label>
+
+            {(appSettings.historyRetentionMode ?? 'count') === 'count' ? (
+              <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                <span style={{ opacity: 0.85 }}>Max snapshots</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={500}
+                  value={appSettings.historyMaxCount ?? 10}
+                  onChange={(e) =>
+                    onAppSettingsChange?.({
+                      historyMaxCount: Math.max(1, Math.min(500, Number(e.target.value) || 10)),
+                    })
+                  }
+                  style={{ ...inputStyle, width: 76 }}
+                />
+              </label>
+            ) : (
+              <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                <span style={{ opacity: 0.85 }}>Max history size (MB)</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={2048}
+                  value={appSettings.historyMaxTotalSizeMb ?? 10}
+                  onChange={(e) =>
+                    onAppSettingsChange?.({
+                      historyMaxTotalSizeMb: Math.max(
+                        1,
+                        Math.min(2048, Number(e.target.value) || 10),
+                      ),
+                    })
+                  }
+                  style={{ ...inputStyle, width: 76 }}
+                />
+              </label>
+            )}
+
+            <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+              <span style={{ opacity: 0.85 }}>Skip data body above (MB)</span>
+              <input
+                type="number"
+                min={0}
+                max={1024}
+                value={appSettings.historyMaxDataFileSizeMb ?? 20}
+                onChange={(e) =>
+                  onAppSettingsChange?.({
+                    historyMaxDataFileSizeMb: Math.max(
+                      0,
+                      Math.min(1024, Number(e.target.value) || 0),
+                    ),
+                  })
+                }
+                style={{ ...inputStyle, width: 76 }}
+              />
+            </label>
+          </div>
+        )}
+      </div>
+
       {extraSection && (
         <>
           <hr style={{ border: 'none', borderTop: `1px solid ${border}`, margin: '2px 0' }} />
