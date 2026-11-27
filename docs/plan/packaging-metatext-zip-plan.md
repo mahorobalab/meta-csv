@@ -101,8 +101,8 @@ report.csv.metatext.zip
 
 ## 6. ロードマップ（チェックリスト）
 
-- [ ] `metatext-spec` に `.metatext.zip` パッケージ構造（`manifest.json` スキーマ・必須エントリ検証ルール）を追記
+- [x] `metatext-spec` に `.metatext.zip` パッケージ構造（`manifest.json` スキーマ・必須エントリ検証ルール）を追記
 - [x] `packages/core` に `manifest.json` 生成／検証・Zip Slip / Zip Bomb チェック共通ロジックを実装
-- [x] VS Code 向けに `fflate` ベースの `.metatext.zip` 直接オープン・アトミック上書き保存・Export を実装（Web 展開は次フェーズ）
+- [x] VS Code / Playground（Web）向けに `fflate` ベースの `.metatext.zip` 直接オープン・保存・Export を実装
 - [x] Desktop（Rust）向けに `zip` クレートベースの `.metatext.zip` 直接オープン・アトミック上書き保存・Export（`history/` 同梱可否対応）を実装
 - [x] エクスポート設定モーダル（「履歴を含める」既定 OFF・想定サイズ表示）を `packages/ui` に実装

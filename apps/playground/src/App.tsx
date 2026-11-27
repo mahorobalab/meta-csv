@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, Code2, ExternalLink, FileSpreadsheet } from 'lucide-react';
+import { isMetaTextZipFileName } from '@metatext-editor/core';
 import {
   I18nProvider,
   MetaTextEditor,
@@ -12,6 +13,7 @@ import {
   type EditorAppSettings,
   type EditorStatusInfo,
   type MessageKey,
+  type MetaTextEditorHandle,
   type NewFileFormat,
   type ThemePreference,
 } from '@metatext-editor/ui';
@@ -27,6 +29,11 @@ import {
   createMemoryAdapter,
   generateLargeCsvBytes,
 } from './datasets';
+import {
+  buildMetaTextBundleWeb,
+  createWebBundleAdapter,
+  triggerZipDownload,
+} from './webBundle';
 
 type PresetKey = 'spec' | 'jsonl' | 'log' | 'large100k' | 'new' | 'custom';
 
@@ -83,6 +90,8 @@ export const App: React.FC = () => {
   const [newSeq, setNewSeq] = useState<number>(0);
   const [isDraggingFile, setIsDraggingFile] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const editorRef = useRef<MetaTextEditorHandle | null>(null);
+  const currentFileNameRef = useRef<string>('spec_setting.csv');
   const isDirtyRef = useRef<boolean>(false);
   const dragDepthRef = useRef<number>(0);
 
@@ -143,6 +152,11 @@ export const App: React.FC = () => {
       });
     }
     if (customFile) {
+      if (isMetaTextZipFileName(customFile.name)) {
+        return createWebBundleAdapter(customFile, (loadedMeta) => {
+          setMetaText(loadedMeta);
+        });
+      }
       return createFileAdapter(customFile, customMetaText);
     }
     return createMemoryAdapter({
@@ -159,6 +173,13 @@ export const App: React.FC = () => {
     const dataFile = files.find((f) => !f.name.toLowerCase().endsWith('.metatext.jsonc'));
     if (!dataFile) return;
 
+    if (dataFile.name.toLowerCase().endsWith('.zip') && !isMetaTextZipFileName(dataFile.name)) {
+      window.alert(
+        'Only ".metatext.zip" bundles are supported (regular .zip files cannot be opened).',
+      );
+      return;
+    }
+
     if (
       isDirtyRef.current &&
       !window.confirm(t('web.discardConfirm', { name: dataFile.name }))
@@ -167,7 +188,7 @@ export const App: React.FC = () => {
     }
 
     let nextMeta: string | null = null;
-    if (sidecarFile) {
+    if (sidecarFile && !isMetaTextZipFileName(dataFile.name)) {
       try {
         nextMeta = await sidecarFile.text();
       } catch {
@@ -185,6 +206,12 @@ export const App: React.FC = () => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
+    if (file.name.toLowerCase().endsWith('.zip') && !isMetaTextZipFileName(file.name)) {
+      window.alert(
+        'Only ".metatext.zip" bundles are supported (regular .zip files cannot be opened).',
+      );
+      return;
+    }
     if (
       isDirtyRef.current &&
       !window.confirm(t('web.discardConfirm', { name: file.name }))
@@ -395,13 +422,14 @@ export const App: React.FC = () => {
       <input
         ref={fileInputRef}
         type="file"
-        accept=".csv,.tsv,.jsonl,.ndjson,.log,.txt"
+        accept=".csv,.tsv,.jsonl,.ndjson,.log,.txt,.zip"
         onChange={handleOpenLocalCsv}
         style={{ display: 'none' }}
       />
 
       <div style={{ flex: 1, minWidth: 0, height: '100%' }}>
         <MetaTextEditor
+          ref={editorRef}
           adapter={adapter}
           hostMode="web"
           themeMode={resolvedTheme}
@@ -490,9 +518,24 @@ export const App: React.FC = () => {
           settingsExtraSection={settingsExtraSection}
           onStatusChange={(info: EditorStatusInfo) => {
             isDirtyRef.current = info.dirty;
+            if (info.fileName) {
+              currentFileNameRef.current = info.fileName;
+            }
             document.title = info.fileName
               ? `${info.fileName}${info.dirty ? ' *' : ''} — MetaText Editor`
               : 'MetaText Editor Web';
+          }}
+          onExportBundle={async () => {
+            const currentBytes =
+              editorRef.current?.serializeCurrentCsv() ?? (await adapter.load()).csvBytes;
+            const { bundleFileName, zipBytes } = buildMetaTextBundleWeb({
+              fileName: currentFileNameRef.current || 'untitled.csv',
+              dataBytes: currentBytes,
+              metaText,
+              includeHistory: false,
+            });
+            triggerZipDownload(bundleFileName, zipBytes);
+            return bundleFileName;
           }}
           externalMetaText={metaText}
           onMetaTextChange={setMetaText}

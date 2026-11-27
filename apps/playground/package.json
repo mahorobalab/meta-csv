@@ -14,6 +14,7 @@
     "@metatext-editor/core": "workspace:*",
     "@metatext-editor/schema": "workspace:*",
     "@metatext-editor/ui": "workspace:*",
+    "fflate": "^0.8.3",
     "lucide-react": "^1.79.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"

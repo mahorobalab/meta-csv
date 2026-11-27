@@ -26,6 +26,7 @@ import {
 } from '@metatext-editor/schema';
 import {
   UndoRedoHistory,
+  isMetaTextZipFileName,
   type ParseProgress,
   type ParsedCsvData,
 } from '@metatext-editor/core';
@@ -958,7 +959,7 @@ export const MetaTextEditor = React.forwardRef<MetaTextEditorHandle, MetaTextEdi
         onOpenFile={onOpenFile}
         onSaveAs={onSaveAs ? () => void handleSaveAs() : undefined}
         onOpenExportBundle={
-          onExportBundle && filePath
+          onExportBundle && (filePath || hostMode === 'web')
             ? () => {
                 setShowExportModal(true);
                 if (historyAdapter?.getStorageUsageBytes) {
@@ -1005,8 +1006,8 @@ export const MetaTextEditor = React.forwardRef<MetaTextEditorHandle, MetaTextEdi
         onRemoveMarker={handleRemoveMarker}
         onClearAllMarkers={handleClearAllMarkers}
         getRowPreview={getRowPreview}
-        canTail={canTail}
-        showTailPanel={showTailPanel}
+        canTail={canTail && !isMetaTextZipFileName(fileName)}
+        showTailPanel={showTailPanel && !isMetaTextZipFileName(fileName)}
         zebraEnabled={zebraEnabled}
         showCellInspector={showCellInspector}
         showHistoryPanel={showHistoryPanel}
