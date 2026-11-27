@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { FileSpreadsheet, Moon, Plus, X } from 'lucide-react';
+import { FileSpreadsheet, Moon, Package, Plus, X } from 'lucide-react';
+import { isMetaTextZipFileName } from '@metatext-editor/core';
 import { NEW_FILE_FORMAT_OPTIONS, useI18n, type NewFileFormat } from '@metatext-editor/ui';
 import type { DesktopTab } from '../hooks/useDesktopTabs';
 import { formatBytesShort } from '../utils/pathUtils';
@@ -7,6 +8,7 @@ import { formatBytesShort } from '../utils/pathUtils';
 export interface DesktopTabBarProps {
   tabs: DesktopTab[];
   activeTabId: string | null;
+  isDark: boolean;
   tabBarBg: string;
   tabActiveBg: string;
   tabInactiveBg: string;
@@ -20,6 +22,7 @@ export interface DesktopTabBarProps {
 export const DesktopTabBar: React.FC<DesktopTabBarProps> = ({
   tabs,
   activeTabId,
+  isDark,
   tabBarBg,
   tabActiveBg,
   tabInactiveBg,
@@ -93,6 +96,7 @@ export const DesktopTabBar: React.FC<DesktopTabBarProps> = ({
   >
     {tabs.map((tab) => {
       const isTabActive = tab.id === activeTabId;
+      const isBundle = isMetaTextZipFileName(tab.fileName);
       const sizeLabel = formatBytesShort(tab.fileBytes);
       const tabTooltip = [
         tab.filePath ?? tab.fileName,
@@ -119,21 +123,43 @@ export const DesktopTabBar: React.FC<DesktopTabBarProps> = ({
             alignItems: 'center',
             gap: 6,
             padding: '0 8px 0 11px',
-            maxWidth: 220,
+            maxWidth: 240,
             minWidth: 100,
             fontSize: 12,
             fontWeight: isTabActive ? 600 : 400,
-            background: isTabActive ? tabActiveBg : tabInactiveBg,
+            background: isBundle
+              ? isDark
+                ? isTabActive
+                  ? 'rgba(249, 115, 22, 0.28)'
+                  : 'rgba(249, 115, 22, 0.14)'
+                : isTabActive
+                  ? '#fed7aa'
+                  : '#ffedd5'
+              : isTabActive
+                ? tabActiveBg
+                : tabInactiveBg,
             color: barFg,
-            opacity: isTabActive ? 1 : tab.sleeping ? 0.56 : 0.78,
+            opacity: isTabActive ? 1 : tab.sleeping ? 0.56 : 0.86,
             borderRight: `1px solid ${border}`,
-            borderTop: isTabActive ? '2px solid #3b82f6' : '2px solid transparent',
+            borderTop: isBundle
+              ? isDark
+                ? isTabActive
+                  ? '2px solid #f97316'
+                  : '2px solid rgba(249, 115, 22, 0.55)'
+                : isTabActive
+                  ? '2px solid #ea580c'
+                  : '2px solid #fb923c'
+              : isTabActive
+                ? '2px solid #3b82f6'
+                : '2px solid transparent',
             cursor: 'pointer',
             flexShrink: 0,
           }}
         >
           {tab.sleeping ? (
             <Moon size={11} style={{ opacity: 0.75, flexShrink: 0 }} />
+          ) : isBundle ? (
+            <Package size={12} style={{ color: isDark ? '#fb923c' : '#ea580c', flexShrink: 0 }} />
           ) : (
             <FileSpreadsheet size={12} style={{ opacity: 0.7, flexShrink: 0 }} />
           )}

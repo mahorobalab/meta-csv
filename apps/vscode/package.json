@@ -36,6 +36,16 @@
           }
         ],
         "priority": "option"
+      },
+      {
+        "viewType": "metatext.bundleEditor",
+        "displayName": "MetaText Editor",
+        "selector": [
+          {
+            "filenamePattern": "*.metatext.zip"
+          }
+        ],
+        "priority": "default"
       }
     ],
     "commands": [
@@ -48,7 +58,7 @@
       "editor/title": [
         {
           "command": "metatext.openWithEditor",
-          "when": "resourceExtname == .csv || resourceExtname == .tsv || resourceExtname == .jsonl || resourceExtname == .ndjson || resourceExtname == .log",
+          "when": "resourceExtname == .csv || resourceExtname == .tsv || resourceExtname == .jsonl || resourceExtname == .ndjson || resourceExtname == .log || resourceFilename =~ /\\.metatext\\.zip$/",
           "group": "navigation"
         }
       ]
@@ -157,6 +167,7 @@
     "@metatext-editor/core": "workspace:*",
     "@metatext-editor/schema": "workspace:*",
     "@metatext-editor/ui": "workspace:*",
+    "fflate": "^0.8.3",
     "isomorphic-git": "^1.44.19",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"

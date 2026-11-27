@@ -227,8 +227,11 @@ async function pruneRepo(
  * Writes and reads standard bare Git objects in `<targetFile>.metatext.history/`
  * with 100% format compatibility with Desktop's Rust (`gix`) implementation.
  */
-export function createNodeIsomorphicHistoryAdapter(targetFilePath: string): HistoryAdapter {
-  const gitdir = adjacentHistoryDir(targetFilePath);
+export function createNodeIsomorphicHistoryAdapter(
+  targetFilePath: string,
+  overrideGitdir?: string,
+): HistoryAdapter {
+  const gitdir = overrideGitdir ?? adjacentHistoryDir(targetFilePath);
 
   return {
     readsSavedFileDirectly: true,

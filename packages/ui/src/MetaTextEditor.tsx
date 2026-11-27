@@ -78,6 +78,7 @@ import { HistorySidePanel } from './editor/components/HistorySidePanel';
 import { LiveTailPanel } from './editor/components/LiveTailPanel';
 import { EditorStatusBar } from './editor/components/EditorStatusBar';
 import { EditorConfirmDialogs } from './editor/components/EditorConfirmDialogs';
+import { ExportBundleModal } from './dialogs/ExportBundleModal';
 import { useSnapshotHistory } from './editor/hooks/useSnapshotHistory';
 
 export type {
@@ -118,10 +119,15 @@ export const MetaTextEditor = React.forwardRef<MetaTextEditorHandle, MetaTextEdi
       historyAdapter,
       showHistoryPanel: controlledShowHistoryPanel,
       onToggleHistoryPanel: controlledToggleHistoryPanel,
+      historyRefreshTick,
+      externalSavingSnapshot = false,
+      onExportBundle,
     },
     ref,
   ) {
   const [internalShowHistoryPanel, setInternalShowHistoryPanel] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportHistoryBytes, setExportHistoryBytes] = useState<number | null>(null);
   const showHistoryPanel = controlledShowHistoryPanel ?? internalShowHistoryPanel;
   const handleToggleHistoryPanel = useCallback(() => {
     if (controlledToggleHistoryPanel) {
@@ -707,6 +713,7 @@ export const MetaTextEditor = React.forwardRef<MetaTextEditorHandle, MetaTextEdi
     setDataVersion,
     setStatusMsg,
     showHistoryPanel,
+    historyRefreshTick,
   });
 
   // File save / Save As / New / Close / Undo / Redo
@@ -950,6 +957,21 @@ export const MetaTextEditor = React.forwardRef<MetaTextEditorHandle, MetaTextEdi
         onNewFile={onNewFile ? handleNewFileAction : undefined}
         onOpenFile={onOpenFile}
         onSaveAs={onSaveAs ? () => void handleSaveAs() : undefined}
+        onOpenExportBundle={
+          onExportBundle && filePath
+            ? () => {
+                setShowExportModal(true);
+                if (historyAdapter?.getStorageUsageBytes) {
+                  void historyAdapter
+                    .getStorageUsageBytes()
+                    .then((b) => setExportHistoryBytes(b))
+                    .catch(() => setExportHistoryBytes(null));
+                } else {
+                  setExportHistoryBytes(null);
+                }
+              }
+            : undefined
+        }
         onCloseFile={onCloseFile ? handleCloseFileAction : undefined}
         onSaveCsv={() => void handleSaveCsv()}
         onUndo={handleUndo}
@@ -988,7 +1010,7 @@ export const MetaTextEditor = React.forwardRef<MetaTextEditorHandle, MetaTextEdi
         zebraEnabled={zebraEnabled}
         showCellInspector={showCellInspector}
         showHistoryPanel={showHistoryPanel}
-        savingSnapshot={savingSnapshot}
+        savingSnapshot={savingSnapshot || externalSavingSnapshot}
         onLockReadOnly={() => {
           setOpenMenu('none');
           setIsReadOnly(true);
@@ -1462,6 +1484,30 @@ export const MetaTextEditor = React.forwardRef<MetaTextEditorHandle, MetaTextEdi
         themeMode={themeMode}
         hostMode={hostMode}
       />
+
+      {onExportBundle && (
+        <ExportBundleModal
+          open={showExportModal}
+          onClose={() => setShowExportModal(false)}
+          isDark={isDark}
+          border={toolbarBorder}
+          fg={toolbarFg}
+          fileName={fileName || 'untitled.csv'}
+          dataBytes={fileBytes}
+          metaBytes={new TextEncoder().encode(metaTextRef.current ?? '').byteLength}
+          historyBytes={exportHistoryBytes}
+          hasUnsavedChanges={dirtyCsv}
+          onConfirmExport={async (opts) => {
+            const res = await onExportBundle(opts);
+            if (typeof res === 'string' && res.length > 0) {
+              setStatusMsg(`Exported ${res}`);
+            } else if (res !== false) {
+              setStatusMsg(`Exported ${fileName}.metatext.zip`);
+            }
+            return res;
+          }}
+        />
+      )}
 
       {/* Row / Column Delete & Hide Confirmation Dialogs */}
       <EditorConfirmDialogs

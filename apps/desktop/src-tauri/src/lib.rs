@@ -1,5 +1,7 @@
+mod bundle;
 mod history;
 
+use bundle::{BundleExportResult, BundleOpenMeta};
 use history::{
     GixHistoryRepository, HistoryRestoreMeta, HistoryRetentionPolicy, HistorySnapshotMeta,
 };
@@ -636,6 +638,16 @@ fn write_clipboard_html(html: String, alt_text: String) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
+fn resolve_history_repo_for_read(file_path: &Path) -> Result<Option<GixHistoryRepository>, String> {
+    if bundle::is_metatext_zip_path(file_path) {
+        let Some(cache_dir) = bundle::extract_bundle_history_to_temp(file_path)? else {
+            return Ok(None);
+        };
+        return Ok(Some(GixHistoryRepository::from_repo_dir(cache_dir)));
+    }
+    Ok(Some(GixHistoryRepository::for_file(file_path)))
+}
+
 #[tauri::command]
 async fn history_save_snapshot(
     file_path: String,
@@ -646,6 +658,15 @@ async fn history_save_snapshot(
 ) -> Result<Option<HistorySnapshotMeta>, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let target = Path::new(&file_path);
+        if bundle::is_metatext_zip_path(target) {
+            return bundle::save_bundle_snapshot_atomic(
+                target,
+                &message,
+                include_data,
+                &meta_text,
+                &policy,
+            );
+        }
         let repo = GixHistoryRepository::for_file(target);
         repo.save_snapshot_from_file(target, &message, include_data, &meta_text, &policy)
     })
@@ -659,7 +680,9 @@ async fn history_list_snapshots(
     limit: Option<usize>,
 ) -> Result<Vec<HistorySnapshotMeta>, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let repo = GixHistoryRepository::for_file(Path::new(&file_path));
+        let Some(repo) = resolve_history_repo_for_read(Path::new(&file_path))? else {
+            return Ok(Vec::new());
+        };
         repo.list_snapshots(limit)
     })
     .await
@@ -672,7 +695,9 @@ async fn history_restore_snapshot_meta(
     id: String,
 ) -> Result<HistoryRestoreMeta, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let repo = GixHistoryRepository::for_file(Path::new(&file_path));
+        let Some(repo) = resolve_history_repo_for_read(Path::new(&file_path))? else {
+            return Err("No history exists in this bundle".to_string());
+        };
         repo.restore_snapshot_meta(&id)
     })
     .await
@@ -685,7 +710,9 @@ async fn history_restore_snapshot_data(
     id: String,
 ) -> Result<Response, String> {
     let bytes = tauri::async_runtime::spawn_blocking(move || {
-        let repo = GixHistoryRepository::for_file(Path::new(&file_path));
+        let Some(repo) = resolve_history_repo_for_read(Path::new(&file_path))? else {
+            return Err("No history exists in this bundle".to_string());
+        };
         repo.restore_snapshot_data(&id)
     })
     .await
@@ -696,8 +723,10 @@ async fn history_restore_snapshot_data(
 #[tauri::command]
 async fn history_storage_usage(file_path: String) -> Result<u64, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let repo = GixHistoryRepository::for_file(Path::new(&file_path));
-        repo.storage_usage_bytes()
+        match resolve_history_repo_for_read(Path::new(&file_path)) {
+            Ok(Some(repo)) => repo.storage_usage_bytes(),
+            _ => 0,
+        }
     })
     .await
     .map_err(|e| format!("History task join error: {e}"))
@@ -711,6 +740,67 @@ async fn history_clear(file_path: String) -> Result<(), String> {
     })
     .await
     .map_err(|e| format!("History task join error: {e}"))?
+}
+
+#[tauri::command]
+async fn export_metatext_bundle(
+    source_path: String,
+    dest_path: String,
+    include_history: bool,
+    format: Option<String>,
+) -> Result<BundleExportResult, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        bundle::export_metatext_bundle(
+            Path::new(&source_path),
+            Path::new(&dest_path),
+            include_history,
+            format.as_deref(),
+        )
+    })
+    .await
+    .map_err(|e| format!("Bundle export task join error: {e}"))?
+}
+
+#[tauri::command]
+async fn load_bundle_meta(path: String) -> Result<BundleOpenMeta, String> {
+    tauri::async_runtime::spawn_blocking(move || bundle::load_bundle_meta(Path::new(&path)))
+        .await
+        .map_err(|e| format!("Bundle load task join error: {e}"))?
+}
+
+#[tauri::command]
+async fn load_bundle_data(path: String) -> Result<Response, String> {
+    let bytes = tauri::async_runtime::spawn_blocking(move || {
+        bundle::load_bundle_data(Path::new(&path))
+    })
+    .await
+    .map_err(|e| format!("Bundle load task join error: {e}"))??;
+    Ok(Response::new(bytes))
+}
+
+#[tauri::command]
+fn save_bundle_data(request: Request<'_>) -> Result<(), String> {
+    let encoded_path = request
+        .headers()
+        .get("x-file-path")
+        .and_then(|v| v.to_str().ok())
+        .ok_or_else(|| "Missing x-file-path header".to_string())?;
+    let path = percent_decode(encoded_path)?;
+    match request.body() {
+        tauri::ipc::InvokeBody::Raw(bytes) => {
+            bundle::update_bundle_atomic(Path::new(&path), Some(bytes), None)
+        }
+        tauri::ipc::InvokeBody::Json(_) => Err("Expected raw binary payload".to_string()),
+    }
+}
+
+#[tauri::command]
+async fn save_bundle_meta(path: String, meta_text: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        bundle::update_bundle_atomic(Path::new(&path), None, Some(&meta_text))
+    })
+    .await
+    .map_err(|e| format!("Bundle save meta task join error: {e}"))?
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -780,7 +870,12 @@ pub fn run() {
             history_restore_snapshot_meta,
             history_restore_snapshot_data,
             history_storage_usage,
-            history_clear
+            history_clear,
+            export_metatext_bundle,
+            load_bundle_meta,
+            load_bundle_data,
+            save_bundle_data,
+            save_bundle_meta
         ])
         .run(tauri::generate_context!())
         .expect("error while running MetaText Editor desktop application");

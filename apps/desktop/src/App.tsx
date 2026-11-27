@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
+import { save } from '@tauri-apps/plugin-dialog';
 import { Check, ChevronDown, Code2, History, Info, Settings } from 'lucide-react';
+import { defaultBundleFileName } from '@metatext-editor/core';
 import {
   AboutModal,
   I18nProvider,
@@ -264,6 +266,7 @@ export const App: React.FC = () => {
         <DesktopTabBar
           tabs={tabs}
           activeTabId={activeTabId}
+          isDark={isDark}
           tabBarBg={tabBarBg}
           tabActiveBg={tabActiveBg}
           tabInactiveBg={tabInactiveBg}
@@ -316,6 +319,41 @@ export const App: React.FC = () => {
                     showHistoryPanel={showHistoryPanel}
                     onToggleHistoryPanel={() =>
                       setRightPanel((p) => (p === 'history' ? 'none' : 'history'))
+                    }
+                    onExportBundle={
+                      tab.filePath
+                        ? async ({ includeHistory }) => {
+                            const srcPath = tab.filePath!;
+                            const defaultName = defaultBundleFileName(tab.fileName);
+                            const lastSep = Math.max(
+                              srcPath.lastIndexOf('\\'),
+                              srcPath.lastIndexOf('/'),
+                            );
+                            const defaultPath =
+                              lastSep >= 0
+                                ? `${srcPath.slice(0, lastSep + 1)}${defaultName}`
+                                : defaultName;
+                            const destPath = await save({
+                              defaultPath,
+                              filters: [{ name: 'MetaText Bundle', extensions: ['zip'] }],
+                            });
+                            if (typeof destPath !== 'string' || destPath.length === 0) {
+                              return false;
+                            }
+                            const res = await invoke<{
+                              destPath: string;
+                              zipBytes: number;
+                              includesHistory: boolean;
+                            }>('export_metatext_bundle', {
+                              sourcePath: srcPath,
+                              destPath,
+                              includeHistory,
+                              format: null,
+                            });
+                            const parts = res.destPath.split(/[\\/]/);
+                            return parts[parts.length - 1] || defaultName;
+                          }
+                        : undefined
                     }
                     externalMetaText={tab.metaText}
                     onMetaTextChange={(nextMeta) => handleTabMetaTextChange(tab.id, nextMeta)}

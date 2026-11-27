@@ -82,6 +82,12 @@ export interface MetaTextEditorProps {
   showHistoryPanel?: boolean;
   /** Optional controlled toggle handler for the right-side History panel */
   onToggleHistoryPanel?: () => void;
+  /** Optional counter bumped by host when background snapshot recording completes */
+  historyRefreshTick?: number;
+  /** Optional host-controlled saving indicator for background snapshots */
+  externalSavingSnapshot?: boolean;
+  /** Optional portable .metatext.zip bundle export handler */
+  onExportBundle?: (options: { includeHistory: boolean }) => Promise<boolean | string | void>;
 }
 
 export interface HeaderContextMenuState {

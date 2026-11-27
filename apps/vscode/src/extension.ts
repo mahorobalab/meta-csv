@@ -6,6 +6,13 @@ import {
   DEFAULT_VSCODE_HISTORY_POLICY,
   createNodeIsomorphicHistoryAdapter,
 } from './isomorphicHistory';
+import {
+  exportMetaTextBundleNode,
+  extractBundleHistoryToTempNode,
+  loadMetaTextBundleNode,
+  saveMetaTextBundleNode,
+  saveMetaTextBundleSnapshotNode,
+} from './bundleExport';
 
 type SidecarVisibilityMode = 'nest' | 'hide' | 'show';
 type LanguageSetting = 'auto' | 'en' | 'ja' | 'zh-cn' | 'zh-tw' | 'ko' | 'de' | 'fr' | 'es';
@@ -21,12 +28,13 @@ interface VsCodeAppSettings {
 }
 
 const SIDECAR_EXCLUDE_GLOB = '**/*.metatext.jsonc';
+const HISTORY_EXCLUDE_GLOB = '**/*.metatext.history';
 const SIDECAR_NESTING_PATTERNS: Record<string, string> = {
-  '*.csv': '${capture}.csv.metatext.jsonc, ${capture}.csv.metatext.history',
-  '*.tsv': '${capture}.tsv.metatext.jsonc, ${capture}.tsv.metatext.history',
-  '*.jsonl': '${capture}.jsonl.metatext.jsonc, ${capture}.jsonl.metatext.history',
-  '*.ndjson': '${capture}.ndjson.metatext.jsonc, ${capture}.ndjson.metatext.history',
-  '*.log': '${capture}.log.metatext.jsonc, ${capture}.log.metatext.history',
+  '*.csv': '${capture}.csv.metatext.jsonc',
+  '*.tsv': '${capture}.tsv.metatext.jsonc',
+  '*.jsonl': '${capture}.jsonl.metatext.jsonc',
+  '*.ndjson': '${capture}.ndjson.metatext.jsonc',
+  '*.log': '${capture}.log.metatext.jsonc',
 };
 
 interface EditorStatusPayload {
@@ -156,25 +164,59 @@ class MetaTextEditorProvider implements vscode.CustomEditorProvider<MetaTextDocu
 
   async saveCustomDocument(document: MetaTextDocument, _cancellation: vscode.CancellationToken): Promise<void> {
     const buf = await this.requestCsvBytesFromWebview(document);
-    await fs.writeFile(document.uri.fsPath, buf);
+    const isBundle = document.uri.fsPath.toLowerCase().endsWith('.metatext.zip');
+    if (isBundle) {
+      await saveMetaTextBundleNode(document.uri.fsPath, { dataBytes: new Uint8Array(buf) });
+    } else {
+      await fs.writeFile(document.uri.fsPath, buf);
+    }
     const panel = this.panelsByDoc.get(document.uri.toString());
     if (panel) {
       await panel.webview.postMessage({ type: 'hostCommand', command: 'hostSaved' });
     }
-    // Fire-and-forget background Shadow Git snapshot via isomorphic-git
+    // Fire-and-forget background Shadow Git snapshot (inside ZIP history/ for bundles, or adjacent .metatext.history/)
     void (async () => {
-      try {
-        const metaPath = `${document.uri.fsPath}.metatext.jsonc`;
-        const metaText = await fs.readFile(metaPath, 'utf-8').catch(() => '');
-        const historyAdapter = createNodeIsomorphicHistoryAdapter(document.uri.fsPath);
-        await historyAdapter.saveSnapshot({
-          message: `Saved ${path.basename(document.uri.fsPath)}`,
-          includeDataFromDisk: true,
-          metaText,
-          policy: DEFAULT_VSCODE_HISTORY_POLICY,
+      if (panel) {
+        void panel.webview.postMessage({
+          type: 'hostCommand',
+          command: 'historySaving',
+          saving: true,
         });
-      } catch {
-        // Never block or disturb user save
+      }
+      try {
+        if (isBundle) {
+          const loaded = await loadMetaTextBundleNode(document.uri.fsPath);
+          await saveMetaTextBundleSnapshotNode(document.uri.fsPath, {
+            message: `Saved ${loaded.fileName}`,
+            includeData: true,
+            metaText: loaded.metaText,
+            policy: DEFAULT_VSCODE_HISTORY_POLICY,
+          });
+        } else {
+          const metaPath = `${document.uri.fsPath}.metatext.jsonc`;
+          const metaText = await fs.readFile(metaPath, 'utf-8').catch(() => '');
+          const historyAdapter = createNodeIsomorphicHistoryAdapter(document.uri.fsPath);
+          await historyAdapter.saveSnapshot({
+            message: `Saved ${path.basename(document.uri.fsPath)}`,
+            includeDataFromDisk: true,
+            metaText,
+            policy: DEFAULT_VSCODE_HISTORY_POLICY,
+          });
+        }
+      } catch (err) {
+        console.error('[MetaText VS Code] Failed to save Shadow Git snapshot:', err);
+      } finally {
+        if (panel) {
+          void panel.webview.postMessage({
+            type: 'hostCommand',
+            command: 'historySaving',
+            saving: false,
+          });
+          void panel.webview.postMessage({
+            type: 'hostCommand',
+            command: 'historyUpdated',
+          });
+        }
       }
     })();
   }
@@ -237,22 +279,32 @@ class MetaTextEditorProvider implements vscode.CustomEditorProvider<MetaTextDocu
     webview.html = this.getHtmlForWebview(webview, webviewRoot);
 
     const csvPath = document.uri.fsPath;
+    const isBundle = csvPath.toLowerCase().endsWith('.metatext.zip');
     const metaPath = `${csvPath}.metatext.jsonc`;
 
     const sendFilePayload = async () => {
       try {
-        const csvBuffer = await fs.readFile(csvPath);
+        let fileName = path.basename(csvPath);
+        let csvBuffer: Buffer;
         let metaText: string | null = null;
-        try {
-          metaText = await fs.readFile(metaPath, 'utf-8');
-        } catch {
-          metaText = null;
+
+        if (isBundle) {
+          const loaded = await loadMetaTextBundleNode(csvPath);
+          csvBuffer = Buffer.from(loaded.dataBytes);
+          metaText = loaded.metaText;
+        } else {
+          csvBuffer = await fs.readFile(csvPath);
+          try {
+            metaText = await fs.readFile(metaPath, 'utf-8');
+          } catch {
+            metaText = null;
+          }
         }
 
         await webview.postMessage({
           type: 'loaded',
           payload: {
-            fileName: path.basename(csvPath),
+            fileName,
             csvBase64: csvBuffer.toString('base64'),
             metaText,
             themeMode: getThemeMode(),
@@ -279,7 +331,17 @@ class MetaTextEditorProvider implements vscode.CustomEditorProvider<MetaTextDocu
         case 'historyList': {
           const requestId = Number(message.requestId ?? 0);
           try {
-            const historyAdapter = createNodeIsomorphicHistoryAdapter(csvPath);
+            const gitdir = isBundle ? await extractBundleHistoryToTempNode(csvPath) : undefined;
+            if (isBundle && !gitdir) {
+              await webview.postMessage({
+                type: 'historyListResult',
+                requestId,
+                snapshots: [],
+                usageBytes: 0,
+              });
+              break;
+            }
+            const historyAdapter = createNodeIsomorphicHistoryAdapter(csvPath, gitdir ?? undefined);
             const [snapshots, usageBytes] = await Promise.all([
               historyAdapter.listSnapshots(Number(message.limit ?? 50)),
               historyAdapter.getStorageUsageBytes ? historyAdapter.getStorageUsageBytes() : Promise.resolve(0),
@@ -294,14 +356,20 @@ class MetaTextEditorProvider implements vscode.CustomEditorProvider<MetaTextDocu
         case 'historySave': {
           const requestId = Number(message.requestId ?? 0);
           try {
-            const historyAdapter = createNodeIsomorphicHistoryAdapter(csvPath);
             const policy = (message.policy ?? DEFAULT_VSCODE_HISTORY_POLICY) as HistoryRetentionPolicy;
-            const saved = await historyAdapter.saveSnapshot({
-              message: String(message.message ?? `Saved ${path.basename(csvPath)}`),
-              includeDataFromDisk: Boolean(message.includeDataFromDisk),
-              metaText: String(message.metaText ?? ''),
-              policy,
-            });
+            const saved = isBundle
+              ? await saveMetaTextBundleSnapshotNode(csvPath, {
+                  message: String(message.message ?? `Saved ${path.basename(csvPath)}`),
+                  includeData: Boolean(message.includeDataFromDisk),
+                  metaText: String(message.metaText ?? ''),
+                  policy,
+                })
+              : await createNodeIsomorphicHistoryAdapter(csvPath).saveSnapshot({
+                  message: String(message.message ?? `Saved ${path.basename(csvPath)}`),
+                  includeDataFromDisk: Boolean(message.includeDataFromDisk),
+                  metaText: String(message.metaText ?? ''),
+                  policy,
+                });
             await webview.postMessage({ type: 'historySaveResult', requestId, snapshot: saved });
           } catch (err) {
             await webview.postMessage({ type: 'historyError', requestId, message: String(err) });
@@ -312,7 +380,11 @@ class MetaTextEditorProvider implements vscode.CustomEditorProvider<MetaTextDocu
         case 'historyRestore': {
           const requestId = Number(message.requestId ?? 0);
           try {
-            const historyAdapter = createNodeIsomorphicHistoryAdapter(csvPath);
+            const gitdir = isBundle ? await extractBundleHistoryToTempNode(csvPath) : undefined;
+            if (isBundle && !gitdir) {
+              throw new Error('No history exists in this bundle');
+            }
+            const historyAdapter = createNodeIsomorphicHistoryAdapter(csvPath, gitdir ?? undefined);
             const payload = await historyAdapter.restoreSnapshot(String(message.id ?? ''));
             await webview.postMessage({
               type: 'historyRestoreResult',
@@ -330,11 +402,48 @@ class MetaTextEditorProvider implements vscode.CustomEditorProvider<MetaTextDocu
         case 'historyUsage': {
           const requestId = Number(message.requestId ?? 0);
           try {
-            const historyAdapter = createNodeIsomorphicHistoryAdapter(csvPath);
+            const gitdir = isBundle ? await extractBundleHistoryToTempNode(csvPath) : undefined;
+            if (isBundle && !gitdir) {
+              await webview.postMessage({ type: 'historyUsageResult', requestId, usageBytes: 0 });
+              break;
+            }
+            const historyAdapter = createNodeIsomorphicHistoryAdapter(csvPath, gitdir ?? undefined);
             const usageBytes = historyAdapter.getStorageUsageBytes
               ? await historyAdapter.getStorageUsageBytes()
               : 0;
             await webview.postMessage({ type: 'historyUsageResult', requestId, usageBytes });
+          } catch (err) {
+            await webview.postMessage({ type: 'historyError', requestId, message: String(err) });
+          }
+          break;
+        }
+
+        case 'exportBundle': {
+          const requestId = Number(message.requestId ?? 0);
+          try {
+            const includeHistory = Boolean(message.includeHistory);
+            const defaultName = `${path.basename(csvPath)}.metatext.zip`;
+            const defaultUri = vscode.Uri.file(path.join(path.dirname(csvPath), defaultName));
+            const targetUri = await vscode.window.showSaveDialog({
+              defaultUri,
+              filters: { 'MetaText Bundle': ['zip'] },
+              saveLabel: 'Export .metatext.zip',
+            });
+            if (!targetUri) {
+              await webview.postMessage({
+                type: 'exportBundleResult',
+                requestId,
+                cancelled: true,
+              });
+              break;
+            }
+            const res = await exportMetaTextBundleNode(csvPath, targetUri.fsPath, includeHistory);
+            await webview.postMessage({
+              type: 'exportBundleResult',
+              requestId,
+              cancelled: false,
+              fileName: path.basename(res.destPath),
+            });
           } catch (err) {
             await webview.postMessage({ type: 'historyError', requestId, message: String(err) });
           }
@@ -475,7 +584,11 @@ class MetaTextEditorProvider implements vscode.CustomEditorProvider<MetaTextDocu
         case 'saveCsv': {
           try {
             const buf = Buffer.from(String(message.csvBase64 ?? ''), 'base64');
-            await fs.writeFile(csvPath, buf);
+            if (isBundle) {
+              await saveMetaTextBundleNode(csvPath, { dataBytes: new Uint8Array(buf) });
+            } else {
+              await fs.writeFile(csvPath, buf);
+            }
             await webview.postMessage({ type: 'saved', target: 'csv', requestId: message.requestId });
           } catch (err) {
             void vscode.window.showErrorMessage(`MetaText Editor: Failed to save CSV: ${String(err)}`);
@@ -490,7 +603,12 @@ class MetaTextEditorProvider implements vscode.CustomEditorProvider<MetaTextDocu
 
         case 'saveMeta': {
           try {
-            await fs.writeFile(metaPath, String(message.metaText ?? ''), 'utf-8');
+            const nextMeta = String(message.metaText ?? '');
+            if (isBundle) {
+              await saveMetaTextBundleNode(csvPath, { metaText: nextMeta });
+            } else {
+              await fs.writeFile(metaPath, nextMeta, 'utf-8');
+            }
             await webview.postMessage({ type: 'saved', target: 'meta', requestId: message.requestId });
           } catch (err) {
             void vscode.window.showErrorMessage(`MetaText Editor: Failed to save .metatext.jsonc: ${String(err)}`);
@@ -604,7 +722,9 @@ function readAppSettings(): VsCodeAppSettings {
 async function syncSidecarVisibility(): Promise<void> {
   const mode = readAppSettings().sidecarVisibility;
 
-  // 1. Sync files.exclude for 'hide' mode (preserving all user-defined rules)
+  // 1. Sync files.exclude (preserving all user-defined rules):
+  //    - **/*.metatext.jsonc: hidden in 'hide' mode
+  //    - **/*.metatext.history: hidden in 'nest' and 'hide' modes (VS Code fileNesting does not nest folders)
   const filesCfg = vscode.workspace.getConfiguration('files');
   const inspectedExclude = filesCfg.inspect<Record<string, boolean>>('exclude');
   const currentExclude = { ...(inspectedExclude?.globalValue ?? {}) };
@@ -616,6 +736,15 @@ async function syncSidecarVisibility(): Promise<void> {
     }
   } else if (SIDECAR_EXCLUDE_GLOB in currentExclude) {
     delete currentExclude[SIDECAR_EXCLUDE_GLOB];
+    excludeChanged = true;
+  }
+  if (mode === 'nest' || mode === 'hide') {
+    if (currentExclude[HISTORY_EXCLUDE_GLOB] !== true) {
+      currentExclude[HISTORY_EXCLUDE_GLOB] = true;
+      excludeChanged = true;
+    }
+  } else if (HISTORY_EXCLUDE_GLOB in currentExclude) {
+    delete currentExclude[HISTORY_EXCLUDE_GLOB];
     excludeChanged = true;
   }
   if (excludeChanged) {
@@ -704,12 +833,26 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(statusBarItem);
 
   const provider = new MetaTextEditorProvider(context, statusBarItem);
+  const editorOpts = {
+    webviewOptions: {
+      retainContextWhenHidden: true,
+    },
+    supportsMultipleEditorsPerDocument: false,
+  };
   context.subscriptions.push(
-    vscode.window.registerCustomEditorProvider(MetaTextEditorProvider.viewType, provider, {
-      webviewOptions: {
-        retainContextWhenHidden: true,
+    vscode.window.registerCustomEditorProvider(MetaTextEditorProvider.viewType, provider, editorOpts),
+    vscode.window.registerCustomEditorProvider('metatext.bundleEditor', provider, editorOpts),
+    vscode.window.registerFileDecorationProvider({
+      provideFileDecoration(uri: vscode.Uri): vscode.FileDecoration | undefined {
+        if (!uri.fsPath.toLowerCase().endsWith('.metatext.zip')) {
+          return undefined;
+        }
+        return {
+          badge: 'MT',
+          color: new vscode.ThemeColor('charts.orange'),
+          tooltip: 'MetaText Portable Bundle (.metatext.zip)',
+        };
       },
-      supportsMultipleEditorsPerDocument: false,
     }),
   );
 
@@ -735,7 +878,17 @@ export function activate(context: vscode.ExtensionContext): void {
         void vscode.window.showWarningMessage('MetaText Editor: No file selected.');
         return;
       }
-      await vscode.commands.executeCommand('vscode.openWith', targetUri, MetaTextEditorProvider.viewType);
+      const lowerPath = targetUri.fsPath.toLowerCase();
+      if (lowerPath.endsWith('.zip') && !lowerPath.endsWith('.metatext.zip')) {
+        void vscode.window.showWarningMessage(
+          'MetaText Editor: Only ".metatext.zip" bundles are supported (regular .zip files cannot be opened).',
+        );
+        return;
+      }
+      const targetViewType = lowerPath.endsWith('.metatext.zip')
+        ? 'metatext.bundleEditor'
+        : MetaTextEditorProvider.viewType;
+      await vscode.commands.executeCommand('vscode.openWith', targetUri, targetViewType);
     }),
   );
 }

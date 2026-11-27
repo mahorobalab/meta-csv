@@ -29,6 +29,7 @@ export interface UseSnapshotHistoryParams {
   setDataVersion: React.Dispatch<React.SetStateAction<number>>;
   setStatusMsg: (msg: string) => void;
   showHistoryPanel: boolean;
+  historyRefreshTick?: number;
 }
 
 export function buildRetentionPolicy(appSettings?: EditorAppSettings): HistoryRetentionPolicy {
@@ -58,6 +59,7 @@ export function useSnapshotHistory({
   setDataVersion,
   setStatusMsg,
   showHistoryPanel,
+  historyRefreshTick = 0,
 }: UseSnapshotHistoryParams) {
   const [snapshots, setSnapshots] = useState<HistorySnapshotMeta[]>([]);
   const [loadingSnapshots, setLoadingSnapshots] = useState(false);
@@ -94,7 +96,7 @@ export function useSnapshotHistory({
     if (showHistoryPanel) {
       void refreshSnapshots();
     }
-  }, [showHistoryPanel, refreshSnapshots]);
+  }, [showHistoryPanel, historyRefreshTick, refreshSnapshots]);
 
   const recordSaveSnapshotAsync = useCallback(
     (dataBytes: Uint8Array | undefined, message?: string) => {

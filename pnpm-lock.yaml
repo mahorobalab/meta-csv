@@ -100,6 +100,9 @@ importers:
       '@metatext-editor/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      fflate:
+        specifier: ^0.8.3
+        version: 0.8.3
       isomorphic-git:
         specifier: ^1.44.19
         version: 1.44.19
@@ -1001,6 +1004,9 @@ packages:
     peerDependenciesMeta:
       picomatch:
         optional: true
+
+  fflate@0.8.3:
+    resolution: {integrity: sha512-tbZNuJrLwGUp3zshBtdy4W+ORxZuIh8a5ilyIEQDC5rY1f3U20JMry0Ll3WBzU58EZKsEuJFXhb5gwv8CsPvgA==}
 
   find-up@5.0.0:
     resolution: {integrity: sha512-78/PXT1wlLLDgTzDs7sjq9hzz0vXD+zn+7wypEe4fXQxCmdmqfGsEPQxmiCSQI3ajFV91bVSsvNtrJRiW6nGng==}
@@ -2278,6 +2284,8 @@ snapshots:
   fdir@6.5.0(picomatch@4.0.7):
     optionalDependencies:
       picomatch: 4.0.7
+
+  fflate@0.8.3: {}
 
   find-up@5.0.0:
     dependencies:

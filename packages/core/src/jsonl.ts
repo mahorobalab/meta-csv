@@ -27,7 +27,7 @@ export function detectTargetFormat(
   explicitFormat?: MetaTextFormat,
 ): MetaTextFormat {
   if (explicitFormat) return explicitFormat;
-  const lower = fileName.trim().toLowerCase();
+  const lower = fileName.trim().toLowerCase().replace(/\.metatext\.zip$/, '');
   if (lower.endsWith('.jsonl') || lower.endsWith('.ndjson')) return 'jsonl';
   if (lower.endsWith('.tsv')) return 'tsv';
   if (lower.endsWith('.log')) return 'log';

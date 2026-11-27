@@ -1,5 +1,5 @@
 import React from 'react';
-import { FileText, History, Info, Lock, Settings, Unlock } from 'lucide-react';
+import { FileText, History, Info, Lock, Package, Settings, Unlock } from 'lucide-react';
 import type { MetaTextFormat } from '@metatext-editor/schema';
 import { FoxTailIcon } from '../../icons/FoxTailIcon';
 import { ZebraRowsIcon } from '../../icons/ZebraRowsIcon';
@@ -26,6 +26,7 @@ export interface EditorToolbarRightProps {
   onToggleZebra: () => void;
   onToggleCellInspector: () => void;
   onToggleHistoryPanel: () => void;
+  onOpenExportBundle?: () => void;
   onOpenSettings: () => void;
   onOpenAbout: () => void;
 }
@@ -51,6 +52,7 @@ export const EditorToolbarRight: React.FC<EditorToolbarRightProps> = ({
   onToggleZebra,
   onToggleCellInspector,
   onToggleHistoryPanel,
+  onOpenExportBundle,
   onOpenSettings,
   onOpenAbout,
 }) => {
@@ -205,6 +207,17 @@ export const EditorToolbarRight: React.FC<EditorToolbarRightProps> = ({
     >
       <History size={14} />
     </button>
+    {onOpenExportBundle && (
+      <button
+        type="button"
+        aria-label="Export as .metatext.zip"
+        title="Export as .metatext.zip"
+        style={{ ...btnStyle, padding: '3px 6px' }}
+        onClick={onOpenExportBundle}
+      >
+        <Package size={14} />
+      </button>
+    )}
     <button
       type="button"
       aria-label={t('common.settings')}

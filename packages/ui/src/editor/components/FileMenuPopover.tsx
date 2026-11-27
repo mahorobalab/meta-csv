@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight, FilePlus, FolderOpen, Redo2, Save, SaveAll, Undo2, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, FilePlus, FolderOpen, Package, Redo2, Save, SaveAll, Undo2, X } from 'lucide-react';
 import type { MetaTextFormat } from '@metatext-editor/schema';
 import type { EditorHostMode } from '../../SettingsAboutDialogs';
 import { NEW_FILE_FORMAT_OPTIONS, type NewFileFormat } from '../../newFileTemplates';
@@ -19,6 +19,7 @@ export interface FileMenuPopoverProps {
   onNewFile?: (format?: NewFileFormat) => void;
   onOpenFile?: () => void;
   onSaveAs?: () => void;
+  onOpenExportBundle?: () => void;
   onCloseFile?: () => void;
   onSaveCsv: () => void;
   onUndo: () => void;
@@ -41,6 +42,7 @@ export const FileMenuPopover: React.FC<FileMenuPopoverProps> = ({
   onNewFile,
   onOpenFile,
   onSaveAs,
+  onOpenExportBundle,
   onCloseFile,
   onSaveCsv,
   onUndo,
@@ -182,6 +184,25 @@ export const FileMenuPopover: React.FC<FileMenuPopoverProps> = ({
             <span>{t('fileMenu.saveAs')}</span>
           </span>
           <span style={{ fontSize: 10.5, opacity: 0.6 }}>Ctrl+Shift+S</span>
+        </button>
+      )}
+      {onOpenExportBundle && (
+        <button
+          type="button"
+          style={{
+            ...menuItemStyle,
+            opacity: hasCsvData ? 1 : 0.45,
+          }}
+          disabled={!hasCsvData}
+          onClick={() => {
+            onCloseMenu();
+            onOpenExportBundle();
+          }}
+        >
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+            <Package size={14} />
+            <span>Export .metatext.zip...</span>
+          </span>
         </button>
       )}
       {onCloseFile && (

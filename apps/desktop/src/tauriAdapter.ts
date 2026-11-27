@@ -1,5 +1,10 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { CsvFilePayload, FileAppendResult, FileSystemAdapter } from '@metatext-editor/core';
+import {
+  isMetaTextZipFileName,
+  type CsvFilePayload,
+  type FileAppendResult,
+  type FileSystemAdapter,
+} from '@metatext-editor/core';
 import { createNewFileTemplate, type NewFileFormat } from '@metatext-editor/ui';
 
 function extractFileName(filePath: string): string {
@@ -47,6 +52,19 @@ export function createTauriAdapter(initialPath: string): DesktopFileSystemAdapte
     },
 
     async load(): Promise<CsvFilePayload> {
+      if (isMetaTextZipFileName(currentPath)) {
+        const [metaInfo, buffer] = await Promise.all([
+          invoke<{ fileName: string; metaText: string }>('load_bundle_meta', {
+            path: currentPath,
+          }),
+          invoke<ArrayBuffer>('load_bundle_data', { path: currentPath }),
+        ]);
+        return {
+          fileName: extractFileName(currentPath),
+          csvBytes: new Uint8Array(buffer),
+          metaText: metaInfo.metaText,
+        };
+      }
       const [buffer, metaText] = await Promise.all([
         invoke<ArrayBuffer>('load_csv_bytes', { path: currentPath }),
         invoke<string | null>('load_meta_text', { path: currentPath }),
@@ -71,6 +89,14 @@ export function createTauriAdapter(initialPath: string): DesktopFileSystemAdapte
     },
 
     async saveCsv(bytes: Uint8Array): Promise<void> {
+      if (isMetaTextZipFileName(currentPath)) {
+        await invoke('save_bundle_data', bytes, {
+          headers: {
+            'x-file-path': encodeURIComponent(currentPath),
+          },
+        });
+        return;
+      }
       await invoke('save_csv_raw', bytes, {
         headers: {
           'x-file-path': encodeURIComponent(currentPath),
@@ -79,10 +105,33 @@ export function createTauriAdapter(initialPath: string): DesktopFileSystemAdapte
     },
 
     async saveCsvStream(chunks: Iterable<Uint8Array>): Promise<void> {
+      if (isMetaTextZipFileName(currentPath)) {
+        const list = Array.from(chunks);
+        const total = list.reduce((s, c) => s + c.byteLength, 0);
+        const merged = new Uint8Array(total);
+        let off = 0;
+        for (const c of list) {
+          merged.set(c, off);
+          off += c.byteLength;
+        }
+        await invoke('save_bundle_data', merged, {
+          headers: {
+            'x-file-path': encodeURIComponent(currentPath),
+          },
+        });
+        return;
+      }
       await saveFileStreamViaTauri(currentPath, chunks);
     },
 
     async saveMeta(jsoncText: string): Promise<void> {
+      if (isMetaTextZipFileName(currentPath)) {
+        await invoke('save_bundle_meta', {
+          path: currentPath,
+          metaText: jsoncText,
+        });
+        return;
+      }
       await invoke('save_meta_text', {
         path: currentPath,
         metaText: jsoncText,

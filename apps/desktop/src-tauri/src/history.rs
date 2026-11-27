@@ -171,6 +171,10 @@ impl GixHistoryRepository {
         }
     }
 
+    pub fn from_repo_dir(repo_dir: PathBuf) -> Self {
+        Self { repo_dir }
+    }
+
     #[cfg(test)]
     pub fn repo_dir(&self) -> &Path {
         &self.repo_dir

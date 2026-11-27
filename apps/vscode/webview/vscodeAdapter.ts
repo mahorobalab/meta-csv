@@ -35,9 +35,18 @@ function bytesToBase64(bytes: Uint8Array): string {
 }
 
 export interface HostCommand {
-  command: 'undo' | 'redo' | 'reload' | 'hostSaved' | 'requestCsvData' | 'setZoom';
+  command:
+    | 'undo'
+    | 'redo'
+    | 'reload'
+    | 'hostSaved'
+    | 'requestCsvData'
+    | 'setZoom'
+    | 'historySaving'
+    | 'historyUpdated';
   requestId?: number;
   scale?: number;
+  saving?: boolean;
 }
 
 export interface VsCodeAdapterBundle {
@@ -52,6 +61,7 @@ export interface VsCodeAdapterBundle {
   notifyStatus: (status: EditorStatusInfo) => void;
   updateSettings: (patch: Partial<EditorAppSettings>) => void;
   openSettings: () => void;
+  exportBundle: (options: { includeHistory: boolean }) => Promise<boolean | string>;
 }
 
 export function createVsCodeAdapter(): VsCodeAdapterBundle {
@@ -145,6 +155,12 @@ export function createVsCodeAdapter(): VsCodeAdapterBundle {
         pendingHistory.delete(msg.requestId);
         p.resolve(Number(msg.usageBytes ?? 0));
       }
+    } else if (msg.type === 'exportBundleResult') {
+      const p = pendingHistory.get(msg.requestId);
+      if (p) {
+        pendingHistory.delete(msg.requestId);
+        p.resolve(msg.cancelled ? false : String(msg.fileName ?? ''));
+      }
     } else if (msg.type === 'historySaveResult') {
       const p = pendingHistory.get(msg.requestId);
       if (p) {
@@ -173,7 +189,12 @@ export function createVsCodeAdapter(): VsCodeAdapterBundle {
       settingsListeners.forEach((cb) => cb(msg.appSettings));
     } else if (msg.type === 'hostCommand') {
       commandListeners.forEach((cb) =>
-        cb({ command: msg.command, requestId: msg.requestId, scale: msg.scale }),
+        cb({
+          command: msg.command,
+          requestId: msg.requestId,
+          scale: msg.scale,
+          saving: typeof msg.saving === 'boolean' ? msg.saving : undefined,
+        }),
       );
     }
   });
@@ -311,6 +332,20 @@ export function createVsCodeAdapter(): VsCodeAdapterBundle {
     },
     openSettings() {
       vscode.postMessage({ type: 'openSettings' });
+    },
+    exportBundle(options: { includeHistory: boolean }): Promise<boolean | string> {
+      const requestId = reqSeq++;
+      return new Promise((resolve, reject) => {
+        pendingHistory.set(requestId, {
+          resolve: (v) => resolve(v as boolean | string),
+          reject,
+        });
+        vscode.postMessage({
+          type: 'exportBundle',
+          requestId,
+          includeHistory: options.includeHistory,
+        });
+      });
     },
   };
 }

@@ -42,6 +42,7 @@ export interface EditorToolbarProps {
   onNewFile?: (format?: NewFileFormat) => void;
   onOpenFile?: () => void;
   onSaveAs?: () => void;
+  onOpenExportBundle?: () => void;
   onCloseFile?: () => void;
   onSaveCsv: () => void;
   onUndo: () => void;
@@ -238,6 +239,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = (p) => {
       onToggleZebra={p.onToggleZebra}
       onToggleCellInspector={p.onToggleCellInspector}
       onToggleHistoryPanel={p.onToggleHistoryPanel}
+      onOpenExportBundle={p.onOpenExportBundle}
       onOpenSettings={p.onOpenSettings}
       onOpenAbout={p.onOpenAbout}
     />
@@ -257,6 +259,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = (p) => {
         onNewFile={p.onNewFile}
         onOpenFile={p.onOpenFile}
         onSaveAs={p.onSaveAs}
+        onOpenExportBundle={p.onOpenExportBundle}
         onCloseFile={p.onCloseFile}
         onSaveCsv={p.onSaveCsv}
         onUndo={p.onUndo}

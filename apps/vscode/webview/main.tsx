@@ -21,6 +21,7 @@ const VsCodeApp: React.FC = () => {
     notifyStatus,
     updateSettings,
     openSettings,
+    exportBundle,
   } = useMemo(() => createVsCodeAdapter(), []);
   const editorRef = useRef<MetaTextEditorHandle | null>(null);
   const [themeMode, setThemeMode] = useState<'light' | 'dark'>(() =>
@@ -28,6 +29,8 @@ const VsCodeApp: React.FC = () => {
   );
   const [hostLanguage, setHostLanguage] = useState<string | undefined>(undefined);
   const [appSettings, setAppSettings] = useState<EditorAppSettings>({});
+  const [historyRefreshTick, setHistoryRefreshTick] = useState(0);
+  const [externalSavingSnapshot, setExternalSavingSnapshot] = useState(false);
 
   useEffect(() => onThemeMode(setThemeMode), [onThemeMode]);
   useEffect(() => onHostLanguage(setHostLanguage), [onHostLanguage]);
@@ -60,6 +63,12 @@ const VsCodeApp: React.FC = () => {
               ed.setZoomScale(cmd.scale);
             }
             break;
+          case 'historySaving':
+            setExternalSavingSnapshot(Boolean(cmd.saving));
+            break;
+          case 'historyUpdated':
+            setHistoryRefreshTick((t) => t + 1);
+            break;
         }
       }),
     [onHostCommand, respondCsvData],
@@ -81,6 +90,9 @@ const VsCodeApp: React.FC = () => {
             updateSettings(patch);
           }}
           onOpenSettings={openSettings}
+          onExportBundle={exportBundle}
+          historyRefreshTick={historyRefreshTick}
+          externalSavingSnapshot={externalSavingSnapshot}
           onDocumentEdit={notifyEdit}
           onStatusChange={notifyStatus}
         />

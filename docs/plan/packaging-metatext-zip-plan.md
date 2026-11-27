@@ -67,6 +67,7 @@ report.csv.metatext.zip
 2. **編集・保存（`Ctrl+S`）**:
    - 検証を通過した `.metatext.zip` は、編集後の **`Ctrl+S` で元の `.metatext.zip` へ直接保存** できる（`FileSystemAdapter` の `ZipFileSystemAdapter` 実装として透過的に扱う）。
    - **破損防止のアトミック書き換え（Desktop / VS Code）**: 保存時は一時ファイル `*.metatext.zip.tmp` へ新アーカイブを完全書き出し・検証したうえで元ファイルを置換（rename）し、書き込み途中クラッシュによる ZIP 破損を防ぐ。Web 版では更新済み `.metatext.zip` をダウンロード保存する。
+   - **ZIP 内履歴の継続記録**: 履歴記録が ON のとき、`.metatext.zip` 上での `Ctrl+S` でも ZIP の外に別フォルダは作らず、ZIP 内の `history/` へ非同期で新しいスナップショットを追記・アトミック更新する。
    - （必要に応じて「中の生ファイル＋`.metatext.jsonc` をフォルダへ取り出す（Extract）」操作もメニューから実行可能にする。）
 
 ### 3.2 エクスポート時のプライバシー配慮（既定 OFF）
@@ -101,7 +102,7 @@ report.csv.metatext.zip
 ## 6. ロードマップ（チェックリスト）
 
 - [ ] `metatext-spec` に `.metatext.zip` パッケージ構造（`manifest.json` スキーマ・必須エントリ検証ルール）を追記
-- [ ] `packages/core` に `manifest.json` 生成／検証・Zip Slip / Zip Bomb チェック共通ロジックを実装
-- [ ] Web / VS Code 向けに `fflate` ベースの `ZipAdapter`（直接オープン・ZIP 保存・Export）を実装
-- [ ] Desktop（Rust）向けに `zip` クレートベースのアトミック上書き保存対応 `ZipAdapter`（`history/` 同梱可否対応）を実装
-- [ ] エクスポート設定モーダル（「履歴を含める」既定 OFF・想定サイズ表示）を `packages/ui` に実装
+- [x] `packages/core` に `manifest.json` 生成／検証・Zip Slip / Zip Bomb チェック共通ロジックを実装
+- [x] VS Code 向けに `fflate` ベースの `.metatext.zip` 直接オープン・アトミック上書き保存・Export を実装（Web 展開は次フェーズ）
+- [x] Desktop（Rust）向けに `zip` クレートベースの `.metatext.zip` 直接オープン・アトミック上書き保存・Export（`history/` 同梱可否対応）を実装
+- [x] エクスポート設定モーダル（「履歴を含める」既定 OFF・想定サイズ表示）を `packages/ui` に実装

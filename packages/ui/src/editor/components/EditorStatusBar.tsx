@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Minus, Plus } from 'lucide-react';
+import { isMetaTextZipFileName } from '@metatext-editor/core';
 import type { MetaTextFormat } from '@metatext-editor/schema';
 import { useI18n } from '../../i18n';
 
@@ -114,6 +115,23 @@ export const EditorStatusBar: React.FC<EditorStatusBarProps> = ({
           position: 'relative',
         }}
       >
+        {isMetaTextZipFileName(fileName) && (
+          <span
+            style={{
+              padding: '0 5px',
+              borderRadius: 3,
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: '0.03em',
+              background: isDark ? 'rgba(245, 158, 11, 0.22)' : 'rgba(245, 158, 11, 0.16)',
+              border: '1px solid rgba(245, 158, 11, 0.55)',
+              color: isDark ? '#fbbf24' : '#b45309',
+              flexShrink: 0,
+            }}
+          >
+            ZIP
+          </span>
+        )}
         <span
           onMouseEnter={() => {
             if (filePath) setShowPathTooltip(true);

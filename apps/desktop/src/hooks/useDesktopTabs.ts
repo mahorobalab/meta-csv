@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { open, save } from '@tauri-apps/plugin-dialog';
-import type { HistoryAdapter } from '@metatext-editor/core';
+import { isMetaTextZipFileName, type HistoryAdapter } from '@metatext-editor/core';
 import {
   createNewFileTemplate,
   type EditorAppSettings,
@@ -222,7 +222,21 @@ export function useDesktopTabs() {
   );
 
   const openFilePathsInTabs = useCallback(
-    (paths: string[], preferredActivePath?: string | null) => {
+    (rawPaths: string[], preferredActivePath?: string | null) => {
+      if (rawPaths.length === 0) return;
+      const unsupportedZips: string[] = [];
+      const paths = rawPaths.filter((p) => {
+        if (p.toLowerCase().endsWith('.zip') && !isMetaTextZipFileName(p)) {
+          unsupportedZips.push(extractFileName(p));
+          return false;
+        }
+        return true;
+      });
+      if (unsupportedZips.length > 0) {
+        window.alert(
+          `Only ".metatext.zip" bundles can be opened. Regular .zip archives are not supported:\n${unsupportedZips.join('\n')}`,
+        );
+      }
       if (paths.length === 0) return;
       let targetActiveId: string | null = null;
       const existing = tabsRef.current;
@@ -442,8 +456,8 @@ export function useDesktopTabs() {
       defaultPath: lastDirectory,
       filters: [
         {
-          name: 'CSV / TSV / JSONL / Log',
-          extensions: ['csv', 'tsv', 'jsonl', 'ndjson', 'log', 'txt'],
+          name: 'CSV / TSV / JSONL / Log / Bundle',
+          extensions: ['csv', 'tsv', 'jsonl', 'ndjson', 'log', 'txt', 'zip'],
         },
         { name: 'All Files', extensions: ['*'] },
       ],
