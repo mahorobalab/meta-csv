@@ -1,0 +1,160 @@
+======================================================================
+Visual Studio Marketplace Registration Notes (English)
+Extension: MetaText Editor
+Marketplace URL:
+https://marketplace.visualstudio.com/items?itemName=mahorobalab.metatext-editor
+======================================================================
+
+NOTE:
+On Visual Studio Marketplace, most extension fields (title, description,
+overview, categories, keywords, icon, links, changelog) are populated
+automatically from the uploaded .vsix package (package.json, README.md,
+CHANGELOG.md, LICENSE).
+Only Publisher profile fields are entered on the Marketplace Manage web UI.
+
+----------------------------------------------------------------------
+1. Publisher Profile (https://marketplace.visualstudio.com/manage)
+----------------------------------------------------------------------
+Publisher ID:
+mahorobalab
+
+Publisher Name (Display Name):
+MahorobaLab
+
+Description:
+Independent software studio building fast, clean, Git-friendly developer tools and structured-text utilities.
+
+Website:
+https://mahorobalab.github.io/metatext-editor/
+
+Source Code / GitHub:
+https://github.com/mahorobalab
+
+Support / Issues:
+https://github.com/mahorobalab/metatext-editor/issues
+
+Logo:
+128x128 (or 256x256) PNG
+
+----------------------------------------------------------------------
+2. Extension Metadata (apps/vscode/package.json)
+----------------------------------------------------------------------
+publisher:
+mahorobalab
+
+name:
+metatext-editor
+
+displayName (IMPORTANT for CSV search ranking — keeps URL as mahorobalab.metatext-editor):
+MetaText Editor - CSV / TSV / JSONL / Log
+
+version:
+1.0.0
+
+description (max 200 chars, shown in search results — put "CSV Editor" first):
+Fast CSV editor & viewer (100k+ rows, 60fps) for CSV, TSV, JSONL/NDJSON & logs with Git-friendly .metatext.jsonc styling, Shadow Git snapshots & .metatext.zip bundles.
+
+categories (up to 5, from VS Code official list):
+- Visualization
+- Data Science
+- Other
+
+keywords (up to 5, used for Marketplace search — CSV-focused):
+- csv
+- csv editor
+- tsv
+- jsonl
+- log
+
+pricing:
+Free
+
+license:
+MIT
+
+homepage:
+https://mahorobalab.github.io/metatext-editor/
+
+repository:
+https://github.com/mahorobalab/metatext-editor
+
+bugs:
+https://github.com/mahorobalab/metatext-editor/issues
+
+galleryBanner:
+{
+  "color": "#18181b",
+  "theme": "dark"
+}
+
+icon:
+media/icon.png (128x128 or 256x256 PNG, SVG is not allowed by Marketplace)
+
+----------------------------------------------------------------------
+3. Overview / README.md Draft (Displayed on Marketplace Page)
+----------------------------------------------------------------------
+# MetaText Editor
+
+High-performance CSV, TSV, JSONL/NDJSON & Log editor and viewer for VS Code — powered by `.metatext.jsonc` sidecar metadata.
+
+Keep your raw data files clean and Git-friendly while saving column widths, cell/row styles, conditional formatting, sort order, row markers, and filter presets in an adjacent `<filename>.metatext.jsonc` file.
+
+## Key Features
+
+- **100k+ Rows at 60fps**: Smooth Canvas-based data grid built for large CSV, TSV, JSONL/NDJSON, and log files.
+- **Clean, Git-Friendly Sidecar (`.metatext.jsonc`)**: Never pollutes your raw CSV/JSONL/LOG files. Comments and formatting in `.metatext.jsonc` are preserved on every edit, with built-in JSON Schema validation & autocompletion.
+- **Rich Visual Styling**: 5-layer style cascade (table, columns, conditional rules, ranges, rows/cells), zebra striping, number formatting, text wrapping, and row markers with notes.
+- **Powerful Filtering & Facets**: Instant query filtering (`col:val`, `OR`, `-not`, `>100`, `/regex/`), context rows (`grep -C`), consecutive duplicate collapse, column value facets, and reusable filter presets.
+- **Non-Destructive View Sort**: Sort any column in the view without mutating the underlying file order.
+- **Live Tail Mode**: Follow appended lines in real time for log and JSONL files.
+- **2-Layer History (Undo/Redo + Shadow Git Snapshots)**: Instant in-memory undo/redo plus persistent save snapshots stored in a lightweight local Shadow Git repository (`.metatext.history/`).
+- **Portable Bundles (`.metatext.zip`)**: Open, edit, and export self-contained `.metatext.zip` archives bundling data, metadata, and optional snapshot history.
+- **Encoding & Dialect Preservation**: Automatically detects and preserves UTF-8, UTF-8 BOM, Shift-JIS, LF/CRLF, and delimiters.
+- **8 Languages**: English, Japanese, Simplified Chinese, Traditional Chinese, Korean, German, French, and Spanish.
+
+## Supported Formats
+
+- `.csv` (Comma-Separated Values)
+- `.tsv` (Tab-Separated Values)
+- `.jsonl` / `.ndjson` (JSON Lines with automatic key flattening)
+- `.log` (IIS W3C, Docker/JSON logs, and custom regex presets)
+- `.metatext.zip` (Portable MetaText Bundle — default editor)
+
+## Links
+
+- **MetaText Specification & Schema**: https://mahorobalab.github.io/metatext-spec/
+- **Desktop App (Microsoft Store)**: https://apps.microsoft.com/detail/9NSTR10L2L6W
+- **GitHub Repository**: https://github.com/mahorobalab/metatext-editor
+
+----------------------------------------------------------------------
+4. CHANGELOG.md Draft (Displayed on Changelog Tab)
+----------------------------------------------------------------------
+# Change Log
+
+## [1.0.0] - 2026-XX-XX
+
+### Initial Release
+- High-performance Canvas grid editor for CSV, TSV, JSONL/NDJSON, and LOG files.
+- Comment-preserving `.metatext.jsonc` sidecar metadata with JSON Schema completion.
+- 5-layer styling, conditional formatting rules, row markers, and filter bar with facets & presets.
+- Live Tail panel for log and JSONL files.
+- 2-layer History system (in-memory Undo/Redo + Shadow Git snapshots).
+- Native `.metatext.zip` portable bundle open, edit, and export support.
+- 8-language UI localization.
+
+----------------------------------------------------------------------
+5. Packaging & Publishing Quick Checklist
+----------------------------------------------------------------------
+1. Add `apps/vscode/README.md`, `apps/vscode/CHANGELOG.md`, `apps/vscode/LICENSE`,
+   and `apps/vscode/media/icon.png` (128x128+ PNG).
+2. Remove `"private": true` (or keep it if publishing manually; vsce accepts it
+   with warning, or omit `"private"` in apps/vscode/package.json).
+3. Build extension & webview:
+   pnpm.cmd --filter metatext-editor build
+4. Package VSIX:
+   npx @vscode/vsce package
+5. Upload the generated `metatext-editor-1.0.0.vsix` at:
+   https://marketplace.visualstudio.com/manage/publishers/mahorobalab
+   ("+ New extension" -> "Visual Studio Code")
+   OR publish via CLI:
+   npx @vscode/vsce publish

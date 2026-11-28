@@ -1,0 +1,137 @@
+======================================================================
+Microsoft Store Registration Notes (English)
+Product Name: MetaText Editor
+Store ID: 9NSTR10L2L6W
+Store URL: https://apps.microsoft.com/detail/9NSTR10L2L6W
+Executable: MetaTextEditor.exe
+Version: 1.0.0
+======================================================================
+
+----------------------------------------------------------------------
+1. Properties (Partner Center -> Properties)
+----------------------------------------------------------------------
+Category:
+Developer tools
+(Alternative: Productivity)
+
+Subcategory:
+Utilities
+
+Privacy Policy URL:
+https://mahorobalab.github.io/metatext-editor/privacy
+(NOTE: Publish a short privacy policy page stating that MetaText Editor
+processes all files locally on the device and does not collect or transmit
+user file contents.)
+
+Website:
+https://mahorobalab.github.io/metatext-editor/
+
+Support contact info (URL or email):
+https://github.com/mahorobalab/metatext-editor/issues
+
+System Requirements (Minimum):
+- OS: Windows 10 version 1809 or higher / Windows 11 (x64)
+- Runtime: Microsoft Edge WebView2 (pre-installed on Windows 11)
+
+----------------------------------------------------------------------
+2. Store Listing - English (en-US)
+----------------------------------------------------------------------
+
+[Product Name] (Reserved)
+MetaText Editor
+
+[Short Description] (Max 100 chars — shown in search results)
+Fast CSV editor & viewer for 100k+ rows. Style CSV, TSV, JSONL & logs cleanly without dirtying files.
+
+[Description] (Max 10,000 chars)
+MetaText Editor is a high-performance CSV editor and viewer built for developers, analysts, and anyone working with large structured text files.
+
+Open and edit 100,000+ rows smoothly at 60fps in a spreadsheet-like Canvas grid — while keeping your raw CSV, TSV, JSONL/NDJSON, and log files 100% clean and Git-friendly.
+
+Instead of modifying or converting your original CSV file, MetaText Editor saves all visual metadata — column widths, cell/row colors, conditional formatting rules, view sort order, row markers, and filter presets — in a companion `.metatext.jsonc` sidecar file next to your data.
+
+■ Why MetaText Editor for CSV & Structured Text?
+- Opens huge CSV files (100k+ rows) smoothly without freezing like traditional spreadsheet apps.
+- Preserves your original encoding (UTF-8, UTF-8 BOM, Shift-JIS), line endings (LF/CRLF), and delimiters — no unwanted date auto-conversion or broken leading zeros.
+- Keeps diffs clean in Git because formatting lives in `.metatext.jsonc` with comments preserved.
+
+■ Powerful Data Exploration
+- Instant query filtering (`col:val`, `OR`, `-not`, `>100`, `/regex/`), context rows (`grep -C`), consecutive duplicate collapse, column value facets, and reusable filter presets.
+- Non-destructive view sorting: sort any column without changing the underlying row order.
+- Row markers with 5 colors and notes, plus quick jump navigation.
+- Live Tail mode for real-time monitoring of growing `.log` and `.jsonl` files.
+
+■ Built-in History & Portable Sharing
+- 2-Layer History: instant in-memory Undo/Redo plus persistent save snapshots stored in a lightweight local Shadow Git repository (`.metatext.history/`).
+- Portable Bundles (`.metatext.zip`): package your CSV/JSONL/LOG file, `.metatext.jsonc` styling, and optional snapshot history into a single portable archive that opens directly in MetaText Editor.
+
+■ Supported Formats
+- CSV (`.csv`)
+- TSV (`.tsv`)
+- JSONL / NDJSON (`.jsonl`, `.ndjson`) with automatic key flattening
+- Log files (`.log`) with IIS W3C, Docker/JSON, and custom regex parser presets
+- MetaText Portable Bundle (`.metatext.zip`)
+
+■ Also Available on VS Code & Web
+- VS Code Extension: https://marketplace.visualstudio.com/items?itemName=mahorobalab.metatext-editor
+- Open Specification: https://mahorobalab.github.io/metatext-spec/
+
+[What's new in this version] (Max 1,500 chars)
+Version 1.0.0 — Initial Release
+- High-performance Canvas CSV / TSV / JSONL / LOG editor & viewer (100k+ rows at 60fps).
+- Comment-preserving `.metatext.jsonc` sidecar metadata for styles, column widths, conditional rules, sort order, and filter presets.
+- Multi-tab desktop workspace with drag-and-drop and session restore.
+- Advanced filter bar (regex, NOT, numeric comparisons, context rows, duplicate collapse, facets, presets).
+- Live Tail mode for real-time log and JSONL monitoring.
+- 2-Layer History (in-memory Undo/Redo + Shadow Git save snapshots).
+- Native `.metatext.zip` portable bundle open, edit, and export.
+- Light / Dark themes and 8 UI languages (English, Japanese, Chinese, Korean, German, French, Spanish).
+
+[Product Features] (Up to 20 bullet points, max 200 chars each)
+1. Smooth 60fps CSV editor & viewer built for 100,000+ rows
+2. Clean, Git-friendly .metatext.jsonc sidecar saves styles, widths, rules & sort order without altering raw CSV
+3. Preserves UTF-8, UTF-8 BOM, Shift-JIS, LF/CRLF, and delimiters with zero unwanted Excel-style auto-conversion
+4. Supports CSV, TSV, JSONL/NDJSON (auto-flattened), LOG (IIS/Docker/Regex), and .metatext.zip bundles
+5. Instant query filter bar with regex, NOT, numeric comparisons, grep -C context rows, facets & presets
+6. Non-destructive view sorting and 5-color row markers with notes
+7. Live Tail mode to follow growing log and JSONL files in real time
+8. 2-Layer History: instant Undo/Redo plus persistent Shadow Git save snapshots
+9. Export and directly edit self-contained .metatext.zip portable bundles
+10. Multi-tab desktop app with Light/Dark themes and 8 UI languages
+
+[Search Terms] (Up to 7 terms, max 30 chars each — CSV-focused SEO)
+1. CSV
+2. CSV Editor
+3. CSV Viewer
+4. TSV
+5. JSONL
+6. Log Viewer
+7. Spreadsheet
+
+[Copyright and trademark info]
+© 2026 MahorobaLab. Licensed under the MIT License.
+
+[Additional license terms]
+Open-source software licensed under the MIT License.
+Source code: https://github.com/mahorobalab/metatext-editor
+
+----------------------------------------------------------------------
+3. Store Assets Checklist (Images)
+----------------------------------------------------------------------
+- App Icon / Store Logo (PNG, transparent or solid):
+  - 300x300 px (Store Logo)
+  - 150x150 px, 71x71 px, 44x44 px (MSIX visual assets)
+- Screenshots (1366x768 or 1920x1080 PNG, 16:9 recommended, at least 1, up to 10):
+  1. Main CSV editing view with colored styles, markers & filter bar
+  2. Large 100k-row CSV with facets / filter query in action
+  3. Unified History (Snapshots) & Metadata (.metatext.jsonc) side panel
+  4. Dark theme view with JSONL / Log + Live Tail
+  5. Export .metatext.zip bundle dialog
+- Poster Art / Box Art (optional): 720x1080 px (2:3), 1920x1080 px (16:9)
+
+----------------------------------------------------------------------
+4. Age Ratings & Certification Notes
+----------------------------------------------------------------------
+- Age Rating: IARC questionnaire -> All ages (E / 3+)
+- Network / Data collection: Offline local file editor; no telemetry or cloud upload
+- Package type: MSIX (Windows 10/11 desktop bridge / Tauri bundle)

@@ -3,41 +3,73 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MetaText Editor — High-Performance CSV Editor with .metatext.jsonc</title>
+    <title>MetaText Editor — High-Performance CSV, TSV, JSONL &amp; Log Editor</title>
     <meta
       name="description"
-      content="Keep CSV files plain and Git-friendly. Get 1,000,000-row 60fps Canvas performance, column layout memory, styling, and log-analysis filters powered by .metatext.jsonc."
+      content="Keep CSV files plain and Git-friendly. 1,000,000-row 60fps Canvas grid, .metatext.jsonc sidecar styling, Shadow Git history, and .metatext.zip portable bundles."
     />
     <link rel="icon" type="image/svg+xml" href="./assets/icon.svg" />
     <style>
       :root {
-        --bg: #f8fafc;
+        --bg: #ffffff;
+        --bg-subtle: #fafafa;
         --surface: #ffffff;
-        --surface-muted: #f1f5f9;
-        --text: #0f172a;
-        --text-muted: #475569;
-        --border: #e2e8f0;
-        --accent: #2563eb;
-        --accent-hover: #1d4ed8;
-        --accent-soft: rgba(37, 99, 235, 0.1);
-        --badge-bg: #dbeafe;
-        --badge-fg: #1e40af;
+        --surface-2: #f4f4f5;
+        --text: #09090b;
+        --text-secondary: #52525b;
+        --text-muted: #71717a;
+        --border: #e4e4e7;
+        --border-strong: #d4d4d8;
+        --primary: #09090b;
+        --primary-fg: #fafafa;
+        --primary-hover: #27272a;
+        --grid-line: rgba(9, 9, 11, 0.045);
+        --code-bg: #f4f4f5;
+        --window-bg: #ffffff;
+        --window-chrome: #f4f4f5;
+        --window-border: #e4e4e7;
+        --shadow-window: 0 24px 64px -20px rgba(9, 9, 11, 0.16), 0 2px 10px -2px rgba(9, 9, 11, 0.06);
+        --syn-key: #0f766e;
+        --syn-str: #b45309;
+        --syn-num: #1d4ed8;
+        --syn-com: #71717a;
+        --syn-add: #15803d;
+        --syn-add-bg: rgba(22, 163, 74, 0.09);
+        --row-rose: rgba(244, 63, 94, 0.10);
+        --row-amber: rgba(245, 158, 11, 0.12);
+        --row-emerald: rgba(16, 185, 129, 0.10);
+        --status-dot: #10b981;
       }
 
-      @media (prefers-color-scheme: dark) {
-        :root {
-          --bg: #0f1117;
-          --surface: #181b23;
-          --surface-muted: #202430;
-          --text: #f1f5f9;
-          --text-muted: #94a3b8;
-          --border: #2a3040;
-          --accent: #3b82f6;
-          --accent-hover: #60a5fa;
-          --accent-soft: rgba(59, 130, 246, 0.16);
-          --badge-bg: rgba(59, 130, 246, 0.2);
-          --badge-fg: #93c5fd;
-        }
+      [data-theme='dark'] {
+        --bg: #09090b;
+        --bg-subtle: #0e0e11;
+        --surface: #0f0f12;
+        --surface-2: #18181b;
+        --text: #fafafa;
+        --text-secondary: #a1a1aa;
+        --text-muted: #71717a;
+        --border: #27272a;
+        --border-strong: #3f3f46;
+        --primary: #fafafa;
+        --primary-fg: #09090b;
+        --primary-hover: #e4e4e7;
+        --grid-line: rgba(255, 255, 255, 0.04);
+        --code-bg: #18181b;
+        --window-bg: #0c0c0f;
+        --window-chrome: #141418;
+        --window-border: #27272a;
+        --shadow-window: 0 32px 80px -20px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.04);
+        --syn-key: #5eead4;
+        --syn-str: #fcd34d;
+        --syn-num: #93c5fd;
+        --syn-com: #71717a;
+        --syn-add: #4ade80;
+        --syn-add-bg: rgba(74, 222, 128, 0.10);
+        --row-rose: rgba(244, 63, 94, 0.15);
+        --row-amber: rgba(245, 158, 11, 0.16);
+        --row-emerald: rgba(16, 185, 129, 0.14);
+        --status-dot: #34d399;
       }
 
       * {
@@ -50,28 +82,40 @@
 
       body {
         margin: 0;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Yu Gothic UI', 'Hiragino Sans', sans-serif;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Kaku Gothic ProN',
+          'Yu Gothic UI', Meiryo, sans-serif;
         background: var(--bg);
         color: var(--text);
         line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
       }
 
       a {
         color: inherit;
       }
 
-      .container {
-        max-width: 1060px;
-        margin: 0 auto;
-        padding: 0 20px;
+      code,
+      pre,
+      .mono {
+        font-family: ui-monospace, 'Cascadia Code', 'JetBrains Mono', SFMono-Regular, Menlo,
+          Consolas, monospace;
       }
 
+      .container {
+        max-width: 1120px;
+        margin: 0 auto;
+        padding: 0 24px;
+      }
+
+      /* Header */
       header {
         position: sticky;
         top: 0;
-        z-index: 10;
-        backdrop-filter: blur(10px);
-        background: color-mix(in srgb, var(--bg) 85%, transparent);
+        z-index: 40;
+        background: color-mix(in srgb, var(--bg) 82%, transparent);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
         border-bottom: 1px solid var(--border);
       }
 
@@ -80,34 +124,46 @@
         align-items: center;
         justify-content: space-between;
         gap: 16px;
-        height: 60px;
+        height: 56px;
       }
 
       .brand {
         display: inline-flex;
         align-items: center;
-        gap: 10px;
+        gap: 9px;
         text-decoration: none;
-        font-weight: 700;
-        font-size: 18px;
+        font-weight: 600;
+        font-size: 14.5px;
+        letter-spacing: -0.015em;
       }
 
       .brand img {
-        width: 28px;
-        height: 28px;
-        border-radius: 7px;
+        width: 24px;
+        height: 24px;
+        border-radius: 6px;
+      }
+
+      .brand-tag {
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--text-muted);
+        padding: 1px 6px;
+        border: 1px solid var(--border);
+        border-radius: 999px;
       }
 
       .nav-links {
         display: flex;
         align-items: center;
-        gap: 18px;
-        font-size: 14px;
+        gap: 24px;
+        font-size: 13px;
+        font-weight: 500;
       }
 
       .nav-links a {
         text-decoration: none;
-        color: var(--text-muted);
+        color: var(--text-secondary);
+        transition: color 120ms ease;
       }
 
       .nav-links a:hover {
@@ -117,203 +173,681 @@
       .nav-actions {
         display: flex;
         align-items: center;
-        gap: 10px;
+        gap: 8px;
       }
 
+      /* Buttons */
       .btn {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        gap: 6px;
-        padding: 8px 14px;
-        border-radius: 8px;
-        font-size: 14px;
-        font-weight: 600;
+        gap: 7px;
+        height: 34px;
+        padding: 0 13px;
+        border-radius: 7px;
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 500;
         text-decoration: none;
         border: 1px solid var(--border);
         background: var(--surface);
         color: var(--text);
         cursor: pointer;
-        transition: transform 0.12s ease, background-color 0.15s ease, border-color 0.15s ease;
+        transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+        white-space: nowrap;
       }
 
       .btn:hover {
-        border-color: var(--accent);
+        background: var(--surface-2);
+        border-color: var(--border-strong);
+      }
+
+      .btn-ghost {
+        border-color: transparent;
+        background: transparent;
+        color: var(--text-secondary);
+      }
+
+      .btn-ghost:hover {
+        color: var(--text);
+        background: var(--surface-2);
+        border-color: transparent;
       }
 
       .btn-primary {
-        background: var(--accent);
-        border-color: var(--accent);
-        color: #ffffff;
+        background: var(--primary);
+        border-color: var(--primary);
+        color: var(--primary-fg);
       }
 
       .btn-primary:hover {
-        background: var(--accent-hover);
-        border-color: var(--accent-hover);
+        background: var(--primary-hover);
+        border-color: var(--primary-hover);
+        color: var(--primary-fg);
       }
 
       .btn-lg {
-        padding: 12px 22px;
-        font-size: 15px;
+        height: 40px;
+        padding: 0 18px;
+        font-size: 13.5px;
+        font-weight: 600;
+        border-radius: 8px;
+      }
+
+      .icon-btn {
+        width: 34px;
+        padding: 0;
+      }
+
+      /* Hero */
+      .hero-wrap {
+        position: relative;
+        border-bottom: 1px solid var(--border);
+        background-image:
+          linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+          linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+        background-size: 40px 40px;
+        background-position: top center;
+      }
+
+      .hero-wrap::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: radial-gradient(
+          ellipse 80% 55% at 50% 0%,
+          transparent 0%,
+          var(--bg) 88%
+        );
       }
 
       .hero {
-        padding: 64px 0 42px;
+        position: relative;
+        z-index: 1;
+        padding: 72px 0 64px;
+      }
+
+      .hero-top {
+        max-width: 760px;
+        margin: 0 auto 44px;
         text-align: center;
       }
 
-      .pill {
-        display: inline-block;
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
         padding: 4px 12px;
         border-radius: 999px;
-        background: var(--badge-bg);
-        color: var(--badge-fg);
+        border: 1px solid var(--border);
+        background: var(--surface);
+        color: var(--text-secondary);
         font-size: 12px;
-        font-weight: 600;
-        margin-bottom: 16px;
+        font-weight: 500;
+        margin-bottom: 22px;
+      }
+
+      .eyebrow-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--status-dot);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--status-dot) 22%, transparent);
       }
 
       h1 {
-        margin: 0 auto 16px;
-        max-width: 780px;
-        font-size: clamp(28px, 4.5vw, 44px);
-        line-height: 1.2;
-        letter-spacing: -0.02em;
+        margin: 0 0 18px;
+        font-size: clamp(32px, 4.8vw, 54px);
+        font-weight: 700;
+        line-height: 1.12;
+        letter-spacing: -0.035em;
       }
 
-      .hero p {
-        margin: 0 auto 28px;
-        max-width: 680px;
-        font-size: 17px;
+      .hero-sub-line {
         color: var(--text-muted);
+      }
+
+      .hero-desc {
+        margin: 0 auto 28px;
+        max-width: 640px;
+        font-size: 15.5px;
+        line-height: 1.65;
+        color: var(--text-secondary);
+      }
+
+      .inline-code {
+        font-size: 0.88em;
+        padding: 2px 6px;
+        border-radius: 5px;
+        background: var(--code-bg);
+        border: 1px solid var(--border);
+        color: var(--text);
       }
 
       .cta-group {
         display: flex;
         flex-wrap: wrap;
         justify-content: center;
-        gap: 12px;
+        gap: 10px;
       }
 
+      /* Product Showcase Window */
+      .showcase {
+        border-radius: 12px;
+        border: 1px solid var(--window-border);
+        background: var(--window-bg);
+        box-shadow: var(--shadow-window);
+        overflow: hidden;
+      }
+
+      .win-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 9px 14px;
+        background: var(--window-chrome);
+        border-bottom: 1px solid var(--border);
+        font-size: 12px;
+        color: var(--text-secondary);
+      }
+
+      .win-dots {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .win-dots span {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--border-strong);
+      }
+
+      .win-title {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text);
+      }
+
+      .win-badge {
+        font-size: 10.5px;
+        padding: 1px 6px;
+        border-radius: 4px;
+        border: 1px solid var(--border);
+        background: var(--surface);
+        color: var(--text-secondary);
+      }
+
+      .win-split {
+        display: grid;
+        grid-template-columns: 1.38fr 1fr;
+        min-height: 312px;
+      }
+
+      .win-grid-pane {
+        display: flex;
+        flex-direction: column;
+        border-right: 1px solid var(--border);
+        min-width: 0;
+      }
+
+      .mock-filter {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 12px;
+        border-bottom: 1px solid var(--border);
+        background: var(--bg-subtle);
+        font-size: 11.5px;
+        color: var(--text-muted);
+      }
+
+      .mock-query {
+        flex: 1;
+        padding: 3px 8px;
+        border-radius: 5px;
+        border: 1px solid var(--border);
+        background: var(--surface);
+        color: var(--text);
+        font-size: 11.5px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .mock-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 11.5px;
+        table-layout: fixed;
+      }
+
+      .mock-table th,
+      .mock-table td {
+        padding: 6px 10px;
+        text-align: left;
+        border-bottom: 1px solid var(--border);
+        border-right: 1px solid var(--border);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .mock-table th {
+        background: var(--bg-subtle);
+        font-weight: 600;
+        color: var(--text-secondary);
+        font-size: 11px;
+      }
+
+      .mock-table th:last-child,
+      .mock-table td:last-child {
+        border-right: none;
+      }
+
+      .mock-table .col-idx {
+        width: 34px;
+        text-align: right;
+        color: var(--text-muted);
+        background: var(--bg-subtle);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .mock-row-rose td:not(.col-idx) {
+        background: var(--row-rose);
+      }
+
+      .mock-row-amber td:not(.col-idx) {
+        background: var(--row-amber);
+      }
+
+      .mock-row-emerald td:not(.col-idx) {
+        background: var(--row-emerald);
+      }
+
+      .marker-bar {
+        box-shadow: inset 3px 0 0 #f59e0b;
+      }
+
+      .mock-status {
+        margin-top: auto;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 6px 12px;
+        border-top: 1px solid var(--border);
+        background: var(--window-chrome);
+        font-size: 11px;
+        color: var(--text-muted);
+      }
+
+      /* Right sidecar / diff inspector mock */
+      .win-side-pane {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        background: var(--bg-subtle);
+      }
+
+      .side-tabs {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        padding: 6px 8px;
+        border-bottom: 1px solid var(--border);
+        background: var(--window-chrome);
+      }
+
+      .side-tab {
+        border: 1px solid transparent;
+        background: transparent;
+        color: var(--text-muted);
+        font-size: 11.5px;
+        font-weight: 500;
+        padding: 4px 9px;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+      }
+
+      .side-tab:hover {
+        color: var(--text);
+      }
+
+      .side-tab.active {
+        background: var(--surface);
+        color: var(--text);
+        border-color: var(--border);
+        font-weight: 600;
+      }
+
+      .side-code {
+        margin: 0;
+        padding: 14px 16px;
+        font-size: 11.5px;
+        line-height: 1.62;
+        overflow-x: auto;
+        color: var(--text);
+        flex: 1;
+      }
+
+      .syn-k {
+        color: var(--syn-key);
+      }
+      .syn-s {
+        color: var(--syn-str);
+      }
+      .syn-n {
+        color: var(--syn-num);
+      }
+      .syn-c {
+        color: var(--syn-com);
+      }
+      .syn-a {
+        display: inline-block;
+        width: 100%;
+        color: var(--syn-add);
+        background: var(--syn-add-bg);
+        border-radius: 3px;
+        padding: 0 4px;
+      }
+
+      /* Sections */
       .section {
-        padding: 40px 0;
+        padding: 72px 0;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .section-header {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 20px;
+        margin-bottom: 32px;
+        flex-wrap: wrap;
+      }
+
+      .section-kicker {
+        font-size: 11.5px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-muted);
+        margin-bottom: 8px;
       }
 
       .section-title {
-        font-size: 24px;
-        margin: 0 0 8px;
-      }
-
-      .section-sub {
-        color: var(--text-muted);
-        margin: 0 0 24px;
-        font-size: 15px;
-      }
-
-      .bench-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
-        gap: 14px;
-      }
-
-      .bench-card {
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: 12px;
-        padding: 18px;
-        text-align: center;
-      }
-
-      .bench-val {
-        font-size: 26px;
-        font-weight: 800;
-        color: var(--accent);
+        margin: 0;
+        font-size: clamp(22px, 3vw, 30px);
+        font-weight: 700;
+        letter-spacing: -0.025em;
         line-height: 1.2;
       }
 
-      .bench-label {
-        font-size: 13px;
-        color: var(--text-muted);
-        margin-top: 6px;
+      .section-sub {
+        margin: 8px 0 0;
+        font-size: 14.5px;
+        color: var(--text-secondary);
+        max-width: 620px;
       }
 
-      .cards {
+      /* Benchmark Strip */
+      .metrics-strip {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-        gap: 16px;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        overflow: hidden;
+        background: var(--surface);
       }
 
-      .card {
+      .metric-cell {
+        padding: 24px 22px;
+        border-right: 1px solid var(--border);
+      }
+
+      .metric-cell:last-child {
+        border-right: none;
+      }
+
+      .metric-val {
+        font-size: clamp(24px, 2.8vw, 30px);
+        font-weight: 700;
+        letter-spacing: -0.03em;
+        line-height: 1.15;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .metric-label {
+        margin-top: 8px;
+        font-size: 13px;
+        color: var(--text-secondary);
+      }
+
+      /* Bento Capabilities Grid */
+      .bento {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .bento-card {
+        grid-column: span 2;
         background: var(--surface);
         border: 1px solid var(--border);
-        border-radius: 12px;
-        padding: 20px;
+        border-radius: 10px;
+        padding: 22px;
         display: flex;
         flex-direction: column;
+        gap: 10px;
+        transition: border-color 140ms ease;
+      }
+
+      .bento-card:hover {
+        border-color: var(--border-strong);
+      }
+
+      .bento-card.wide {
+        grid-column: span 3;
+      }
+
+      .bento-num {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--text-muted);
+        letter-spacing: 0.04em;
+      }
+
+      .bento-card h3 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 600;
+        letter-spacing: -0.015em;
+      }
+
+      .bento-card p {
+        margin: 0;
+        font-size: 13.5px;
+        color: var(--text-secondary);
+        line-height: 1.62;
+      }
+
+      .bento-snippet {
+        margin-top: auto;
+        padding: 10px 12px;
+        border-radius: 7px;
+        background: var(--bg-subtle);
+        border: 1px solid var(--border);
+        font-size: 11.5px;
+        color: var(--text-secondary);
+        overflow-x: auto;
+        white-space: nowrap;
+      }
+
+      .format-pills {
+        margin-top: auto;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        padding-top: 4px;
+      }
+
+      .format-pill {
+        font-size: 11.5px;
+        padding: 2px 8px;
+        border-radius: 5px;
+        border: 1px solid var(--border);
+        background: var(--bg-subtle);
+        color: var(--text);
+      }
+
+      /* Platforms Grid */
+      .platform-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .platform-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .platform-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
         gap: 8px;
       }
 
-      .card h3 {
-        margin: 0;
-        font-size: 17px;
-      }
-
-      .card p {
-        margin: 0;
-        font-size: 14px;
-        color: var(--text-muted);
-      }
-
-      .status {
-        align-self: flex-start;
+      .platform-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
         font-size: 11px;
-        font-weight: 700;
+        font-weight: 600;
         padding: 2px 8px;
         border-radius: 999px;
-        background: var(--accent-soft);
-        color: var(--accent);
+        border: 1px solid var(--border);
+        background: var(--bg-subtle);
+        color: var(--text-secondary);
       }
 
-      .card-footer {
-        margin-top: auto;
-        padding-top: 12px;
+      .platform-badge .dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--status-dot);
       }
 
-      code {
-        font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-        font-size: 0.9em;
-        padding: 2px 6px;
-        border-radius: 5px;
-        background: var(--surface-muted);
+      .platform-card h3 {
+        margin: 0;
+        font-size: 17px;
+        font-weight: 600;
+        letter-spacing: -0.015em;
       }
 
-      footer {
-        margin-top: 40px;
-        padding: 28px 0 40px;
-        border-top: 1px solid var(--border);
+      .platform-card p {
+        margin: 0;
+        font-size: 13.5px;
+        color: var(--text-secondary);
+        line-height: 1.62;
+      }
+
+      .platform-meta {
+        font-size: 11.5px;
         color: var(--text-muted);
-        font-size: 13px;
+      }
+
+      .platform-actions {
+        margin-top: auto;
+        padding-top: 8px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      /* Footer */
+      footer {
+        padding: 36px 0 48px;
+        color: var(--text-muted);
+        font-size: 12.5px;
+      }
+
+      .footer-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 16px;
+        margin-bottom: 16px;
       }
 
       .footer-links {
         display: flex;
         flex-wrap: wrap;
-        gap: 16px;
-        margin-bottom: 12px;
+        gap: 18px;
       }
 
       .footer-links a {
         text-decoration: none;
+        transition: color 120ms ease;
       }
 
       .footer-links a:hover {
-        text-decoration: underline;
         color: var(--text);
       }
 
+      /* Responsive */
+      @media (max-width: 920px) {
+        .win-split {
+          grid-template-columns: 1fr;
+        }
+        .win-grid-pane {
+          border-right: none;
+          border-bottom: 1px solid var(--border);
+        }
+        .metrics-strip {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .metric-cell:nth-child(2) {
+          border-right: none;
+        }
+        .metric-cell:nth-child(1),
+        .metric-cell:nth-child(2) {
+          border-bottom: 1px solid var(--border);
+        }
+        .bento-card,
+        .bento-card.wide {
+          grid-column: span 6;
+        }
+        .platform-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
       @media (max-width: 720px) {
-        .nav-links {
+        .nav-links,
+        .brand-tag {
           display: none;
+        }
+        .hero {
+          padding: 48px 0 44px;
+        }
+        .section {
+          padding: 52px 0;
         }
       }
     </style>
@@ -324,246 +858,562 @@
         <a class="brand" href="./">
           <img src="./assets/icon.svg" alt="MetaText Editor icon" />
           <span>MetaText Editor</span>
+          <span class="brand-tag mono">v1.0</span>
         </a>
+
         <nav class="nav-links">
-          <a href="#features" data-i18n="navFeatures">Features</a>
-          <a href="#benchmark" data-i18n="navBenchmark">Benchmark</a>
+          <a href="#benchmark" data-i18n="navBenchmark">Performance</a>
+          <a href="#features" data-i18n="navFeatures">Architecture</a>
           <a href="#download" data-i18n="navDownload">Download</a>
+          <a
+            href="https://mahorobalab.github.io/metatext-spec/"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Spec
+          </a>
           <a href="./privacy/" data-i18n="navPrivacy">Privacy</a>
         </nav>
+
         <div class="nav-actions">
-          <button id="langToggle" type="button" class="btn">日本語</button>
-          <a class="btn btn-primary" href="./app/" data-i18n="launchApp">Launch Web App</a>
+          <button
+            id="themeToggle"
+            type="button"
+            class="btn btn-ghost icon-btn"
+            aria-label="Toggle theme"
+            title="Toggle light / dark theme"
+          >
+            ☾
+          </button>
+          <button id="langToggle" type="button" class="btn btn-ghost">日本語</button>
+          <a class="btn btn-primary" href="./app/" data-i18n="launchApp">Launch Web App →</a>
         </div>
       </div>
     </header>
 
-    <main class="container">
-      <section class="hero">
-        <span class="pill" data-i18n="heroPill">1,000,000 Rows @ 60fps · Plain CSV + .metatext.jsonc</span>
-        <h1 data-i18n="heroTitle">Excel-like CSV comfort without corrupting your plain CSV files.</h1>
-        <p data-i18n="heroDesc">
-          MetaText Editor stores column widths, styling, non-destructive view sorts, and filter presets in an adjacent
-          <code>.metatext.jsonc</code> file — keeping your CSV data 100% plain, encoding-safe, and Git-friendly.
-        </p>
-        <div class="cta-group">
-          <a class="btn btn-primary btn-lg" href="./app/" data-i18n="ctaTryWeb">Try Web App (PWA)</a>
-          <a
-            class="btn btn-lg"
-            href="https://github.com/mahorobalab/metatext-editor"
-            target="_blank"
-            rel="noopener noreferrer"
-            data-i18n="ctaGitHub"
-          >
-            View on GitHub
-          </a>
+    <div class="hero-wrap">
+      <section class="container hero">
+        <div class="hero-top">
+          <div class="eyebrow mono">
+            <span class="eyebrow-dot"></span>
+            <span data-i18n="heroPill">v1.0.0 · MIT Open Source · CSV / TSV / JSONL / LOG</span>
+          </div>
+          <h1 data-i18n="heroTitle">
+            Plain CSV stays plain.<br /><span class="hero-sub-line">The view gets superpowers.</span>
+          </h1>
+          <p class="hero-desc" data-i18n="heroDesc">
+            A 60fps Canvas grid built for 1,000,000-row structured text. Column widths, cell styles,
+            non-destructive sorts, and filter presets live in an adjacent
+            <code class="inline-code">.metatext.jsonc</code> sidecar — leaving your raw data
+            encoding-safe and Git-clean.
+          </p>
+          <div class="cta-group">
+            <a class="btn btn-primary btn-lg" href="./app/" data-i18n="ctaTryWeb">
+              Launch Web App →
+            </a>
+            <a
+              class="btn btn-lg"
+              href="https://apps.microsoft.com/detail/9NSTR10L2L6W"
+              target="_blank"
+              rel="noopener noreferrer"
+              data-i18n="ctaStore"
+            >
+              Microsoft Store
+            </a>
+            <a
+              class="btn btn-lg"
+              href="https://marketplace.visualstudio.com/items?itemName=mahorobalab.metatext-editor"
+              target="_blank"
+              rel="noopener noreferrer"
+              data-i18n="ctaVscode"
+            >
+              VS Code Extension
+            </a>
+            <a
+              class="btn btn-lg"
+              href="https://github.com/mahorobalab/metatext-editor"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              GitHub
+            </a>
+          </div>
+        </div>
+
+        <!-- Product Architecture Preview -->
+        <div class="showcase" aria-label="MetaText Editor architecture preview">
+          <div class="win-bar">
+            <div class="win-dots" aria-hidden="true">
+              <span></span><span></span><span></span>
+            </div>
+            <div class="win-title mono">
+              <span>orders_1m.csv</span>
+              <span class="win-badge">UTF-8 · LF</span>
+            </div>
+            <div class="mono" style="font-size: 11px; color: var(--text-muted)">
+              60 fps · 0% idle CPU
+            </div>
+          </div>
+
+          <div class="win-split">
+            <div class="win-grid-pane">
+              <div class="mock-filter">
+                <span class="mono" style="font-weight: 600">Filter</span>
+                <div class="mock-query mono">status:blocked OR status:review -owner:suzuki amount:&gt;50000</div>
+              </div>
+              <table class="mock-table mono">
+                <thead>
+                  <tr>
+                    <th class="col-idx">#</th>
+                    <th style="width: 24%">order_id</th>
+                    <th style="width: 20%">status</th>
+                    <th style="width: 22%">owner</th>
+                    <th>amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr class="mock-row-rose">
+                    <td class="col-idx marker-bar">14</td>
+                    <td>ORD-00014</td>
+                    <td>blocked</td>
+                    <td>sato</td>
+                    <td>128,400</td>
+                  </tr>
+                  <tr class="mock-row-amber">
+                    <td class="col-idx">29</td>
+                    <td>ORD-00029</td>
+                    <td>review</td>
+                    <td>tanaka</td>
+                    <td>94,200</td>
+                  </tr>
+                  <tr class="mock-row-rose">
+                    <td class="col-idx">42</td>
+                    <td>ORD-00042</td>
+                    <td>blocked</td>
+                    <td>watanabe</td>
+                    <td>210,000</td>
+                  </tr>
+                  <tr class="mock-row-emerald">
+                    <td class="col-idx">58</td>
+                    <td>ORD-00058</td>
+                    <td>review</td>
+                    <td>ito</td>
+                    <td>67,850</td>
+                  </tr>
+                  <tr>
+                    <td class="col-idx">71</td>
+                    <td>ORD-00071</td>
+                    <td>review</td>
+                    <td>takahashi</td>
+                    <td>52,100</td>
+                  </tr>
+                </tbody>
+              </table>
+              <div class="mock-status mono">
+                <span>orders_1m.csv · CSV · UTF-8 · LF</span>
+                <span>1,000,000 rows × 10 cols</span>
+              </div>
+            </div>
+
+            <div class="win-side-pane">
+              <div class="side-tabs" role="tablist">
+                <button type="button" class="side-tab active mono" data-tab="jsonc">
+                  .metatext.jsonc
+                </button>
+                <button type="button" class="side-tab mono" data-tab="git">
+                  git status
+                </button>
+                <button type="button" class="side-tab mono" data-tab="zip">
+                  .metatext.zip
+                </button>
+              </div>
+              <pre id="sideCode" class="side-code mono"></pre>
+            </div>
+          </div>
         </div>
       </section>
+    </div>
 
+    <main>
       <section id="benchmark" class="section">
-        <h2 class="section-title" data-i18n="benchTitle">Measured Performance</h2>
-        <p class="section-sub" data-i18n="benchSub">
-          Tested on Windows 11 with a 1,000,000 rows × 10 columns (181.27 MB) UTF-8 CSV containing Japanese text and quoted fields.
-        </p>
-        <div class="bench-grid">
-          <div class="bench-card">
-            <div class="bench-val">1,000,000 × 10</div>
-            <div class="bench-label" data-i18n="benchCells">10,000,000 cells loaded</div>
+        <div class="container">
+          <div class="section-header">
+            <div>
+              <div class="section-kicker mono" data-i18n="benchKicker">Benchmarks</div>
+              <h2 class="section-title" data-i18n="benchTitle">Engineered for 10M+ cells.</h2>
+              <p class="section-sub" data-i18n="benchSub">
+                Measured on Windows 11 with a 1,000,000 rows × 10 columns (181.27 MB) UTF-8 CSV
+                containing Japanese text and quoted fields.
+              </p>
+            </div>
           </div>
-          <div class="bench-card">
-            <div class="bench-val">~1.1 s</div>
-            <div class="bench-label" data-i18n="benchLoad">Parse & render time (181 MB)</div>
-          </div>
-          <div class="bench-card">
-            <div class="bench-val">~519 MB</div>
-            <div class="bench-label" data-i18n="benchMem">Desktop RAM (0% CPU idle)</div>
-          </div>
-          <div class="bench-card">
-            <div class="bench-val">60 fps</div>
-            <div class="bench-label" data-i18n="benchScroll">Canvas virtual scrolling</div>
+
+          <div class="metrics-strip">
+            <div class="metric-cell">
+              <div class="metric-val mono">1,000,000 × 10</div>
+              <div class="metric-label" data-i18n="benchCells">10M cells loaded in one pass</div>
+            </div>
+            <div class="metric-cell">
+              <div class="metric-val mono">~1.1 s</div>
+              <div class="metric-label" data-i18n="benchLoad">Parse &amp; initial render (181 MB)</div>
+            </div>
+            <div class="metric-cell">
+              <div class="metric-val mono">~519 MB</div>
+              <div class="metric-label" data-i18n="benchMem">Desktop RAM · 0% idle CPU</div>
+            </div>
+            <div class="metric-cell">
+              <div class="metric-val mono">60 fps</div>
+              <div class="metric-label" data-i18n="benchScroll">Canvas virtual scrolling</div>
+            </div>
           </div>
         </div>
       </section>
 
       <section id="features" class="section">
-        <h2 class="section-title" data-i18n="featTitle">Key Capabilities</h2>
-        <p class="section-sub" data-i18n="featSub">
-          Designed for developers, data analysts, and log inspection workflows.
-        </p>
-        <div class="cards">
-          <article class="card">
-            <h3 data-i18n="f1Title">.metatext.jsonc Sidecar</h3>
-            <p data-i18n="f1Desc">
-              Zero-config auto-fit on first open. Column widths, frozen panes, 5-layer Excel-like styles, and sort order are persisted in <code>*.csv.metatext.jsonc</code>.
-            </p>
-          </article>
-          <article class="card">
-            <h3 data-i18n="f2Title">Comment-Preserving JSONC</h3>
-            <p data-i18n="f2Desc">
-              Powered by Microsoft's <code>jsonc-parser</code>: GUI edits patch metadata cleanly while preserving your handwritten comments and formatting.
-            </p>
-          </article>
-          <article class="card">
-            <h3 data-i18n="f3Title">Log-Analysis Filter Bar</h3>
-            <p data-i18n="f3Desc">
-              Supports <code>OR</code>, <code>-exclude</code>, <code>col:val</code>, numeric comparisons, <code>/regex/</code>, <code>grep -C</code> context rows, consecutive dedupe, and frequency facets.
-            </p>
-          </article>
-          <article class="card">
-            <h3 data-i18n="f4Title">100% Local & Privacy-First</h3>
-            <p data-i18n="f4Desc">
-              Zero servers, zero telemetry. Even the Web / PWA version parses and edits CSV files completely inside your browser via Web Workers.
-            </p>
-          </article>
+        <div class="container">
+          <div class="section-header">
+            <div>
+              <div class="section-kicker mono" data-i18n="featKicker">Architecture</div>
+              <h2 class="section-title" data-i18n="featTitle">Built for real-world data &amp; log workflows.</h2>
+              <p class="section-sub" data-i18n="featSub">
+                No silent date reformatting, no dropped leading zeros, no bloated binary lock-in.
+              </p>
+            </div>
+          </div>
+
+          <div class="bento">
+            <article class="bento-card wide">
+              <span class="bento-num mono">01 / SIDECAR METADATA</span>
+              <h3 data-i18n="f1Title">Comment-preserving .metatext.jsonc</h3>
+              <p data-i18n="f1Desc">
+                5-layer styling (table, columns, conditional rules, ranges, cells), column widths,
+                frozen panes, and non-destructive sort order are patched via Microsoft's
+                <code class="inline-code">jsonc-parser</code> — your handwritten comments stay intact.
+              </p>
+              <div class="bento-snippet mono">
+                table → columns → rules → ranges → rows / cells
+              </div>
+            </article>
+
+            <article class="bento-card wide">
+              <span class="bento-num mono">02 / QUERY &amp; LOG ANALYSIS</span>
+              <h3 data-i18n="f2Title">Log-grade filter bar &amp; Live Tail</h3>
+              <p data-i18n="f2Desc">
+                Query with <code class="inline-code">col:val</code>, <code class="inline-code">OR</code>,
+                <code class="inline-code">-exclude</code>, numeric comparisons, and
+                <code class="inline-code">/regex/</code>. Includes <code class="inline-code">grep -C</code>
+                context rows, duplicate collapse, value facets, presets, and real-time Live Tail.
+              </p>
+              <div class="bento-snippet mono">
+                level:ERROR -service:health /timeout/i &nbsp;|&nbsp; ±3 context &nbsp;|&nbsp; Live Tail
+              </div>
+            </article>
+
+            <article class="bento-card">
+              <span class="bento-num mono">03 / 2-LAYER HISTORY</span>
+              <h3 data-i18n="f3Title">Undo/Redo + Shadow Git</h3>
+              <p data-i18n="f3Desc">
+                Instant in-memory undo/redo paired with persistent save snapshots stored in a
+                local <code class="inline-code">.metatext.history/</code> Git repository. Restore any snapshot byte-for-byte.
+              </p>
+            </article>
+
+            <article class="bento-card">
+              <span class="bento-num mono">04 / PORTABLE BUNDLE</span>
+              <h3 data-i18n="f4Title">.metatext.zip archive</h3>
+              <p data-i18n="f4Desc">
+                Bundle raw data, <code class="inline-code">.metatext.jsonc</code> styling, and
+                optional history into one portable archive. Open and edit directly across Desktop,
+                VS Code, and Web.
+              </p>
+            </article>
+
+            <article class="bento-card">
+              <span class="bento-num mono">05 / FORMATS &amp; PRIVACY</span>
+              <h3 data-i18n="f5Title">Multi-format, 100% local</h3>
+              <p data-i18n="f5Desc">
+                Preserves UTF-8, UTF-8 BOM, Shift-JIS, LF/CRLF, and delimiters. Zero servers, zero
+                telemetry — even the Web edition runs entirely in local Web Workers.
+              </p>
+              <div class="format-pills mono">
+                <span class="format-pill">.csv</span>
+                <span class="format-pill">.tsv</span>
+                <span class="format-pill">.jsonl</span>
+                <span class="format-pill">.ndjson</span>
+                <span class="format-pill">.log</span>
+                <span class="format-pill">.metatext.zip</span>
+              </div>
+            </article>
+          </div>
         </div>
       </section>
 
-      <section id="download" class="section">
-        <h2 class="section-title" data-i18n="dlTitle">Platforms & Distribution</h2>
-        <p class="section-sub" data-i18n="dlSub">
-          Open-source core on GitHub (MIT); official signed desktop builds distributed via Microsoft Store &amp; BOOTH (no binaries on GitHub Releases).
-        </p>
-        <div class="cards">
-          <article class="card">
-            <span class="status" data-i18n="statusLive">Available Now</span>
-            <h3 data-i18n="pWebTitle">Web App / PWA</h3>
-            <p data-i18n="pWebDesc">
-              No installation needed. Open local CSV files directly in your browser with offline PWA support and the 100k-row benchmark.
-            </p>
-            <div class="card-footer">
-              <a class="btn btn-primary" href="./app/" data-i18n="launchApp">Launch Web App</a>
+      <section id="download" class="section" style="border-bottom: none">
+        <div class="container">
+          <div class="section-header">
+            <div>
+              <div class="section-kicker mono" data-i18n="dlKicker">Get MetaText Editor</div>
+              <h2 class="section-title" data-i18n="dlTitle">Run everywhere you inspect data.</h2>
+              <p class="section-sub" data-i18n="dlSub">
+                Same core engine and open specification across Web, VS Code, and Desktop.
+              </p>
             </div>
-          </article>
-          <article class="card">
-            <span class="status" data-i18n="statusSoon">Coming Soon</span>
-            <h3 data-i18n="pVscodeTitle">VS Code / Open VSX Extension</h3>
-            <p data-i18n="pVscodeDesc">
-              Custom Editor integration inside VS Code, Antigravity, and Cursor with automatic theme sync and <code>.metatext.jsonc</code> schema IntelliSense.
-            </p>
-            <div class="card-footer">
-              <a
-                class="btn"
-                href="https://github.com/mahorobalab/metatext-editor/tree/main/apps/vscode"
-                target="_blank"
-                rel="noopener noreferrer"
-                data-i18n="viewSource"
-              >
-                View Source
-              </a>
-            </div>
-          </article>
-          <article class="card">
-            <span class="status" data-i18n="statusSoon">Coming Soon</span>
-            <h3 data-i18n="pDesktopTitle">Desktop App (Windows / macOS)</h3>
-            <p data-i18n="pDesktopDesc">
-              Lightweight Tauri v2 native app (~9 MB) with instant startup, window state memory, and automatic adjacent <code>.metatext.jsonc</code> sync via Microsoft Store &amp; BOOTH.
-            </p>
-            <div class="card-footer">
-              <a
-                class="btn"
-                href="https://github.com/mahorobalab/metatext-editor#download--official-builds"
-                target="_blank"
-                rel="noopener noreferrer"
-                data-i18n="buildFromSource"
-              >
-                Build Instructions
-              </a>
-            </div>
-          </article>
+          </div>
+
+          <div class="platform-grid">
+            <article class="platform-card">
+              <div class="platform-head">
+                <span class="platform-badge mono">
+                  <span class="dot"></span>
+                  <span data-i18n="statusLive">Available Now</span>
+                </span>
+                <span class="platform-meta mono">PWA / Offline</span>
+              </div>
+              <h3 data-i18n="pWebTitle">Web App</h3>
+              <p data-i18n="pWebDesc">
+                Zero install. Drop local CSV, JSONL, LOG, or <code class="inline-code">.metatext.zip</code>
+                files into your browser with full Web Worker performance and 100k-row benchmark.
+              </p>
+              <div class="platform-actions">
+                <a class="btn btn-primary" href="./app/" data-i18n="launchApp">Launch Web App →</a>
+              </div>
+            </article>
+
+            <article class="platform-card">
+              <div class="platform-head">
+                <span class="platform-badge mono">
+                  <span class="dot"></span>
+                  <span>Marketplace</span>
+                </span>
+                <span class="platform-meta mono">VS Code / Cursor</span>
+              </div>
+              <h3 data-i18n="pVscodeTitle">VS Code Extension</h3>
+              <p data-i18n="pVscodeDesc">
+                Custom Editor inside VS Code, Antigravity, and Cursor with IDE theme sync,
+                <code class="inline-code">.metatext.jsonc</code> schema IntelliSense, and Shadow Git snapshots.
+              </p>
+              <div class="platform-actions">
+                <a
+                  class="btn btn-primary"
+                  href="https://marketplace.visualstudio.com/items?itemName=mahorobalab.metatext-editor"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  data-i18n="openMarketplace"
+                >
+                  VS Marketplace →
+                </a>
+                <a
+                  class="btn"
+                  href="https://github.com/mahorobalab/metatext-editor/tree/main/apps/vscode"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  data-i18n="viewSource"
+                >
+                  Source
+                </a>
+              </div>
+            </article>
+
+            <article class="platform-card">
+              <div class="platform-head">
+                <span class="platform-badge mono">
+                  <span class="dot"></span>
+                  <span>Windows 10 / 11</span>
+                </span>
+                <span class="platform-meta mono">Tauri v2 · ~9 MB</span>
+              </div>
+              <h3 data-i18n="pDesktopTitle">Desktop App</h3>
+              <p data-i18n="pDesktopDesc">
+                Native Rust + Tauri v2 desktop app with multi-tab workspace, instant startup,
+                <code class="inline-code">gix</code> Shadow Git snapshots, and automatic sidecar sync.
+                macOS coming soon.
+              </p>
+              <div class="platform-actions">
+                <a
+                  class="btn btn-primary"
+                  href="https://apps.microsoft.com/detail/9NSTR10L2L6W"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  data-i18n="openStore"
+                >
+                  Microsoft Store →
+                </a>
+                <a
+                  class="btn"
+                  href="https://github.com/mahorobalab/metatext-editor"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  data-i18n="viewSource"
+                >
+                  Source
+                </a>
+              </div>
+            </article>
+          </div>
         </div>
       </section>
     </main>
 
     <footer>
       <div class="container">
-        <div class="footer-links">
-          <a href="./app/" data-i18n="footerApp">Web App</a>
-          <a href="./schema/metatext.schema.json">JSON Schema</a>
-          <a
-            href="https://github.com/mahorobalab/metatext-spec/blob/main/SPEC.md"
-            target="_blank"
-            rel="noopener noreferrer"
-            data-i18n="footerSpec"
-          >
-            Specification
-          </a>
-          <a href="./privacy/" data-i18n="footerPrivacy">Privacy Policy</a>
-          <a
-            href="https://github.com/mahorobalab/metatext-editor/blob/main/LICENSE"
-            target="_blank"
-            rel="noopener noreferrer"
-            data-i18n="footerLicense"
-          >
-            MIT License
-          </a>
-          <a
-            href="https://github.com/mahorobalab/metatext-editor"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            GitHub
-          </a>
+        <div class="footer-top">
+          <div class="footer-links">
+            <a href="./app/" data-i18n="footerApp">Web App</a>
+            <a
+              href="https://mahorobalab.github.io/metatext-spec/"
+              target="_blank"
+              rel="noopener noreferrer"
+              data-i18n="footerSpec"
+            >
+              MetaText Spec
+            </a>
+            <a href="./schema/metatext.schema.json">JSON Schema</a>
+            <a
+              href="https://mahorobalab.github.io/metatext-spec/schemas/v0.1/metatext-bundle.schema.json"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Bundle Manifest
+            </a>
+            <a href="./privacy/" data-i18n="footerPrivacy">Privacy Policy</a>
+            <a
+              href="https://github.com/mahorobalab/metatext-editor/blob/main/LICENSE"
+              target="_blank"
+              rel="noopener noreferrer"
+              data-i18n="footerLicense"
+            >
+              MIT License
+            </a>
+            <a
+              href="https://github.com/mahorobalab/metatext-editor"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              GitHub
+            </a>
+          </div>
         </div>
         <div data-i18n="footerCopy">
-          © 2026 MahorobaLab. Source code and specification are licensed under MIT; "MetaText Editor" name and official icons are trademarks/assets of MahorobaLab.
+          © 2026 MahorobaLab. Source code and specification are licensed under MIT; "MetaText
+          Editor" name and official icons are assets of MahorobaLab.
         </div>
       </div>
     </footer>
 
     <script>
+      const sideSnippets = {
+        jsonc: `<span class="syn-c">// Hand-written comments are preserved on every GUI edit</span>
+{
+  <span class="syn-k">"$schema"</span>: <span class="syn-s">"https://mahorobalab.github.io/metatext-spec/schemas/v1/metatext.schema.json"</span>,
+  <span class="syn-k">"version"</span>: <span class="syn-s">"1.0"</span>,
+  <span class="syn-k">"columns"</span>: {
+    <span class="syn-k">"order_id"</span>: { <span class="syn-k">"width"</span>: <span class="syn-n">120</span>, <span class="syn-k">"pinned"</span>: <span class="syn-n">true</span> },
+    <span class="syn-k">"amount"</span>:   { <span class="syn-k">"numberFormat"</span>: <span class="syn-s">"#,##0"</span> }
+  },
+  <span class="syn-k">"rules"</span>: [
+    { <span class="syn-k">"when"</span>: { <span class="syn-k">"column"</span>: <span class="syn-s">"status"</span>, <span class="syn-k">"equals"</span>: <span class="syn-s">"blocked"</span> }, <span class="syn-k">"style"</span>: <span class="syn-s">"danger"</span> }
+  ],
+  <span class="syn-k">"markers"</span>: [
+    { <span class="syn-k">"row"</span>: <span class="syn-n">14</span>, <span class="syn-k">"color"</span>: <span class="syn-s">"amber"</span>, <span class="syn-k">"note"</span>: <span class="syn-s">"Follow up with ops"</span> }
+  ]
+}`,
+        git: `<span class="syn-c">$ git status --short</span>
+<span class="syn-a">M  orders_1m.csv.metatext.jsonc</span>
+
+<span class="syn-c">$ git diff --stat orders_1m.csv</span>
+<span class="syn-c"># (0 lines changed — raw CSV encoding, quotes, and leading zeros untouched)</span>
+
+<span class="syn-c">$ git diff orders_1m.csv.metatext.jsonc</span>
+<span class="syn-a">+  "markers": [{ "row": 14, "color": "amber", "note": "Follow up with ops" }]</span>`,
+        zip: `<span class="syn-c"># Portable .metatext.zip archive (open directly in Desktop / VS Code / Web)</span>
+orders_1m.csv.metatext.zip
+├── <span class="syn-k">manifest.json</span>                  <span class="syn-c"># format v0.1 metadata &amp; checksums</span>
+├── <span class="syn-k">data/</span>
+│   ├── <span class="syn-s">orders_1m.csv</span>              <span class="syn-c"># untouched raw data</span>
+│   └── <span class="syn-s">orders_1m.csv.metatext.jsonc</span>
+└── <span class="syn-k">history/</span>                       <span class="syn-c"># optional Shadow Git snapshots (off by default)</span>
+    ├── HEAD
+    └── objects/`,
+      };
+
+      const sideCodeEl = document.getElementById('sideCode');
+      const sideTabs = document.querySelectorAll('.side-tab');
+
+      function selectSideTab(key) {
+        sideCodeEl.innerHTML = sideSnippets[key] || '';
+        sideTabs.forEach((btn) => {
+          btn.classList.toggle('active', btn.getAttribute('data-tab') === key);
+        });
+      }
+
+      sideTabs.forEach((btn) => {
+        btn.addEventListener('click', () => {
+          selectSideTab(btn.getAttribute('data-tab'));
+        });
+      });
+      selectSideTab('jsonc');
+
       const i18n = {
         en: {
           toggle: '日本語',
-          navFeatures: 'Features',
-          navBenchmark: 'Benchmark',
+          navBenchmark: 'Performance',
+          navFeatures: 'Architecture',
           navDownload: 'Download',
           navPrivacy: 'Privacy',
-          launchApp: 'Launch Web App',
-          heroPill: '1,000,000 Rows @ 60fps · Plain CSV + .metatext.jsonc',
-          heroTitle: 'Excel-like CSV comfort without corrupting your plain CSV files.',
+          launchApp: 'Launch Web App →',
+          heroPill: 'v1.0.0 · MIT Open Source · CSV / TSV / JSONL / LOG',
+          heroTitle:
+            'Plain CSV stays plain.<br /><span class="hero-sub-line">The view gets superpowers.</span>',
           heroDesc:
-            'MetaText Editor stores column widths, styling, non-destructive view sorts, and filter presets in an adjacent <code>.metatext.jsonc</code> file — keeping your CSV data 100% plain, encoding-safe, and Git-friendly.',
-          ctaTryWeb: 'Try Web App (PWA)',
-          ctaGitHub: 'View on GitHub',
-          benchTitle: 'Measured Performance',
+            'A 60fps Canvas grid built for 1,000,000-row structured text. Column widths, cell styles, non-destructive sorts, and filter presets live in an adjacent <code class="inline-code">.metatext.jsonc</code> sidecar — leaving your raw data encoding-safe and Git-clean.',
+          ctaTryWeb: 'Launch Web App →',
+          ctaStore: 'Microsoft Store',
+          ctaVscode: 'VS Code Extension',
+          benchKicker: 'Benchmarks',
+          benchTitle: 'Engineered for 10M+ cells.',
           benchSub:
-            'Tested on Windows 11 with a 1,000,000 rows × 10 columns (181.27 MB) UTF-8 CSV containing Japanese text and quoted fields.',
-          benchCells: '10,000,000 cells loaded',
-          benchLoad: 'Parse & render time (181 MB)',
-          benchMem: 'Desktop RAM (0% CPU idle)',
+            'Measured on Windows 11 with a 1,000,000 rows × 10 columns (181.27 MB) UTF-8 CSV containing Japanese text and quoted fields.',
+          benchCells: '10M cells loaded in one pass',
+          benchLoad: 'Parse & initial render (181 MB)',
+          benchMem: 'Desktop RAM · 0% idle CPU',
           benchScroll: 'Canvas virtual scrolling',
-          featTitle: 'Key Capabilities',
-          featSub: 'Designed for developers, data analysts, and log inspection workflows.',
-          f1Title: '.metatext.jsonc Sidecar',
+          featKicker: 'Architecture',
+          featTitle: 'Built for real-world data & log workflows.',
+          featSub:
+            'No silent date reformatting, no dropped leading zeros, no bloated binary lock-in.',
+          f1Title: 'Comment-preserving .metatext.jsonc',
           f1Desc:
-            'Zero-config auto-fit on first open. Column widths, frozen panes, 5-layer Excel-like styles, and sort order are persisted in <code>*.csv.metatext.jsonc</code>.',
-          f2Title: 'Comment-Preserving JSONC',
+            '5-layer styling (table, columns, conditional rules, ranges, cells), column widths, frozen panes, and non-destructive sort order are patched via Microsoft\'s <code class="inline-code">jsonc-parser</code> — your handwritten comments stay intact.',
+          f2Title: 'Log-grade filter bar & Live Tail',
           f2Desc:
-            "Powered by Microsoft's <code>jsonc-parser</code>: GUI edits patch metadata cleanly while preserving your handwritten comments and formatting.",
-          f3Title: 'Log-Analysis Filter Bar',
+            'Query with <code class="inline-code">col:val</code>, <code class="inline-code">OR</code>, <code class="inline-code">-exclude</code>, numeric comparisons, and <code class="inline-code">/regex/</code>. Includes <code class="inline-code">grep -C</code> context rows, duplicate collapse, value facets, presets, and real-time Live Tail.',
+          f3Title: 'Undo/Redo + Shadow Git',
           f3Desc:
-            'Supports <code>OR</code>, <code>-exclude</code>, <code>col:val</code>, numeric comparisons, <code>/regex/</code>, <code>grep -C</code> context rows, consecutive dedupe, and frequency facets.',
-          f4Title: '100% Local & Privacy-First',
+            'Instant in-memory undo/redo paired with persistent save snapshots stored in a local <code class="inline-code">.metatext.history/</code> Git repository. Restore any snapshot byte-for-byte.',
+          f4Title: '.metatext.zip archive',
           f4Desc:
-            'Zero servers, zero telemetry. Even the Web / PWA version parses and edits CSV files completely inside your browser via Web Workers.',
-          dlTitle: 'Platforms & Distribution',
-          dlSub:
-            'Open-source core on GitHub (MIT); official signed desktop builds distributed via Microsoft Store & BOOTH (no binaries on GitHub Releases).',
+            'Bundle raw data, <code class="inline-code">.metatext.jsonc</code> styling, and optional history into one portable archive. Open and edit directly across Desktop, VS Code, and Web.',
+          f5Title: 'Multi-format, 100% local',
+          f5Desc:
+            'Preserves UTF-8, UTF-8 BOM, Shift-JIS, LF/CRLF, and delimiters. Zero servers, zero telemetry — even the Web edition runs entirely in local Web Workers.',
+          dlKicker: 'Get MetaText Editor',
+          dlTitle: 'Run everywhere you inspect data.',
+          dlSub: 'Same core engine and open specification across Web, VS Code, and Desktop.',
           statusLive: 'Available Now',
-          statusSoon: 'Coming Soon',
-          pWebTitle: 'Web App / PWA',
+          pWebTitle: 'Web App',
           pWebDesc:
-            'No installation needed. Open local CSV files directly in your browser with offline PWA support and the 100k-row benchmark.',
-          pVscodeTitle: 'VS Code / Open VSX Extension',
+            'Zero install. Drop local CSV, JSONL, LOG, or <code class="inline-code">.metatext.zip</code> files into your browser with full Web Worker performance and 100k-row benchmark.',
+          pVscodeTitle: 'VS Code Extension',
           pVscodeDesc:
-            'Custom Editor integration inside VS Code, Antigravity, and Cursor with automatic theme sync and <code>.metatext.jsonc</code> schema IntelliSense.',
-          pDesktopTitle: 'Desktop App (Windows / macOS)',
+            'Custom Editor inside VS Code, Antigravity, and Cursor with IDE theme sync, <code class="inline-code">.metatext.jsonc</code> schema IntelliSense, and Shadow Git snapshots.',
+          pDesktopTitle: 'Desktop App',
           pDesktopDesc:
-            'Lightweight Tauri v2 native app (~9 MB) with instant startup, window state memory, and automatic adjacent <code>.metatext.jsonc</code> sync via Microsoft Store & BOOTH.',
-          viewSource: 'View Source',
-          buildFromSource: 'Build Instructions',
+            'Native Rust + Tauri v2 desktop app with multi-tab workspace, instant startup, <code class="inline-code">gix</code> Shadow Git snapshots, and automatic sidecar sync. macOS coming soon.',
+          openMarketplace: 'VS Marketplace →',
+          openStore: 'Microsoft Store →',
+          viewSource: 'Source',
           footerApp: 'Web App',
-          footerSpec: 'Specification',
+          footerSpec: 'MetaText Spec',
           footerPrivacy: 'Privacy Policy',
           footerLicense: 'MIT License',
           footerCopy:
@@ -571,56 +1421,64 @@
         },
         ja: {
           toggle: 'English',
-          navFeatures: '機能',
           navBenchmark: 'ベンチマーク',
+          navFeatures: '設計・機能',
           navDownload: '入手方法',
           navPrivacy: 'プライバシー',
-          launchApp: 'Web 版を開く',
-          heroPill: '100万行 60fps 対応 · プレーン CSV + .metatext.jsonc',
-          heroTitle: 'プレーンな CSV を壊さず、Excel ライクな快適さを。',
+          launchApp: 'Web 版を開く →',
+          heroPill: 'v1.0.0 · MIT オープンソース · CSV / TSV / JSONL / LOG',
+          heroTitle:
+            'プレーンな CSV はそのままに。<br /><span class="hero-sub-line">編集体験だけを、別次元へ。</span>',
           heroDesc:
-            'MetaText Editor は列幅・装飾・非破壊ビューソート・フィルタプリセットを隣の <code>.metatext.jsonc</code> に保存します。CSV 本体は文字コード・改行・先頭ゼロを一切壊さず Git フレンドリーなまま保ちます。',
-          ctaTryWeb: 'Web 版 (PWA) を試す',
-          ctaGitHub: 'GitHub を見る',
-          benchTitle: 'パフォーマンス実測値',
+            '100万行を 60fps で扱う Canvas グリッド。列幅・装飾・非破壊ソート・フィルタプリセットは隣の <code class="inline-code">.metatext.jsonc</code> に分離保存し、元データの文字コード・改行・先頭ゼロ・Git 差分を一切汚しません。',
+          ctaTryWeb: 'Web 版を試す →',
+          ctaStore: 'Microsoft Store',
+          ctaVscode: 'VS Code 拡張機能',
+          benchKicker: 'Benchmarks',
+          benchTitle: '1,000万セルを、ストレスなく。',
           benchSub:
-            'Windows 11 環境にて日本語・クォートを含む 100万行 × 10列（181.27 MB）の UTF-8 CSV で計測した結果です。',
+            'Windows 11 環境にて日本語・クォートを含む 100万行 × 10列（181.27 MB）の UTF-8 CSV で計測した実測値です。',
           benchCells: '1,000万セルを一括読み込み',
           benchLoad: 'パース〜初期描画（181 MB）',
-          benchMem: 'デスクトップ版常駐メモリ（待機 CPU 0%）',
+          benchMem: 'デスクトップ RAM · 待機 CPU 0%',
           benchScroll: 'Canvas 仮想スクロール追従',
-          featTitle: '主な特長',
-          featSub: '開発・データ確認・ログ調査の実務向けに設計しています。',
-          f1Title: '.metatext.jsonc サイドカー連携',
+          featKicker: 'Architecture',
+          featTitle: '実務のデータ確認・ログ調査のために設計。',
+          featSub:
+            '勝手な日付変換も、先頭ゼロ落ちも、独自バイナリへの囲い込みもありません。',
+          f1Title: 'コメント保持 .metatext.jsonc',
           f1Desc:
-            '初回オープンは設定不要の自動列幅フィット。列幅・枠固定・5階層スタイル・ソート順を隣の <code>*.csv.metatext.jsonc</code> に自動記憶します。',
-          f2Title: 'コメント保持 JSONC 更新',
+            '5階層スタイル（テーブル・列・条件ルール・範囲・セル）、列幅、枠固定、非破壊ソート順を Microsoft 製 <code class="inline-code">jsonc-parser</code> で差分パッチ。手書きコメントや整形を壊しません。',
+          f2Title: 'ログ解析フィルタ & Live Tail',
           f2Desc:
-            'Microsoft 製 <code>jsonc-parser</code> により、手書きコメントや整形を壊さず GUI 操作の差分だけを安全にパッチ適用します。',
-          f3Title: 'ログ解析対応フィルタバー',
+            '<code class="inline-code">col:val</code>・<code class="inline-code">OR</code>・<code class="inline-code">-除外</code>・数値比較・<code class="inline-code">/正規表現/</code> に対応。<code class="inline-code">grep -C</code> 前後行、連続重複折りたたみ、集計ファセット、Live Tail を搭載。',
+          f3Title: 'Undo/Redo + Shadow Git 履歴',
           f3Desc:
-            '<code>OR</code>・<code>-除外</code>・<code>列:値</code>・数値比較・<code>/正規表現/</code>・<code>grep -C</code> 前後コンテキスト・連続重複折りたたみ・出現頻度ファセットを搭載。',
-          f4Title: '完全ローカル・プライバシー重視',
+            'メモリ内の即時 Undo/Redo に加え、保存ごとのスナップショットをローカルの <code class="inline-code">.metatext.history/</code> に自動記録。過去の状態をバイト単位で復元できます。',
+          f4Title: '.metatext.zip ポータブル共有',
           f4Desc:
-            '外部サーバー通信やテレメトリーは一切ありません。Web / PWA 版も Web Worker 上でブラウザ内完結処理を行います。',
-          dlTitle: '対応環境・配布方針',
-          dlSub:
-            'ソースコードと仕様は GitHub で OSS（MIT）公開し、コード署名済みの公式デスクトップ版は Microsoft Store / BOOTH で配布予定です（GitHub Releases でのバイナリ配布は行いません）。',
+            '生データ・<code class="inline-code">.metatext.jsonc</code> 装飾・任意の履歴を 1 ファイルにまとめて共有。デスクトップ版・VS Code 版・Web 版のすべてでそのまま開いて編集できます。',
+          f5Title: 'マルチ形式・完全ローカル処理',
+          f5Desc:
+            'UTF-8 / UTF-8 BOM / Shift-JIS・LF/CRLF・区切り文字を自動保持。外部通信もテレメトリーもゼロ。Web 版も Web Worker 上でブラウザ内完結で動作します。',
+          dlKicker: 'Get MetaText Editor',
+          dlTitle: 'いつもの開発環境で、そのまま使える。',
+          dlSub: 'Web・VS Code・デスクトップのすべてで共通のコアエンジンとオープン仕様を採用。',
           statusLive: '公開中',
-          statusSoon: '準備中 (Coming Soon)',
-          pWebTitle: 'Web アプリ / PWA 版',
+          pWebTitle: 'Web アプリ / PWA',
           pWebDesc:
-            'インストール不要。ローカル CSV のブラウザ内読み込み・編集、オフライン PWA、10万行ベンチマークをすぐにお試しいただけます。',
-          pVscodeTitle: 'VS Code / Open VSX 拡張機能',
+            'インストール不要。ローカルの CSV / JSONL / LOG / <code class="inline-code">.metatext.zip</code> をドロップするだけですぐに閲覧・編集。10万行ベンチマークも試せます。',
+          pVscodeTitle: 'VS Code 拡張機能',
           pVscodeDesc:
-            'VS Code・Antigravity・Cursor 内でカスタムエディタとして動作。IDE テーマ同期と <code>.metatext.jsonc</code> スキーマ補完に対応します。',
-          pDesktopTitle: 'デスクトップアプリ (Windows / macOS)',
+            'VS Code・Antigravity・Cursor 内でカスタムエディタとして動作。IDE テーマ同期、<code class="inline-code">.metatext.jsonc</code> スキーマ補完、Shadow Git 履歴に対応。',
+          pDesktopTitle: 'デスクトップアプリ',
           pDesktopDesc:
-            '約 9 MB の軽量 Tauri v2 ネイティブアプリ。爆速起動・ウィンドウ状態復元・隣の <code>.metatext.jsonc</code> 自動読み書きに対応。Microsoft Store / BOOTH で配布予定。',
-          viewSource: 'ソースを見る',
-          buildFromSource: 'ビルド手順を見る',
+            '約 9 MB の軽量 Rust + Tauri v2 ネイティブアプリ。マルチタブ、爆速起動、<code class="inline-code">gix</code> による Shadow Git 履歴、サイドカー自動同期に対応。macOS 版は近日公開予定。',
+          openMarketplace: 'VS Marketplace →',
+          openStore: 'Microsoft Store →',
+          viewSource: 'ソースコード',
           footerApp: 'Web アプリ',
-          footerSpec: '仕様書 (SPEC.md)',
+          footerSpec: 'MetaText 仕様',
           footerPrivacy: 'プライバシーポリシー',
           footerLicense: 'MIT ライセンス',
           footerCopy:
@@ -628,14 +1486,15 @@
         },
       };
 
-      let currentLang = navigator.language && navigator.language.toLowerCase().startsWith('ja') ? 'ja' : 'en';
-      const toggleBtn = document.getElementById('langToggle');
+      let currentLang =
+        navigator.language && navigator.language.toLowerCase().startsWith('ja') ? 'ja' : 'en';
+      const langToggleBtn = document.getElementById('langToggle');
 
       function applyLang(lang) {
         currentLang = lang;
         document.documentElement.lang = lang;
         const dict = i18n[lang];
-        toggleBtn.textContent = dict.toggle;
+        langToggleBtn.textContent = dict.toggle;
         document.querySelectorAll('[data-i18n]').forEach((el) => {
           const key = el.getAttribute('data-i18n');
           if (key && dict[key]) {
@@ -644,8 +1503,36 @@
         });
       }
 
-      toggleBtn.addEventListener('click', () => {
+      langToggleBtn.addEventListener('click', () => {
         applyLang(currentLang === 'ja' ? 'en' : 'ja');
+      });
+
+      // Theme toggle (follows system by default, persists user override)
+      const themeToggleBtn = document.getElementById('themeToggle');
+      const mediaDark = window.matchMedia('(prefers-color-scheme: dark)');
+
+      function getInitialTheme() {
+        try {
+          const saved = localStorage.getItem('metatext-lp-theme');
+          if (saved === 'light' || saved === 'dark') return saved;
+        } catch {}
+        return mediaDark.matches ? 'dark' : 'light';
+      }
+
+      function applyTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        themeToggleBtn.textContent = theme === 'dark' ? '☀' : '☾';
+      }
+
+      let currentTheme = getInitialTheme();
+      applyTheme(currentTheme);
+
+      themeToggleBtn.addEventListener('click', () => {
+        currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        try {
+          localStorage.setItem('metatext-lp-theme', currentTheme);
+        } catch {}
+        applyTheme(currentTheme);
       });
 
       applyLang(currentLang);

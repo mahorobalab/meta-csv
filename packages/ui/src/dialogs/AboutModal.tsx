@@ -182,7 +182,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({
                     border: `1px solid ${border}`,
                   }}
                 >
-                  v0.1.0 · {envLabel}
+                  v1.0.0 · {envLabel}
                 </span>
               </div>
               <div style={{ fontSize: 12, opacity: 0.78, marginTop: 4 }}>

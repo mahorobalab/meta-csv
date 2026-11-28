@@ -1,4 +1,13 @@
 ----------------------------------------
+Site
+----------------------------------------
+    MahorobaLab
+    https://mahorobalab.github.io/metatext-editor/
+
+    Web Playground
+    https://mahorobalab.github.io/metatext-editor/app/
+
+----------------------------------------
 Schema
 ----------------------------------------
 
@@ -12,10 +21,15 @@ Schema
 ----------------------------------------
 Store
 ----------------------------------------
-    Microsoft Store
+    Microsoft Store (MSIX)
         https://apps.microsoft.com/detail/9NSTR10L2L6W 
 
-    Visual Studio Marketplaces
+    Visual Studio Marketplaces (VSIX)
+        https://marketplace.visualstudio.com/
+
+        https://marketplace.visualstudio.com/manage/publishers/mahorobalab
+
+        VS Code Extension 多分これ
         https://marketplace.visualstudio.com/items?itemName=mahorobalab.metatext-editor
 
     BOOTH

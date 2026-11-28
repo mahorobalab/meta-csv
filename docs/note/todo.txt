@@ -2,7 +2,6 @@
 ・アイコン確認
 
 ・アバウト 「ウェブサイト」のリンクが無い
-・リンクの後ろの右上アイコン要らない
     
  ・SchemaStore に登録
     → docs\plan\json.schemastore.org
@@ -14,7 +13,7 @@
     追加
 
 ・Web Playground追加
-    https://mahorobalab.github.io/metatext ←これ削除-editor/
+    https://mahorobalab.github.io/metatext
 
 
 ・概要に関連アプリのリンク
@@ -249,6 +248,7 @@ PLAN
     Info、Setting、Export、ファイルを開く
     青がイマイチ？
 ・Export ダイアログがESCで閉じない
+・リンクの後ろの右上アイコン要らない
 
 
 ----------------------------------------

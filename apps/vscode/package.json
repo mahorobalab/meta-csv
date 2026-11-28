@@ -2,8 +2,14 @@
   "name": "metatext-editor",
   "displayName": "MetaText Editor",
   "description": "%extension.description%",
-  "version": "0.1.0",
-  "publisher": "metatext-editor",
+  "version": "1.0.0",
+  "publisher": "mahorobalab",
+  "license": "MIT",
+  "homepage": "https://mahorobalab.github.io/metatext-editor/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mahorobalab/metatext-editor"
+  },
   "private": true,
   "engines": {
     "vscode": "^1.85.0"

@@ -1,0 +1,163 @@
+======================================================================
+Visual Studio Marketplace 登録メモ（日本語）
+拡張機能名: MetaText Editor
+公開予定 URL:
+https://marketplace.visualstudio.com/items?itemName=mahorobalab.metatext-editor
+======================================================================
+
+※ポイント:
+Visual Studio Marketplace では、拡張機能ページのほとんどの項目
+（タイトル・説明・概要本文・カテゴリ・キーワード・アイコン・各種リンク・更新履歴）は
+アップロードする `.vsix` パッケージ内のファイル
+（`package.json` / `README.md` / `CHANGELOG.md` / `LICENSE`）から自動反映されます。
+Marketplace の Web 管理画面で手入力するのは主に「Publisher（発行元）情報」のみです。
+
+----------------------------------------------------------------------
+1. Publisher プロフィール（https://marketplace.visualstudio.com/manage）
+----------------------------------------------------------------------
+Publisher ID（発行元 ID）:
+mahorobalab
+
+Publisher Name（表示名）:
+MahorobaLab
+
+Description（発行元の紹介文）:
+高速でシンプル、Git フレンドリーな開発者向けツールや構造化テキストユーティリティを制作するインディー開発スタジオです。
+（英語推奨: Independent software studio building fast, clean, Git-friendly developer tools and structured-text utilities.）
+
+Website（Web サイト）:
+https://mahorobalab.github.io/metatext-editor/
+
+Source Code / GitHub:
+https://github.com/mahorobalab
+
+Support / Issues（サポート URL）:
+https://github.com/mahorobalab/metatext-editor/issues
+
+Logo（発行元ロゴ）:
+128x128（または 256x256）の PNG 画像
+
+----------------------------------------------------------------------
+2. 拡張機能メタデータ（apps/vscode/package.json に記載）
+----------------------------------------------------------------------
+publisher:
+mahorobalab
+
+name:
+metatext-editor
+
+displayName（CSV 検索ヒット対策として重要・URL は mahorobalab.metatext-editor のまま維持）:
+MetaText Editor - CSV / TSV / JSONL / Log
+
+version:
+1.0.0
+
+description（200文字以内・検索結果に表示される短い説明 — 冒頭に CSV を配置）:
+10万行以上のCSVを60fpsで快適編集。Git フレンドリーな .metatext.jsonc 装飾・Shadow Git 履歴・.metatext.zip に対応した高速 CSV / TSV / JSONL / ログエディタ。
+（※Marketplace 上の検索は英語 description が強いので、package.json 側は "Fast CSV editor & viewer ..." にし、日本語は package.nls.ja.json でローカライズ）
+
+categories（最大 5 個・VS Code 公式カテゴリから選択）:
+- Visualization
+- Data Science
+- Other
+
+keywords（最大 5 個・Marketplace の検索ヒット用 — CSV 検索重視）:
+- csv
+- csv editor
+- tsv
+- jsonl
+- log
+
+pricing（価格）:
+Free
+
+license:
+MIT
+
+homepage:
+https://mahorobalab.github.io/metatext-editor/
+
+repository:
+https://github.com/mahorobalab/metatext-editor
+
+bugs:
+https://github.com/mahorobalab/metatext-editor/issues
+
+galleryBanner（Marketplace ヘッダー背景色）:
+{
+  "color": "#18181b",
+  "theme": "dark"
+}
+
+icon:
+media/icon.png（128x128 以上の PNG。SVG は Marketplace 非対応のため不可）
+
+----------------------------------------------------------------------
+3. Overview / README.md 案（Marketplace ページ本文に表示）
+----------------------------------------------------------------------
+# MetaText Editor
+
+`.metatext.jsonc` サイドカーメタデータで強化された、VS Code 向けの高速 CSV / TSV / JSONL (NDJSON) / ログ エディタ＆ビューアです。
+
+元のデータファイルを一切汚さず Git フレンドリーな状態を保ったまま、列幅・セル/行スタイル・条件付き書式・表示ソート順・行マーカー・フィルタプリセットなどを隣の `<ファイル名>.metatext.jsonc` に保存します。
+
+## 主な機能
+
+- **10万行以上を 60fps で快適表示**: 大規模な CSV / TSV / JSONL / ログ向けに設計された高速 Canvas グリッド。
+- **元ファイルを汚さない `.metatext.jsonc` サイドカー**: 生データと装飾を完全分離。編集時も JSONC のコメントや書式を保持し、JSON Schema による補完・検証にも対応。
+- **リッチな装飾機能**: 5 層スタイルカスケード（テーブル・列・条件付きルール・範囲・行/セル）、ゼブラ行、数値書式、折り返し表示、メモ付き行マーカー。
+- **強力なフィルタ＆集計**: クエリ検索（`col:val`, `OR`, `-not`, `>100`, `/regex/`）、前後行表示（`grep -C`）、連続重複の折りたたみ、列の集計（ファセット）、プリセット保存。
+- **非破壊ビューソート**: 元ファイルの行順を変えずに、表示上だけ高速ソート。
+- **Live Tail モード**: ログや JSONL ファイルの追記をリアルタイム追跡。
+- **2 層履歴（Undo/Redo + Shadow Git スナップショット）**: メモリ内の即時 Undo/Redo に加え、保存ごとのスナップショットを軽量なローカル Shadow Git（`.metatext.history/`）に記録・復元可能。
+- **ポータブルバンドル（`.metatext.zip`）**: データ・メタデータ・任意の履歴を 1 ファイルにまとめて直接編集・エクスポート可能。
+- **文字コード・改行・区切り文字の保持**: UTF-8 / UTF-8 BOM / Shift-JIS、LF / CRLF、区切り文字を自動判別して保存時に維持。
+- **8 言語対応**: 日本語・英語・簡体字中国語・繁体字中国語・韓国語・ドイツ語・フランス語・スペイン語。
+
+## 対応フォーマット
+
+- `.csv`（CSV）
+- `.tsv`（TSV）
+- `.jsonl` / `.ndjson`（JSON Lines・ネスト自動展開対応）
+- `.log`（IIS W3C・Docker/JSON ログ・カスタム正規表現プリセット対応）
+- `.metatext.zip`（ポータブル MetaText バンドル・既定エディタ）
+
+## リンク
+
+- **MetaText 仕様 & スキーマ**: https://mahorobalab.github.io/metatext-spec/
+- **デスクトップ版（Microsoft Store）**: https://apps.microsoft.com/detail/9NSTR10L2L6W
+- **GitHub リポジトリ**: https://github.com/mahorobalab/metatext-editor
+
+----------------------------------------------------------------------
+4. CHANGELOG.md 案（Changelog タブに表示）
+----------------------------------------------------------------------
+# 更新履歴 (Change Log)
+
+## [1.0.0] - 2026-XX-XX
+
+### 初回リリース
+- CSV / TSV / JSONL (NDJSON) / LOG 向けの高速 Canvas グリッドエディタを実装。
+- コメント保持型 `.metatext.jsonc` サイドカーと JSON Schema 補完に対応。
+- 5 層スタイル・条件付き書式ルール・行マーカー・フィルタ／集計／プリセットを実装。
+- ログ / JSONL 向けの Live Tail パネルを実装。
+- 2 層履歴（インメモリ Undo/Redo + Shadow Git スナップショット）を実装。
+- `.metatext.zip` ポータブルバンドルの直接編集・エクスポートに対応。
+- 8 言語の UI ローカライズに対応。
+
+----------------------------------------------------------------------
+5. パッケージ作成＆公開チェックリスト
+----------------------------------------------------------------------
+1. `apps/vscode/` に以下を配置する:
+   - `README.md`（Marketplace ページの Overview 本文。英語推奨）
+   - `CHANGELOG.md`（Changelog タブ用）
+   - `LICENSE`（MIT ライセンス本文）
+   - `media/icon.png`（128x128 以上の PNG）
+2. `apps/vscode/package.json` に `icon`, `keywords`, `categories`, `galleryBanner`, `bugs` を追記。
+3. 拡張機能と Webview をビルド:
+   pnpm.cmd --filter metatext-editor build
+4. VSIX ファイルを作成:
+   npx @vscode/vsce package
+5. 以下の管理画面から生成された `metatext-editor-1.0.0.vsix` をアップロード:
+   https://marketplace.visualstudio.com/manage/publishers/mahorobalab
+   （「+ New extension」→「Visual Studio Code」）
+   ※CLI から公開する場合は `npx @vscode/vsce publish`

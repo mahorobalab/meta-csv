@@ -38,15 +38,14 @@ const FloatingCard: React.FC<FloatingCardProps> = ({
         background: isDark ? 'rgba(24, 24, 27, 0.86)' : 'rgba(255, 255, 255, 0.9)',
         backdropFilter: 'blur(14px)',
         WebkitBackdropFilter: 'blur(14px)',
-        border: `1px solid ${
-          hovered
-            ? isDark
-              ? 'rgba(255, 255, 255, 0.34)'
-              : 'rgba(15, 23, 42, 0.32)'
-            : isDark
-              ? 'rgba(255, 255, 255, 0.12)'
-              : 'rgba(15, 23, 42, 0.12)'
-        }`,
+        border: `1px solid ${hovered
+          ? isDark
+            ? 'rgba(255, 255, 255, 0.34)'
+            : 'rgba(15, 23, 42, 0.32)'
+          : isDark
+            ? 'rgba(255, 255, 255, 0.12)'
+            : 'rgba(15, 23, 42, 0.12)'
+          }`,
         boxShadow: hovered
           ? isDark
             ? '0 16px 36px rgba(0, 0, 0, 0.52)'
@@ -131,9 +130,10 @@ const LINKS = {
   specHome: 'https://mahorobalab.github.io/metatext-spec/',
   bundleManifestSchema:
     'https://mahorobalab.github.io/metatext-spec/schemas/v0.1/metatext-bundle.schema.json',
-  vscodeExtension: 'https://marketplace.visualstudio.com/', // TODO: Replace with published extension URL
-  microsoftStore: 'https://apps.microsoft.com/', // TODO: Replace with published Microsoft Store URL
-  booth: 'https://booth.pm/', // TODO: Replace with published BOOTH URL
+  vscodeExtension:
+    'https://marketplace.visualstudio.com/items?itemName=mahorobalab.metatext-editor',
+  microsoftStore: 'https://apps.microsoft.com/detail/9NSTR10L2L6W',
+  // booth: 'https://booth.pm/', // TODO: Replace with published BOOTH URL
 } as const;
 
 export const FloatingInfoCards: React.FC<FloatingInfoCardsProps> = ({ isDark }) => {
@@ -273,9 +273,9 @@ export const FloatingInfoCards: React.FC<FloatingInfoCardsProps> = ({ isDark }) 
             <CardLink href={LINKS.microsoftStore} isDark={isDark}>
               Microsoft Store
             </CardLink>
-            <CardLink href={LINKS.booth} isDark={isDark}>
+            {/* <CardLink href={LINKS.booth} isDark={isDark}>
               BOOTH
-            </CardLink>
+            </CardLink> */}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={labelStyle}>Mac</span>
