@@ -1,0 +1,22 @@
+----------------------------------------
+Schema
+----------------------------------------
+
+    MetaText Spec
+    https://mahorobalab.github.io/metatext-spec/
+
+    SchemaStore ★ 要登録 ★
+    https://schemastore.azurewebsites.net/    
+
+
+----------------------------------------
+Store
+----------------------------------------
+    Microsoft Store
+        https://apps.microsoft.com/detail/9NSTR10L2L6W 
+
+    Visual Studio Marketplaces
+        https://marketplace.visualstudio.com/items?itemName=mahorobalab.metatext-editor
+
+    BOOTH
+

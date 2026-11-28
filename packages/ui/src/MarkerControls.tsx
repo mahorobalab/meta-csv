@@ -8,6 +8,7 @@ import {
   X,
 } from 'lucide-react';
 import type { MarkerColor, RowMarker } from '@metatext-editor/schema';
+import type { ToolbarIconSize } from './dialogs/types';
 import { useI18n } from './i18n';
 
 export const MARKER_COLORS: MarkerColor[] = ['amber', 'rose', 'emerald', 'sky', 'violet'];
@@ -68,6 +69,7 @@ export interface MarkerControlsProps {
   onClearAll: () => void;
   getRowPreview: (dataRow: number) => string;
   themeMode: 'light' | 'dark';
+  iconSize?: ToolbarIconSize;
 }
 
 export const MarkerControls: React.FC<MarkerControlsProps> = ({
@@ -90,8 +92,10 @@ export const MarkerControls: React.FC<MarkerControlsProps> = ({
   onClearAll,
   getRowPreview,
   themeMode,
+  iconSize = 'small',
 }) => {
   const { t } = useI18n();
+  const isLarge = iconSize === 'large';
   const [showList, setShowList] = useState(false);
   const [noteDrafts, setNoteDrafts] = useState<Record<number, string>>({});
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -125,16 +129,17 @@ export const MarkerControls: React.FC<MarkerControlsProps> = ({
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 3,
-    padding: '3px 6px',
-    height: 24,
-    fontSize: 12,
+    gap: isLarge ? 5 : 3,
+    padding: isLarge ? '4px 9px' : '3px 6px',
+    height: isLarge ? 32 : 24,
+    fontSize: isLarge ? 13.5 : 12,
     borderRadius: 4,
     border: `1px solid ${border}`,
     background: isDark ? '#2d2d30' : '#ffffff',
     color: fg,
     cursor: 'pointer',
     whiteSpace: 'nowrap',
+    boxSizing: 'border-box',
   };
 
   const selectedColor = selectedMarker
@@ -148,7 +153,7 @@ export const MarkerControls: React.FC<MarkerControlsProps> = ({
         position: 'relative',
         display: 'inline-flex',
         alignItems: 'center',
-        gap: 3,
+        gap: isLarge ? 5 : 3,
       }}
     >
       <button
@@ -169,7 +174,7 @@ export const MarkerControls: React.FC<MarkerControlsProps> = ({
         title={t('marker.toggleTooltip')}
         aria-label={t('marker.toggleAria')}
       >
-        {selectedMarker ? <BookmarkCheck size={14} /> : <Bookmark size={14} />}
+        {selectedMarker ? <BookmarkCheck size={isLarge ? 17 : 14} /> : <Bookmark size={isLarge ? 17 : 14} />}
         <span>{t('marker.label')}</span>
       </button>
 
@@ -178,7 +183,7 @@ export const MarkerControls: React.FC<MarkerControlsProps> = ({
         style={{
           display: 'inline-flex',
           alignItems: 'center',
-          gap: 3,
+          gap: isLarge ? 4 : 3,
           padding: '0 2px',
         }}
         title={t('marker.colorTitle')}
@@ -194,8 +199,8 @@ export const MarkerControls: React.FC<MarkerControlsProps> = ({
               title={t('marker.colorTooltip', { color: pal.label })}
               onClick={() => onActiveColorChange(color)}
               style={{
-                width: 10,
-                height: 10,
+                width: isLarge ? 13 : 10,
+                height: isLarge ? 13 : 10,
                 padding: 0,
                 borderRadius: '50%',
                 border: isCurrent
@@ -211,23 +216,23 @@ export const MarkerControls: React.FC<MarkerControlsProps> = ({
 
       <button
         type="button"
-        style={{ ...iconBtnStyle, padding: '3px 4px', opacity: visibleMarkerCount === 0 ? 0.45 : 1 }}
+        style={{ ...iconBtnStyle, padding: isLarge ? '4px 6px' : '3px 4px', opacity: visibleMarkerCount === 0 ? 0.45 : 1 }}
         disabled={visibleMarkerCount === 0}
         onClick={onJumpPrev}
         title={t('marker.prevTooltip')}
         aria-label={t('marker.prevAria')}
       >
-        <ChevronUp size={14} />
+        <ChevronUp size={isLarge ? 17 : 14} />
       </button>
       <button
         type="button"
-        style={{ ...iconBtnStyle, padding: '3px 4px', opacity: visibleMarkerCount === 0 ? 0.45 : 1 }}
+        style={{ ...iconBtnStyle, padding: isLarge ? '4px 6px' : '3px 4px', opacity: visibleMarkerCount === 0 ? 0.45 : 1 }}
         disabled={visibleMarkerCount === 0}
         onClick={onJumpNext}
         title={t('marker.nextTooltip')}
         aria-label={t('marker.nextAria')}
       >
-        <ChevronDown size={14} />
+        <ChevronDown size={isLarge ? 17 : 14} />
       </button>
 
       <button
@@ -243,7 +248,7 @@ export const MarkerControls: React.FC<MarkerControlsProps> = ({
         onClick={() => onOnlyMarkedChange(!onlyMarked)}
         title={t('marker.onlyTooltip')}
       >
-        <Bookmark size={12} color={onlyMarked ? '#f59e0b' : undefined} fill={onlyMarked ? '#f59e0b' : 'none'} />
+        <Bookmark size={isLarge ? 15 : 12} color={onlyMarked ? '#f59e0b' : undefined} fill={onlyMarked ? '#f59e0b' : 'none'} />
         <span>{t('marker.only')}</span>
       </button>
 
@@ -257,7 +262,7 @@ export const MarkerControls: React.FC<MarkerControlsProps> = ({
         title={t('marker.openListTooltip')}
       >
         <span>{markers.length}</span>
-        <ChevronDown size={12} />
+        <ChevronDown size={isLarge ? 15 : 12} />
       </button>
 
       {showList && (

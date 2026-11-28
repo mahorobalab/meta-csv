@@ -916,19 +916,23 @@ export const MetaTextEditor = React.forwardRef<MetaTextEditorHandle, MetaTextEdi
   const toolbarBg = isDark ? '#252526' : '#f8fafc';
   const toolbarBorder = isDark ? '#3c3c3c' : '#e2e8f0';
   const toolbarFg = isDark ? '#e2e8f0' : '#0f172a';
+  const toolbarIconSize =
+    appSettings?.toolbarIconSize ?? (hostMode === 'desktop' ? 'large' : 'small');
+  const isLargeToolbar = toolbarIconSize === 'large';
   const btnStyle: React.CSSProperties = {
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
-    padding: '3px 7px',
-    height: 26,
-    fontSize: 12,
+    gap: isLargeToolbar ? 5 : 4,
+    padding: isLargeToolbar ? '4px 10px' : '3px 7px',
+    height: isLargeToolbar ? 32 : 26,
+    fontSize: isLargeToolbar ? 13.5 : 12,
     borderRadius: 4,
     border: `1px solid ${toolbarBorder}`,
     background: isDark ? '#333333' : '#ffffff',
     color: toolbarFg,
     cursor: 'pointer',
+    boxSizing: 'border-box',
   };
 
   const menuItemStyle: React.CSSProperties = {
@@ -964,7 +968,7 @@ export const MetaTextEditor = React.forwardRef<MetaTextEditorHandle, MetaTextEdi
       <EditorToolbar
         toolbarRef={toolbarRef}
         hostMode={hostMode}
-        iconSize={appSettings?.toolbarIconSize ?? (hostMode === 'desktop' ? 'large' : 'small')}
+        iconSize={toolbarIconSize}
         themeMode={themeMode}
         isDark={isDark}
         toolbarBg={toolbarBg}
@@ -1117,6 +1121,7 @@ export const MetaTextEditor = React.forwardRef<MetaTextEditorHandle, MetaTextEdi
             setCollapseColKey(preset.collapseColumn ?? '');
           }}
           themeMode={themeMode}
+          iconSize={toolbarIconSize}
         />
       )}
 

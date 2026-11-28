@@ -116,18 +116,19 @@ export interface EditorToolbarProps {
 
 export const EditorToolbar: React.FC<EditorToolbarProps> = (p) => {
   const { t } = useI18n();
+  const isLarge = p.iconSize === 'large';
   return (
   <div
     ref={p.toolbarRef}
     style={{
       display: 'flex',
       alignItems: 'center',
-      gap: 6,
-      padding: '5px 10px',
+      gap: isLarge ? 7 : 6,
+      padding: isLarge ? '6px 10px' : '5px 10px',
       background: p.toolbarBg,
       borderBottom: `1px solid ${p.toolbarBorder}`,
       color: p.toolbarFg,
-      fontSize: 12,
+      fontSize: isLarge ? 13.5 : 12,
       flexWrap: 'wrap',
       position: 'relative',
     }}
@@ -145,7 +146,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = (p) => {
           title={t('toolbar.fileAndEditMenu')}
           onClick={() => p.setOpenMenu((m) => (m === 'file' ? 'none' : 'file'))}
         >
-          <Menu size={p.iconSize === 'large' ? 23 : 15} />
+          <Menu size={isLarge ? 21 : 15} />
         </ToolbarIconButton>
         {p.onOpenFile && (
           <ToolbarIconButton
@@ -157,7 +158,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = (p) => {
             title={t('toolbar.openFileEllipsis')}
             onClick={p.onOpenFile}
           >
-            <FolderOpen size={p.iconSize === 'large' ? 22 : 14} />
+            <FolderOpen size={isLarge ? 20 : 14} />
           </ToolbarIconButton>
         )}
       </>
@@ -173,7 +174,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = (p) => {
       }}
       onClick={() => p.setOpenMenu((m) => (m === 'edit' ? 'none' : 'edit'))}
     >
-      <Palette size={13} />
+      <Palette size={isLarge ? 17 : 13} />
       <span>{t('common.style')}</span>
     </button>
 
@@ -201,6 +202,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = (p) => {
           onClearAll={p.onClearAllMarkers}
           getRowPreview={p.getRowPreview}
           themeMode={p.themeMode}
+          iconSize={p.iconSize}
         />
         <span style={{ opacity: 0.35 }}>|</span>
       </>
@@ -211,6 +213,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = (p) => {
       toolbarBorder={p.toolbarBorder}
       toolbarFg={p.toolbarFg}
       btnStyle={p.btnStyle}
+      iconSize={p.iconSize}
       searchQuery={p.searchQuery}
       onSearchQueryChange={p.onSearchQueryChange}
       matchCount={p.matchCount}

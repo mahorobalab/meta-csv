@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import type { FilterPreset } from '@metatext-editor/schema';
 import { computeColumnFacets } from '@metatext-editor/core';
+import type { ToolbarIconSize } from './dialogs/types';
 import { useInputHistory } from './useInputHistory';
 import { useI18n } from './i18n';
 
@@ -38,6 +39,7 @@ export interface FilterBarProps {
   onApplyPreset: (preset: FilterPreset) => void;
   extraControls?: React.ReactNode;
   themeMode: 'light' | 'dark';
+  iconSize?: ToolbarIconSize;
 }
 
 export const FilterBar: React.FC<FilterBarProps> = ({
@@ -60,8 +62,10 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   onApplyPreset,
   extraControls,
   themeMode,
+  iconSize = 'small',
 }) => {
   const { t } = useI18n();
+  const isLarge = iconSize === 'large';
   const [showFacets, setShowFacets] = useState(false);
   const [facetColIdx, setFacetColIdx] = useState<number>(0);
   const [showPresets, setShowPresets] = useState(false);
@@ -86,14 +90,16 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   const inputBg = isDark ? '#141416' : '#ffffff';
 
   const btnStyle: React.CSSProperties = {
-    padding: '3px 8px',
-    fontSize: 12,
+    padding: isLarge ? '4px 10px' : '3px 8px',
+    height: isLarge ? 32 : 26,
+    fontSize: isLarge ? 13.5 : 12,
     borderRadius: 4,
     border: `1px solid ${border}`,
     background: isDark ? '#2d2d30' : '#ffffff',
     color: fg,
     cursor: 'pointer',
     whiteSpace: 'nowrap',
+    boxSizing: 'border-box',
   };
 
   const facetData = useMemo(() => {
@@ -124,12 +130,12 @@ export const FilterBar: React.FC<FilterBarProps> = ({
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: 6,
-        padding: '5px 10px',
+        gap: isLarge ? 8 : 6,
+        padding: isLarge ? '6px 10px' : '5px 10px',
         background: bg,
         borderBottom: `1px solid ${border}`,
         color: fg,
-        fontSize: 12,
+        fontSize: isLarge ? 13.5 : 12,
         flexWrap: 'wrap',
         position: 'relative',
       }}
@@ -138,12 +144,12 @@ export const FilterBar: React.FC<FilterBarProps> = ({
         style={{
           display: 'inline-flex',
           alignItems: 'center',
-          gap: 4,
+          gap: isLarge ? 5 : 4,
           fontWeight: 600,
           opacity: 0.85,
         }}
       >
-        <Filter size={13} />
+        <Filter size={isLarge ? 16 : 13} />
         <span>{t('filter.label')}</span>
       </span>
 
@@ -154,7 +160,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           alignItems: 'center',
           flex: '1 1 200px',
           minWidth: 160,
-          maxWidth: 360,
+          maxWidth: isLarge ? 420 : 360,
         }}
       >
         <input
@@ -183,13 +189,15 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           placeholder="status:blocked OR status:review -owner:suzuki amount:>50000"
           style={{
             width: '100%',
-            padding: '4px 44px 4px 8px',
-            fontSize: 12,
+            height: isLarge ? 32 : 26,
+            padding: isLarge ? '4px 48px 4px 10px' : '4px 44px 4px 8px',
+            fontSize: isLarge ? 13.5 : 12,
             fontFamily: "'Consolas', 'Courier New', monospace",
             borderRadius: 4,
             border: `1px solid ${filterError ? '#ef4444' : border}`,
             background: inputBg,
             color: fg,
+            boxSizing: 'border-box',
           }}
         />
         {query.length > 0 && (
@@ -199,7 +207,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
             onClick={() => onQueryChange('')}
             style={{
               position: 'absolute',
-              right: 22,
+              right: isLarge ? 25 : 22,
               border: 'none',
               background: 'transparent',
               color: fg,
@@ -209,7 +217,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               padding: 2,
             }}
           >
-            <X size={13} />
+            <X size={isLarge ? 15 : 13} />
           </button>
         )}
         <button
@@ -222,7 +230,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           }}
           style={{
             position: 'absolute',
-            right: 3,
+            right: isLarge ? 4 : 3,
             border: 'none',
             background: 'transparent',
             color: fg,
@@ -232,7 +240,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
             padding: 3,
           }}
         >
-          <ChevronDown size={12} />
+          <ChevronDown size={isLarge ? 15 : 12} />
         </button>
 
         {showHistory && (filteredHistory.length > 0 || query.trim().length === 0) && (
@@ -331,7 +339,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
 
       {/* grep -C context rows */}
       <label
-        style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+        style={{ display: 'inline-flex', alignItems: 'center', gap: isLarge ? 5 : 4 }}
         title={t('filter.contextTooltip')}
       >
         <span style={{ opacity: 0.8 }}>{t('filter.contextLabel')}</span>
@@ -344,35 +352,39 @@ export const FilterBar: React.FC<FilterBarProps> = ({
             onContextRowsChange(Math.max(0, Math.min(50, Number(e.target.value) || 0)))
           }
           style={{
-            width: 44,
-            padding: '2px 4px',
-            fontSize: 12,
+            width: isLarge ? 52 : 44,
+            height: isLarge ? 32 : 26,
+            padding: isLarge ? '3px 6px' : '2px 4px',
+            fontSize: isLarge ? 13.5 : 12,
             borderRadius: 4,
             border: `1px solid ${border}`,
             background: inputBg,
             color: fg,
+            boxSizing: 'border-box',
           }}
         />
       </label>
 
       {/* Consecutive duplicate collapse */}
       <label
-        style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+        style={{ display: 'inline-flex', alignItems: 'center', gap: isLarge ? 5 : 4 }}
         title={t('filter.collapseTooltip')}
       >
-        <Layers size={13} style={{ opacity: 0.8 }} />
+        <Layers size={isLarge ? 16 : 13} style={{ opacity: 0.8 }} />
         <select
           aria-label={t('filter.collapseAria')}
           value={collapseColKey}
           onChange={(e) => onCollapseColKeyChange(e.target.value)}
           style={{
-            padding: '3px 6px',
-            fontSize: 12,
+            height: isLarge ? 32 : 26,
+            padding: isLarge ? '3px 8px' : '3px 6px',
+            fontSize: isLarge ? 13.5 : 12,
             borderRadius: 4,
             border: `1px solid ${border}`,
             background: inputBg,
             color: fg,
-            maxWidth: 130,
+            maxWidth: isLarge ? 155 : 130,
+            boxSizing: 'border-box',
           }}
         >
           <option value="">{t('filter.collapseOff')}</option>
@@ -391,7 +403,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           ...btnStyle,
           display: 'inline-flex',
           alignItems: 'center',
-          gap: 4,
+          gap: isLarge ? 5 : 4,
           borderColor: showFacets ? '#3b82f6' : border,
         }}
         onClick={() => {
@@ -399,7 +411,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           setShowPresets(false);
         }}
       >
-        <BarChart2 size={13} />
+        <BarChart2 size={isLarge ? 16 : 13} />
         <span>{t('filter.facets')}</span>
       </button>
 
@@ -410,7 +422,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           ...btnStyle,
           display: 'inline-flex',
           alignItems: 'center',
-          gap: 4,
+          gap: isLarge ? 5 : 4,
           borderColor: showPresets ? '#3b82f6' : border,
         }}
         onClick={() => {
@@ -418,7 +430,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           setShowFacets(false);
         }}
       >
-        <BookmarkPlus size={13} />
+        <BookmarkPlus size={isLarge ? 16 : 13} />
         <span>{t('filter.presets', { count: presets.length })}</span>
       </button>
 
@@ -430,7 +442,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
       )}
 
       {/* Result stats / error */}
-      <div style={{ marginLeft: 'auto', fontSize: 11, opacity: 0.8 }}>
+      <div style={{ marginLeft: 'auto', fontSize: isLarge ? 12 : 11, opacity: 0.8 }}>
         {filterError ? (
           <span style={{ color: '#ef4444' }}>{filterError}</span>
         ) : isFiltering ? (

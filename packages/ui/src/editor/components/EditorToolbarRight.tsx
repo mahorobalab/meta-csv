@@ -61,8 +61,9 @@ export const EditorToolbarRight: React.FC<EditorToolbarRightProps> = ({
   onOpenAbout,
 }) => {
   const { t } = useI18n();
-  const basePx = iconSize === 'large' ? 22 : 14;
-  const tailPx = iconSize === 'large' ? 23 : 15;
+  const isLarge = iconSize === 'large';
+  const basePx = isLarge ? 20 : 14;
+  const tailPx = isLarge ? 21 : 15;
   const fgColor = typeof btnStyle.color === 'string' ? btnStyle.color : undefined;
   return (
   <div
@@ -82,7 +83,7 @@ export const EditorToolbarRight: React.FC<EditorToolbarRightProps> = ({
         aria-label={isReadOnly ? t('toolbar.readOnlyAria') : t('toolbar.unlockedAria')}
         style={{
           ...btnStyle,
-          padding: '3px 8px',
+          padding: isLarge ? '4px 10px' : '3px 8px',
           borderColor: isReadOnly
             ? '#f59e0b'
             : openMenu === 'unlock'
@@ -112,7 +113,7 @@ export const EditorToolbarRight: React.FC<EditorToolbarRightProps> = ({
           }
         }}
       >
-        {isReadOnly ? <Lock size={12} /> : <Unlock size={12} />}
+        {isReadOnly ? <Lock size={isLarge ? 15 : 12} /> : <Unlock size={isLarge ? 15 : 12} />}
         <span>{isReadOnly ? t('toolbar.readOnly') : t('toolbar.unlocked')}</span>
       </button>
     )}

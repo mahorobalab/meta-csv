@@ -1,14 +1,20 @@
 
-・Largeアイコン 1.6倍は大きすぎ？ 1.4倍で確認
+    
 
 ・概要に関連アプリのリンク
 
-・ダイアログがダサい
+・ダイアログがダサい 
+    Info、Setting、Export、ファイルを開く
+    青がイマイチ？
+
+・Export ダイアログがESCで閉じない
+
+・Versionを1.0.0 にする
 
 ・Web版のカードのURL 確定
-    ・アマゾンアソシエイトも？
+    ・アマゾンアソシエイトも？ X 審査だるい
+        → 忍者AdMax 検討
 
-・MS Storeの名前予約
 
 ・デスクトップ版のメリット洗い出す
     メモリー節約
@@ -24,6 +30,10 @@
     https://mahorobalab.github.io/metatext-editor/app/
     追加
 
+・アイコン確認
+
+・ヘルプ作成
+    MH-Portalの方で作業
 ・リリース
     ・VS Code マーケットプレイス、 MS Store, BOOTH版
     MSIX
@@ -229,6 +239,10 @@ PLAN
     ・Desktop App
         Windows Microsoft Store BOOTH
         Mac Coming soon...
+
+・MS Storeの名前予約 → MetaText Editor
+・Largeアイコン 1.6倍は大きすぎ？ 1.4倍で確認
+
 
 ----------------------------------------
 Gemin talk

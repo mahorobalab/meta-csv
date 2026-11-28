@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp, Search, X } from 'lucide-react';
+import type { ToolbarIconSize } from '../../dialogs/types';
 import { useI18n } from '../../i18n';
 
 export interface EditorSearchBoxProps {
@@ -7,6 +8,7 @@ export interface EditorSearchBoxProps {
   toolbarBorder: string;
   toolbarFg: string;
   btnStyle: React.CSSProperties;
+  iconSize?: ToolbarIconSize;
   searchQuery: string;
   onSearchQueryChange: (q: string) => void;
   matchCount: number;
@@ -24,6 +26,7 @@ export const EditorSearchBox: React.FC<EditorSearchBoxProps> = ({
   toolbarBorder,
   toolbarFg,
   btnStyle,
+  iconSize = 'small',
   searchQuery,
   onSearchQueryChange,
   matchCount,
@@ -36,6 +39,7 @@ export const EditorSearchBox: React.FC<EditorSearchBoxProps> = ({
   onClearHistory,
 }) => {
   const { t } = useI18n();
+  const isLarge = iconSize === 'large';
   const [showHistory, setShowHistory] = useState(false);
 
   const filteredHistory = useMemo(() => {
@@ -48,10 +52,10 @@ export const EditorSearchBox: React.FC<EditorSearchBoxProps> = ({
     <>
       <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
         <Search
-          size={13}
+          size={isLarge ? 16 : 13}
           style={{
             position: 'absolute',
-            left: 7,
+            left: isLarge ? 9 : 7,
             opacity: 0.55,
             pointerEvents: 'none',
           }}
@@ -80,14 +84,14 @@ export const EditorSearchBox: React.FC<EditorSearchBoxProps> = ({
           }}
           placeholder={t('search.placeholder')}
           style={{
-            padding: '3px 38px 3px 24px',
-            height: 26,
-            fontSize: 12,
+            padding: isLarge ? '4px 44px 4px 30px' : '3px 38px 3px 24px',
+            height: isLarge ? 32 : 26,
+            fontSize: isLarge ? 13.5 : 12,
             borderRadius: 4,
             border: `1px solid ${toolbarBorder}`,
             background: isDark ? '#1e1e1e' : '#ffffff',
             color: toolbarFg,
-            width: 165,
+            width: isLarge ? 195 : 165,
             boxSizing: 'border-box',
           }}
         />
@@ -98,7 +102,7 @@ export const EditorSearchBox: React.FC<EditorSearchBoxProps> = ({
             onClick={() => onSearchQueryChange('')}
             style={{
               position: 'absolute',
-              right: 19,
+              right: isLarge ? 23 : 19,
               border: 'none',
               background: 'transparent',
               color: toolbarFg,
@@ -108,7 +112,7 @@ export const EditorSearchBox: React.FC<EditorSearchBoxProps> = ({
               padding: 2,
             }}
           >
-            <X size={12} />
+            <X size={isLarge ? 15 : 12} />
           </button>
         )}
         <button
@@ -117,7 +121,7 @@ export const EditorSearchBox: React.FC<EditorSearchBoxProps> = ({
           onClick={() => setShowHistory((s) => !s)}
           style={{
             position: 'absolute',
-            right: 2,
+            right: isLarge ? 3 : 2,
             border: 'none',
             background: 'transparent',
             color: toolbarFg,
@@ -127,7 +131,7 @@ export const EditorSearchBox: React.FC<EditorSearchBoxProps> = ({
             padding: 3,
           }}
         >
-          <ChevronDown size={11} />
+          <ChevronDown size={isLarge ? 14 : 11} />
         </button>
 
         {showHistory && (filteredHistory.length > 0 || searchQuery.trim().length === 0) && (
@@ -231,26 +235,26 @@ export const EditorSearchBox: React.FC<EditorSearchBoxProps> = ({
       </div>
       {searchQuery.trim() && (
         <>
-          <span style={{ fontSize: 11, opacity: 0.85 }}>
+          <span style={{ fontSize: isLarge ? 12.5 : 11, opacity: 0.85 }}>
             {matchCount > 0 ? `${activeMatchIdx + 1}/${matchCount}` : '0'}
           </span>
           <button
             type="button"
-            style={{ ...btnStyle, padding: '3px 4px' }}
+            style={{ ...btnStyle, padding: isLarge ? '4px 6px' : '3px 4px' }}
             disabled={matchCount === 0}
             onClick={onPrevMatch}
             title={t('search.prevMatch')}
           >
-            <ChevronUp size={13} />
+            <ChevronUp size={isLarge ? 16 : 13} />
           </button>
           <button
             type="button"
-            style={{ ...btnStyle, padding: '3px 4px' }}
+            style={{ ...btnStyle, padding: isLarge ? '4px 6px' : '3px 4px' }}
             disabled={matchCount === 0}
             onClick={onNextMatch}
             title={t('search.nextMatch')}
           >
-            <ChevronDown size={13} />
+            <ChevronDown size={isLarge ? 16 : 13} />
           </button>
         </>
       )}

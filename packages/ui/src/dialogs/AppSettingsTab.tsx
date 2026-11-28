@@ -80,7 +80,7 @@ export const AppSettingsTab: React.FC<AppSettingsTabProps> = ({
       )}
 
       <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-        <span>Icon Size</span>
+        <span>{t('appSettings.iconSize')}</span>
         <select
           value={appSettings.toolbarIconSize ?? (hostMode === 'desktop' ? 'large' : 'small')}
           onChange={(e) =>
@@ -90,8 +90,8 @@ export const AppSettingsTab: React.FC<AppSettingsTabProps> = ({
           }
           style={inputStyle}
         >
-          <option value="small">Small</option>
-          <option value="large">Large</option>
+          <option value="small">{t('appSettings.iconSizeSmall')}</option>
+          <option value="large">{t('appSettings.iconSizeLarge')}</option>
         </select>
       </label>
 
@@ -258,7 +258,7 @@ export const AppSettingsTab: React.FC<AppSettingsTabProps> = ({
             fontWeight: 600,
           }}
         >
-          <span>Save History (Shadow Git)</span>
+          <span>{t('appSettings.historyEnabled')}</span>
           <input
             type="checkbox"
             checked={appSettings.historyEnabled !== false}
@@ -269,7 +269,7 @@ export const AppSettingsTab: React.FC<AppSettingsTabProps> = ({
         {appSettings.historyEnabled !== false && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingLeft: 8 }}>
             <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-              <span style={{ opacity: 0.85 }}>Retention mode</span>
+              <span style={{ opacity: 0.85 }}>{t('appSettings.historyRetentionMode')}</span>
               <select
                 value={appSettings.historyRetentionMode ?? 'count'}
                 onChange={(e) =>
@@ -279,14 +279,14 @@ export const AppSettingsTab: React.FC<AppSettingsTabProps> = ({
                 }
                 style={inputStyle}
               >
-                <option value="count">Keep last N saves</option>
-                <option value="sizeMb">Limit total size (MB)</option>
+                <option value="count">{t('appSettings.historyRetentionCount')}</option>
+                <option value="sizeMb">{t('appSettings.historyRetentionSize')}</option>
               </select>
             </label>
 
             {(appSettings.historyRetentionMode ?? 'count') === 'count' ? (
               <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-                <span style={{ opacity: 0.85 }}>Max snapshots</span>
+                <span style={{ opacity: 0.85 }}>{t('appSettings.historyMaxCount')}</span>
                 <input
                   type="number"
                   min={1}
@@ -302,7 +302,7 @@ export const AppSettingsTab: React.FC<AppSettingsTabProps> = ({
               </label>
             ) : (
               <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-                <span style={{ opacity: 0.85 }}>Max history size (MB)</span>
+                <span style={{ opacity: 0.85 }}>{t('appSettings.historyMaxTotalSizeMb')}</span>
                 <input
                   type="number"
                   min={1}
@@ -322,7 +322,7 @@ export const AppSettingsTab: React.FC<AppSettingsTabProps> = ({
             )}
 
             <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-              <span style={{ opacity: 0.85 }}>Skip data body above (MB)</span>
+              <span style={{ opacity: 0.85 }}>{t('appSettings.historyMaxDataFileSizeMb')}</span>
               <input
                 type="number"
                 min={0}

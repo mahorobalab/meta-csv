@@ -60,7 +60,10 @@ export const ToolbarIconButton: React.FC<ToolbarIconButtonProps> = ({
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: iconSize === 'large' ? '4px 6px' : '3px 6px',
+        height: iconSize === 'large' ? 32 : 26,
+        minWidth: iconSize === 'large' ? 32 : 26,
+        padding: iconSize === 'large' ? '0 6px' : '0 5px',
+        boxSizing: 'border-box',
         borderRadius: 5,
         border: active
           ? `1px solid ${accentStyle.border}`
