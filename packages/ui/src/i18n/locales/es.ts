@@ -240,7 +240,7 @@ export const es: Messages = {
   'settings.title': 'Configuración',
   'settings.ariaLabel': 'Configuración de MetaText Editor',
   'settings.closeAria': 'Cerrar configuración',
-  'settings.tabFile': 'Archivo (.metatext.jsonc)',
+  'settings.tabFile': 'Archivo',
   'settings.tabApp': 'Aplicación',
   'settings.vscodeSettings': 'Configuración de VS Code',
 
@@ -386,4 +386,18 @@ export const es: Messages = {
   'web.backToHome': 'Volver al inicio de MetaText Editor',
   'web.saveAsPrompt': 'Guardar archivo como:',
   'web.liveMetaHeader': '.metatext.jsonc en vivo (arrastra columnas / clic encabezado / marcadores)',
+
+  // Export Bundle Modal
+  'export.title': 'Exportar como .metatext.zip',
+  'export.packageArchive': 'Archivo de paquete',
+  'export.unsavedWarning':
+    'Hay cambios sin guardar. La exportación empaqueta el último archivo guardado en disco (pulsa Ctrl+S primero).',
+  'export.required': 'obligatorio',
+  'export.includeHistory': 'Incluir history/ ({size})',
+  'export.none': 'ninguno',
+  'export.includeHistoryDesc':
+    'Desactivado por defecto para evitar compartir ediciones intermedias o notas por accidente.',
+  'export.rawTotal': 'Total sin comprimir: ~{size}',
+  'export.exportBtn': 'Exportar',
+  'export.exportingBtn': 'Exportando...',
 };

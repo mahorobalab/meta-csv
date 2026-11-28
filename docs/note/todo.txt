@@ -1,26 +1,9 @@
 
+・アイコン確認
+
+・アバウト 「ウェブサイト」のリンクが無い
+・リンクの後ろの右上アイコン要らない
     
-
-・概要に関連アプリのリンク
-
-・ダイアログがダサい 
-    Info、Setting、Export、ファイルを開く
-    青がイマイチ？
-
-・Export ダイアログがESCで閉じない
-
-・Versionを1.0.0 にする
-
-・Web版のカードのURL 確定
-    ・アマゾンアソシエイトも？ X 審査だるい
-        → 忍者AdMax 検討
-
-
-・デスクトップ版のメリット洗い出す
-    メモリー節約
-
-・アプリ設定 日本語化されてない部分がある
-
  ・SchemaStore に登録
     → docs\plan\json.schemastore.org
     json.schemastore.org
@@ -30,13 +13,32 @@
     https://mahorobalab.github.io/metatext-editor/app/
     追加
 
-・アイコン確認
+・Web Playground追加
+    https://mahorobalab.github.io/metatext ←これ削除-editor/
+
+
+・概要に関連アプリのリンク
+
+
+・Versionを1.0.0 にする Infoダイアログ二表示されてる
+    v0.1.0 · デスクトップアプリ (Tauri)
+
+・Web版のカードのURL 確定
+    ・アマゾンアソシエイトも？ X 審査だるい
+        → 忍者AdMax 検討
+
+・デスクトップ版のメリット洗い出す
+    メモリー節約
+
+
+
 
 ・ヘルプ作成
     MH-Portalの方で作業
 ・リリース
-    ・VS Code マーケットプレイス、 MS Store, BOOTH版
-    MSIX
+    VSIX (Visual Studio Marketplace
+        ・VS Code マーケットプレイス、 MS Store, BOOTH版
+    MSIX (Microsoft Store)
         npm install @microsoft/winappcli --save-dev
         ・VS Marketplaces CSV,TSV,Log,jsonl ヒットするよう調整
 ・ビルド
@@ -242,6 +244,11 @@ PLAN
 
 ・MS Storeの名前予約 → MetaText Editor
 ・Largeアイコン 1.6倍は大きすぎ？ 1.4倍で確認
+・アプリ設定 日本語化されてない部分がある
+・ダイアログがダサい 
+    Info、Setting、Export、ファイルを開く
+    青がイマイチ？
+・Export ダイアログがESCで閉じない
 
 
 ----------------------------------------

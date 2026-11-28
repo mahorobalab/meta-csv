@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, Code2, ExternalLink, FileSpreadsheet } from 'lucide-react';
 import { isMetaTextZipFileName } from '@metatext-editor/core';
 import {
+  DialogSwitchRow,
   I18nProvider,
   MetaTextEditor,
   createNewFileTemplate,
@@ -349,22 +350,11 @@ export const App: React.FC = () => {
   );
 
   const settingsExtraSection = (
-    <label
-      style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        gap: 12,
-        cursor: 'pointer',
-      }}
-    >
-      <span>{t('desktop.showLiveMetaPanel')}</span>
-      <input
-        type="checkbox"
-        checked={showMetaPanel}
-        onChange={(e) => setRightPanel(e.target.checked ? 'meta' : 'none')}
-      />
-    </label>
+    <DialogSwitchRow
+      label={t('desktop.showLiveMetaPanel')}
+      checked={showMetaPanel}
+      onCheckedChange={(checked) => setRightPanel(checked ? 'meta' : 'none')}
+    />
   );
 
   return (

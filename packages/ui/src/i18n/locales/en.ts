@@ -237,8 +237,8 @@ export const en = {
   'settings.title': 'Settings',
   'settings.ariaLabel': 'MetaText Editor Settings',
   'settings.closeAria': 'Close settings',
-  'settings.tabFile': 'File (.metatext.jsonc)',
-  'settings.tabApp': 'App Settings',
+  'settings.tabFile': 'File',
+  'settings.tabApp': 'App',
   'settings.vscodeSettings': 'VS Code Settings',
 
   // App Settings Tab
@@ -383,6 +383,20 @@ export const en = {
   'web.backToHome': 'Back to MetaText Editor Home',
   'web.saveAsPrompt': 'Save As file name:',
   'web.liveMetaHeader': 'Live .metatext.jsonc (drag columns / click header / add markers)',
+
+  // Export Bundle Modal
+  'export.title': 'Export as .metatext.zip',
+  'export.packageArchive': 'Package archive',
+  'export.unsavedWarning':
+    'Unsaved changes exist. Export packages the latest saved file on disk (press Ctrl+S first to include recent edits).',
+  'export.required': 'required',
+  'export.includeHistory': 'Include history/ ({size})',
+  'export.none': 'none',
+  'export.includeHistoryDesc':
+    'Default OFF to avoid accidentally sharing intermediate edits or notes.',
+  'export.rawTotal': 'Raw total: ~{size}',
+  'export.exportBtn': 'Export',
+  'export.exportingBtn': 'Exporting...',
 } as const;
 
 export type MessageKey = keyof typeof en;

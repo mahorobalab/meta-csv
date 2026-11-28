@@ -18,6 +18,8 @@
     "@glideapps/glide-data-grid": "^6.0.3",
     "@metatext-editor/core": "workspace:*",
     "@metatext-editor/schema": "workspace:*",
+    "@radix-ui/react-dialog": "^1.3.1",
+    "@radix-ui/react-switch": "^1.4.1",
     "lodash": "^4.17.21",
     "lucide-react": "^1.79.0",
     "marked": "^15.0.7"

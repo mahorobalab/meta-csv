@@ -240,8 +240,8 @@ export const de: Messages = {
   'settings.title': 'Einstellungen',
   'settings.ariaLabel': 'MetaText Editor Einstellungen',
   'settings.closeAria': 'Einstellungen schließen',
-  'settings.tabFile': 'Datei (.metatext.jsonc)',
-  'settings.tabApp': 'App-Einstellungen',
+  'settings.tabFile': 'Datei',
+  'settings.tabApp': 'App',
   'settings.vscodeSettings': 'VS Code-Einstellungen',
 
   // App Settings Tab
@@ -386,4 +386,18 @@ export const de: Messages = {
   'web.backToHome': 'Zurück zur MetaText Editor-Startseite',
   'web.saveAsPrompt': 'Dateiname zum Speichern:',
   'web.liveMetaHeader': 'Live-.metatext.jsonc (Spalten ziehen / Kopfzeile klicken / Marker setzen)',
+
+  // Export Bundle Modal
+  'export.title': 'Als .metatext.zip exportieren',
+  'export.packageArchive': 'Paketarchiv',
+  'export.unsavedWarning':
+    'Es gibt ungespeicherte Änderungen. Der Export verpackt die zuletzt gespeicherte Datei (drücken Sie zuerst Strg+S).',
+  'export.required': 'erforderlich',
+  'export.includeHistory': 'history/ einschließen ({size})',
+  'export.none': 'keine',
+  'export.includeHistoryDesc':
+    'Standardmäßig AUS, um Zwischenstände oder Notizen nicht versehentlich zu teilen.',
+  'export.rawTotal': 'Rohgröße gesamt: ~{size}',
+  'export.exportBtn': 'Exportieren',
+  'export.exportingBtn': 'Exportiere...',
 };

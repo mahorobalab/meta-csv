@@ -3,6 +3,7 @@ import type { JsonlArrayMode } from '@metatext-editor/schema';
 import { LOG_PRESETS, previewLogPattern } from '@metatext-editor/core';
 import { useI18n } from '../i18n';
 import type { EditorAppSettings, FileLayoutSettingsProps } from './types';
+import { DialogButton, DialogSwitchRow, ToggleSwitch } from './ui/DialogPrimitives';
 
 export interface FileSettingsTabProps {
   open: boolean;
@@ -81,22 +82,11 @@ export const FileSettingsTab: React.FC<FileSettingsTabProps> = ({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
-      <label
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: 12,
-          cursor: 'pointer',
-        }}
-      >
-        <span>{t('fileSettings.readOnly')}</span>
-        <input
-          type="checkbox"
-          checked={fileSettings.readOnly}
-          onChange={(e) => fileSettings.onReadOnlyChange(e.target.checked)}
-        />
-      </label>
+      <DialogSwitchRow
+        label={t('fileSettings.readOnly')}
+        checked={fileSettings.readOnly}
+        onCheckedChange={(checked) => fileSettings.onReadOnlyChange(checked)}
+      />
 
       {fileSettings.format === 'jsonl' ? (
         <>
@@ -205,22 +195,11 @@ export const FileSettingsTab: React.FC<FileSettingsTabProps> = ({
             </label>
           </div>
 
-          <label
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              gap: 12,
-              cursor: 'pointer',
-            }}
-          >
-            <span>{t('fileSettings.logWordWrap')}</span>
-            <input
-              type="checkbox"
-              checked={Boolean(fileSettings.logWordWrap)}
-              onChange={(e) => fileSettings.onLogConfigChange?.({ wordWrap: e.target.checked })}
-            />
-          </label>
+          <DialogSwitchRow
+            label={t('fileSettings.logWordWrap')}
+            checked={Boolean(fileSettings.logWordWrap)}
+            onCheckedChange={(checked) => fileSettings.onLogConfigChange?.({ wordWrap: checked })}
+          />
 
           {logPreview && (
             <div
@@ -298,8 +277,8 @@ export const FileSettingsTab: React.FC<FileSettingsTabProps> = ({
 
           {fileSettings.onLogConfigChange && (
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <button
-                type="button"
+              <DialogButton
+                variant="primary"
                 onClick={() => {
                   const preset = LOG_PRESETS.find((p) => p.id === draftPresetId);
                   fileSettings.onLogConfigChange?.({
@@ -310,40 +289,19 @@ export const FileSettingsTab: React.FC<FileSettingsTabProps> = ({
                     levelColumn: preset?.levelColumn,
                   });
                 }}
-                style={{
-                  padding: '5px 12px',
-                  fontSize: 12,
-                  fontWeight: 600,
-                  borderRadius: 6,
-                  border: '1px solid #3b82f6',
-                  background: '#2563eb',
-                  color: '#ffffff',
-                  cursor: 'pointer',
-                }}
               >
                 {t('fileSettings.logApply')}
-              </button>
+              </DialogButton>
             </div>
           )}
         </>
       ) : (
         <>
-          <label
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              gap: 12,
-              cursor: 'pointer',
-            }}
-          >
-            <span>{t('fileSettings.hasHeader')}</span>
-            <input
-              type="checkbox"
-              checked={fileSettings.hasHeader}
-              onChange={(e) => fileSettings.onHasHeaderChange(e.target.checked)}
-            />
-          </label>
+          <DialogSwitchRow
+            label={t('fileSettings.hasHeader')}
+            checked={fileSettings.hasHeader}
+            onCheckedChange={(checked) => fileSettings.onHasHeaderChange(checked)}
+          />
 
           {!fileSettings.hasHeader && onAppSettingsChange && (
             <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
@@ -411,38 +369,36 @@ export const FileSettingsTab: React.FC<FileSettingsTabProps> = ({
         />
       </label>
 
-      <hr style={{ border: 'none', borderTop: `1px solid ${border}`, margin: '2px 0' }} />
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        <div style={{ fontWeight: 600, fontSize: 12 }}>{t('fileSettings.columnsTitle')}</div>
-        <label
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 4 }}>
+        <div style={{ fontWeight: 600, fontSize: 12.5 }}>{t('fileSettings.columnsTitle')}</div>
+        <div
           style={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: 5,
+            gap: 6,
             fontSize: 11.5,
-            fontWeight: 400,
-            cursor: 'pointer',
             opacity: 0.85,
           }}
           title={t('fileSettings.confirmHideColTooltip')}
         >
-          <input
-            type="checkbox"
-            checked={appSettings.confirmHideColumn !== false}
-            onChange={(e) => onAppSettingsChange?.({ confirmHideColumn: e.target.checked })}
-          />
           <span>{t('fileSettings.confirmHideCol')}</span>
-        </label>
+          <ToggleSwitch
+            size="sm"
+            checked={appSettings.confirmHideColumn !== false}
+            onCheckedChange={(checked) => onAppSettingsChange?.({ confirmHideColumn: checked })}
+            ariaLabel={t('fileSettings.confirmHideCol')}
+          />
+        </div>
       </div>
       <div
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-          gap: 6,
+          gap: 8,
           maxHeight: 170,
           overflowY: 'auto',
-          padding: 8,
-          borderRadius: 6,
+          padding: 10,
+          borderRadius: 8,
           background: inputBg,
           border: `1px solid ${border}`,
         }}
@@ -454,29 +410,32 @@ export const FileSettingsTab: React.FC<FileSettingsTabProps> = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              gap: 4,
+              gap: 6,
               fontSize: 12,
             }}
           >
-            <label
+            <div
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: 6,
-                cursor: 'pointer',
+                gap: 7,
                 minWidth: 0,
                 flex: 1,
               }}
             >
-              <input
-                type="checkbox"
+              <ToggleSwitch
+                size="sm"
                 checked={col.visible}
-                onChange={(e) => fileSettings.onToggleColumnVisible(col.key, e.target.checked)}
+                onCheckedChange={(checked) => fileSettings.onToggleColumnVisible(col.key, checked)}
+                ariaLabel={col.label}
               />
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <span
+                style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }}
+                onClick={() => fileSettings.onToggleColumnVisible(col.key, !col.visible)}
+              >
                 {col.label}
               </span>
-            </label>
+            </div>
             {fileSettings.onToggleColumnWrap && (
               <button
                 type="button"

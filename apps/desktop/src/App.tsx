@@ -6,6 +6,7 @@ import { Check, ChevronDown, Code2, History, Info, Settings } from 'lucide-react
 import { defaultBundleFileName } from '@metatext-editor/core';
 import {
   AboutModal,
+  DialogSwitchRow,
   I18nProvider,
   MetaTextEditor,
   NEW_FILE_FORMAT_OPTIONS,
@@ -197,22 +198,11 @@ export const App: React.FC = () => {
   );
 
   const settingsExtraSection = (
-    <label
-      style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        gap: 12,
-        cursor: 'pointer',
-      }}
-    >
-      <span>{t('desktop.showLiveMetaPanel')}</span>
-      <input
-        type="checkbox"
-        checked={showMetaPanel}
-        onChange={(e) => setRightPanel(e.target.checked ? 'meta' : 'none')}
-      />
-    </label>
+    <DialogSwitchRow
+      label={t('desktop.showLiveMetaPanel')}
+      checked={showMetaPanel}
+      onCheckedChange={(checked) => setRightPanel(checked ? 'meta' : 'none')}
+    />
   );
 
   const dropOverlay = isDraggingFile ? (

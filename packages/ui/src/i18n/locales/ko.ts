@@ -238,8 +238,8 @@ export const ko: Messages = {
   'settings.title': '설정',
   'settings.ariaLabel': 'MetaText Editor 설정',
   'settings.closeAria': '설정 닫기',
-  'settings.tabFile': '파일 (.metatext.jsonc)',
-  'settings.tabApp': '앱 설정',
+  'settings.tabFile': '파일',
+  'settings.tabApp': '앱',
   'settings.vscodeSettings': 'VS Code 설정',
 
   // App Settings Tab
@@ -384,4 +384,18 @@ export const ko: Messages = {
   'web.backToHome': 'MetaText Editor 홈으로 돌아가기',
   'web.saveAsPrompt': '다른 이름으로 저장할 파일 이름:',
   'web.liveMetaHeader': '실시간 .metatext.jsonc (열 드래그 / 헤더 클릭 / 마커 추가 시 동기화)',
+
+  // Export Bundle Modal
+  'export.title': '.metatext.zip으로 내보내기',
+  'export.packageArchive': '패키지 아카이브',
+  'export.unsavedWarning':
+    '저장되지 않은 변경 사항이 있습니다. 내보내기에는 디스크에 마지막으로 저장된 파일이 포함됩니다(먼저 Ctrl+S로 저장하세요).',
+  'export.required': '필수',
+  'export.includeHistory': 'history/ 포함 ({size})',
+  'export.none': '없음',
+  'export.includeHistoryDesc':
+    '중간 편집 내용이나 메모가 실수로 공유되지 않도록 기본값은 꺼짐입니다.',
+  'export.rawTotal': '원본 합계: 약 {size}',
+  'export.exportBtn': '내보내기',
+  'export.exportingBtn': '내보내는 중...',
 };

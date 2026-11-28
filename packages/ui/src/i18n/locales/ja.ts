@@ -238,8 +238,8 @@ export const ja: Messages = {
   'settings.title': '設定',
   'settings.ariaLabel': 'MetaText Editor 設定',
   'settings.closeAria': '設定を閉じる',
-  'settings.tabFile': 'ファイル (.metatext.jsonc)',
-  'settings.tabApp': 'アプリ設定',
+  'settings.tabFile': 'ファイル',
+  'settings.tabApp': 'アプリ',
   'settings.vscodeSettings': 'VS Code 設定を開く',
 
   // App Settings Tab
@@ -384,4 +384,18 @@ export const ja: Messages = {
   'web.backToHome': 'MetaText Editor ホームへ戻る',
   'web.saveAsPrompt': '保存するファイル名:',
   'web.liveMetaHeader': 'ライブ .metatext.jsonc（列ドラッグ・ヘッダークリック・マーカー追加で同期）',
+
+  // Export Bundle Modal
+  'export.title': '.metatext.zip としてエクスポート',
+  'export.packageArchive': 'パッケージアーカイブ',
+  'export.unsavedWarning':
+    '未保存の変更があります。エクスポートにはディスク上の最後に保存された内容が含まれます（最新の編集を含めるには先に Ctrl+S で保存してください）。',
+  'export.required': '必須',
+  'export.includeHistory': 'history/ を含める ({size})',
+  'export.none': 'なし',
+  'export.includeHistoryDesc':
+    '途中の編集やメモを誤って共有しないよう、既定はオフです。',
+  'export.rawTotal': '元サイズ合計: 約 {size}',
+  'export.exportBtn': 'エクスポート',
+  'export.exportingBtn': 'エクスポート中...',
 };

@@ -8,6 +8,7 @@ import {
 } from '../i18n';
 import type { ThemePreference } from '../theme';
 import type { EditorAppSettings, EditorHostMode } from './types';
+import { DialogSwitchRow } from './ui/DialogPrimitives';
 
 export interface AppSettingsTabProps {
   hostMode: EditorHostMode;
@@ -173,39 +174,17 @@ export const AppSettingsTab: React.FC<AppSettingsTabProps> = ({
         </select>
       </label>
 
-      <label
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: 12,
-          cursor: 'pointer',
-        }}
-      >
-        <span>{t('appSettings.showRowNumbers')}</span>
-        <input
-          type="checkbox"
-          checked={appSettings.showRowNumbers !== false}
-          onChange={(e) => onAppSettingsChange?.({ showRowNumbers: e.target.checked })}
-        />
-      </label>
+      <DialogSwitchRow
+        label={t('appSettings.showRowNumbers')}
+        checked={appSettings.showRowNumbers !== false}
+        onCheckedChange={(checked) => onAppSettingsChange?.({ showRowNumbers: checked })}
+      />
 
-      <label
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: 12,
-          cursor: 'pointer',
-        }}
-      >
-        <span>{t('appSettings.zebraStriping')}</span>
-        <input
-          type="checkbox"
-          checked={appSettings.zebraStriping !== false}
-          onChange={(e) => onAppSettingsChange?.({ zebraStriping: e.target.checked })}
-        />
-      </label>
+      <DialogSwitchRow
+        label={t('appSettings.zebraStriping')}
+        checked={appSettings.zebraStriping !== false}
+        onCheckedChange={(checked) => onAppSettingsChange?.({ zebraStriping: checked })}
+      />
 
       {hostMode === 'vscode' && (
         <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
@@ -227,44 +206,20 @@ export const AppSettingsTab: React.FC<AppSettingsTabProps> = ({
       )}
 
       {hostMode === 'desktop' && (
-        <label
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: 12,
-            cursor: 'pointer',
-          }}
-        >
-          <span>{t('appSettings.reopenLastFiles')}</span>
-          <input
-            type="checkbox"
-            checked={appSettings.reopenLastFiles !== false}
-            onChange={(e) => onAppSettingsChange?.({ reopenLastFiles: e.target.checked })}
-          />
-        </label>
+        <DialogSwitchRow
+          label={t('appSettings.reopenLastFiles')}
+          checked={appSettings.reopenLastFiles !== false}
+          onCheckedChange={(checked) => onAppSettingsChange?.({ reopenLastFiles: checked })}
+        />
       )}
 
-      <hr style={{ border: 'none', borderTop: `1px solid ${border}`, margin: '2px 0' }} />
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <label
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: 12,
-            cursor: 'pointer',
-            fontWeight: 600,
-          }}
-        >
-          <span>{t('appSettings.historyEnabled')}</span>
-          <input
-            type="checkbox"
-            checked={appSettings.historyEnabled !== false}
-            onChange={(e) => onAppSettingsChange?.({ historyEnabled: e.target.checked })}
-          />
-        </label>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}>
+        <DialogSwitchRow
+          label={t('appSettings.historyEnabled')}
+          bold
+          checked={appSettings.historyEnabled !== false}
+          onCheckedChange={(checked) => onAppSettingsChange?.({ historyEnabled: checked })}
+        />
 
         {appSettings.historyEnabled !== false && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingLeft: 8 }}>
@@ -344,10 +299,7 @@ export const AppSettingsTab: React.FC<AppSettingsTabProps> = ({
       </div>
 
       {extraSection && (
-        <>
-          <hr style={{ border: 'none', borderTop: `1px solid ${border}`, margin: '2px 0' }} />
-          {extraSection}
-        </>
+        <div style={{ marginTop: 4 }}>{extraSection}</div>
       )}
     </div>
   );

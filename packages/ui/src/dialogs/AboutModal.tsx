@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { ExternalLink, Info, Scale, X } from 'lucide-react';
+import { ExternalLink, Info, Scale } from 'lucide-react';
 import { useI18n } from '../i18n';
 import type { AboutModalProps } from './types';
+import { DialogShell } from './ui/DialogPrimitives';
 
 interface OssLicenseEntry {
   name: string;
@@ -103,20 +104,12 @@ export const AboutModal: React.FC<AboutModalProps> = ({
   useEffect(() => {
     if (!open) return;
     setActiveTab('about');
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
-
-  if (!open) return null;
+  }, [open]);
 
   const isDark = themeMode === 'dark';
-  const bg = isDark ? '#1f1f23' : '#ffffff';
-  const border = isDark ? '#3c3c42' : '#cbd5e1';
-  const fg = isDark ? '#f1f5f9' : '#0f172a';
-  const mutedBg = isDark ? '#27272c' : '#f1f5f9';
+  const bg = isDark ? '#09090b' : '#ffffff';
+  const border = isDark ? '#27272a' : '#e4e4e7';
+  const mutedBg = isDark ? '#18181b' : '#f4f4f5';
 
   const envLabel =
     hostMode === 'vscode'
@@ -135,110 +128,45 @@ export const AboutModal: React.FC<AboutModalProps> = ({
     ['Ctrl+Z / Ctrl+Y', t('about.shortcutUndo')],
   ];
 
-  const tabBtnStyle = (selected: boolean): React.CSSProperties => ({
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 5,
-    padding: '5px 10px',
-    fontSize: 12,
-    fontWeight: selected ? 600 : 500,
-    borderRadius: 5,
-    border: `1px solid ${selected ? '#3b82f6' : 'transparent'}`,
-    background: selected ? (isDark ? 'rgba(59,130,246,0.18)' : '#dbeafe') : 'transparent',
-    color: selected ? (isDark ? '#93c5fd' : '#1d4ed8') : fg,
-    cursor: 'pointer',
-  });
-
   return (
-    <div
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
+    <DialogShell
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onClose();
       }}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 100,
-        background: 'rgba(0, 0, 0, 0.45)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 16,
-      }}
+      isDark={isDark}
+      title={t('about.title')}
+      icon={<Info size={16} />}
+      ariaLabel={t('about.title')}
+      closeAriaLabel={t('about.closeAria')}
+      maxWidth={480}
+      alignTop
     >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={t('about.title')}
-        style={{
-          width: '100%',
-          maxWidth: 460,
-          maxHeight: '82vh',
-          borderRadius: 10,
-          background: bg,
-          color: fg,
-          border: `1px solid ${border}`,
-          boxShadow: '0 16px 48px rgba(0, 0, 0, 0.4)',
-          padding: 18,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 12,
-          fontSize: 13,
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontWeight: 700 }}>
-            <Info size={16} />
-            <span>{t('about.title')}</span>
-          </div>
-          <button
-            type="button"
-            aria-label={t('about.closeAria')}
-            onClick={onClose}
-            style={{
-              border: 'none',
-              background: 'transparent',
-              color: fg,
-              opacity: 0.7,
-              cursor: 'pointer',
-              padding: 4,
-              display: 'inline-flex',
-            }}
-          >
-            <X size={16} />
-          </button>
-        </div>
-
-        {/* Tabs */}
-        <div
-          role="tablist"
-          style={{
-            display: 'flex',
-            gap: 6,
-            borderBottom: `1px solid ${border}`,
-            paddingBottom: 8,
-          }}
+      {/* Tabs */}
+      <div role="tablist" className="mt-dlg-tabs">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'about'}
+          data-state={activeTab === 'about' ? 'active' : 'inactive'}
+          className="mt-dlg-tab"
+          onClick={() => setActiveTab('about')}
         >
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === 'about'}
-            style={tabBtnStyle(activeTab === 'about')}
-            onClick={() => setActiveTab('about')}
-          >
-            <Info size={13} />
-            <span>{t('about.tabAbout')}</span>
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === 'licenses'}
-            style={tabBtnStyle(activeTab === 'licenses')}
-            onClick={() => setActiveTab('licenses')}
-          >
-            <Scale size={13} />
-            <span>{t('about.tabLicenses')}</span>
-          </button>
-        </div>
+          <Info size={13} />
+          <span>{t('about.tabAbout')}</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'licenses'}
+          data-state={activeTab === 'licenses' ? 'active' : 'inactive'}
+          className="mt-dlg-tab"
+          onClick={() => setActiveTab('licenses')}
+        >
+          <Scale size={13} />
+          <span>{t('about.tabLicenses')}</span>
+        </button>
+      </div>
 
         {activeTab === 'about' ? (
           <>
@@ -376,7 +304,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({
                       style={{
                         fontWeight: 600,
                         fontSize: 12,
-                        color: isDark ? '#93c5fd' : '#2563eb',
+                        color: isDark ? '#f4f4f5' : '#18181b',
                         textDecoration: 'none',
                         display: 'inline-flex',
                         alignItems: 'center',
@@ -384,7 +312,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({
                       }}
                     >
                       <span>{pkg.name}</span>
-                      <ExternalLink size={11} />
+                      <ExternalLink size={11} style={{ color: '#94a3b8' }} />
                     </a>
                   </div>
                   {pkg.note && (
@@ -409,7 +337,6 @@ export const AboutModal: React.FC<AboutModalProps> = ({
             ))}
           </div>
         )}
-      </div>
-    </div>
+    </DialogShell>
   );
 };

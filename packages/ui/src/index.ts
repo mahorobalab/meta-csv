@@ -23,6 +23,12 @@ export {
   type AboutModalProps,
 } from './SettingsAboutDialogs';
 export {
+  DialogSwitchRow,
+  ToggleSwitch,
+  type DialogSwitchRowProps,
+  type ToggleSwitchProps,
+} from './dialogs/ui/DialogPrimitives';
+export {
   ConditionalRulesModal,
   BG_SWATCH_COLORS,
   TEXT_SWATCH_COLORS,

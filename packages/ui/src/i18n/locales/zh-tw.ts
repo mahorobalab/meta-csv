@@ -238,8 +238,8 @@ export const zhTw: Messages = {
   'settings.title': '設定',
   'settings.ariaLabel': 'MetaText Editor 設定',
   'settings.closeAria': '關閉設定',
-  'settings.tabFile': '檔案 (.metatext.jsonc)',
-  'settings.tabApp': '應用程式設定',
+  'settings.tabFile': '檔案',
+  'settings.tabApp': '應用程式',
   'settings.vscodeSettings': 'VS Code 設定',
 
   // App Settings Tab
@@ -383,4 +383,18 @@ export const zhTw: Messages = {
   'web.backToHome': '返回 MetaText Editor 首頁',
   'web.saveAsPrompt': '另存新檔名稱：',
   'web.liveMetaHeader': '即時 .metatext.jsonc（拖曳欄 / 點擊標題 / 新增標記時自動同步）',
+
+  // Export Bundle Modal
+  'export.title': '匯出為 .metatext.zip',
+  'export.packageArchive': '封裝封存檔',
+  'export.unsavedWarning':
+    '有未儲存的變更。匯出會封裝磁碟上最後儲存的檔案（請先按 Ctrl+S 儲存以包含最新編輯）。',
+  'export.required': '必要',
+  'export.includeHistory': '包含 history/ ({size})',
+  'export.none': '無',
+  'export.includeHistoryDesc':
+    '預設關閉，以避免意外分享中間編輯記錄或備註。',
+  'export.rawTotal': '原始總大小：約 {size}',
+  'export.exportBtn': '匯出',
+  'export.exportingBtn': '正在匯出...',
 };

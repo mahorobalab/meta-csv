@@ -3,6 +3,7 @@ import { ArrowDown, ArrowUp, Plus, Sparkles, Trash2, X } from 'lucide-react';
 import type { CellStyle, ConditionalRule, RuleOperator } from '@metatext-editor/schema';
 import { resolveStyleRef } from '@metatext-editor/core';
 import { useI18n, type MessageKey } from './i18n';
+import { DialogButton, DialogShell } from './dialogs/ui/DialogPrimitives';
 
 export interface StyleSwatch {
   label: string;
@@ -85,26 +86,20 @@ export const ConditionalRulesModal: React.FC<ConditionalRulesModalProps> = ({
     if (columns.length > 0 && !columns.some((c) => c.key === column)) {
       setColumn(columns[0]!.key);
     }
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose, columns, column]);
-
-  if (!open) return null;
+  }, [open, columns, column]);
 
   const isDark = themeMode === 'dark';
-  const bg = isDark ? '#1f1f23' : '#ffffff';
-  const border = isDark ? '#3c3c42' : '#cbd5e1';
-  const fg = isDark ? '#f1f5f9' : '#0f172a';
-  const inputBg = isDark ? '#141416' : '#f8fafc';
-  const mutedBg = isDark ? '#27272d' : '#f1f5f9';
+  const bg = isDark ? '#09090b' : '#ffffff';
+  const border = isDark ? '#27272a' : '#e4e4e7';
+  const fg = isDark ? '#fafafa' : '#09090b';
+  const inputBg = isDark ? '#141417' : '#ffffff';
+  const mutedBg = isDark ? '#18181b' : '#f4f4f5';
 
   const inputStyle: React.CSSProperties = {
-    padding: '4px 8px',
-    fontSize: 12,
-    borderRadius: 5,
+    padding: '0 10px',
+    height: 32,
+    fontSize: 13,
+    borderRadius: 7,
     border: `1px solid ${border}`,
     background: inputBg,
     color: fg,
@@ -168,64 +163,19 @@ export const ConditionalRulesModal: React.FC<ConditionalRulesModalProps> = ({
   const colLabelByKey = new Map(columns.map((c) => [c.key, c.label]));
 
   return (
-    <div
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
+    <DialogShell
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onClose();
       }}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 110,
-        background: 'rgba(0, 0, 0, 0.45)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 16,
-      }}
+      isDark={isDark}
+      title={t('rules.title')}
+      icon={<Sparkles size={16} />}
+      ariaLabel={t('rules.ariaLabel')}
+      closeAriaLabel={t('rules.closeAria')}
+      maxWidth={580}
+      alignTop
     >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={t('rules.ariaLabel')}
-        style={{
-          width: '100%',
-          maxWidth: 560,
-          maxHeight: '88vh',
-          overflowY: 'auto',
-          borderRadius: 10,
-          background: bg,
-          color: fg,
-          border: `1px solid ${border}`,
-          boxShadow: '0 16px 48px rgba(0, 0, 0, 0.4)',
-          padding: 18,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 14,
-          fontSize: 13,
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontWeight: 700 }}>
-            <Sparkles size={16} />
-            <span>{t('rules.title')}</span>
-          </div>
-          <button
-            type="button"
-            aria-label={t('rules.closeAria')}
-            onClick={onClose}
-            style={{
-              border: 'none',
-              background: 'transparent',
-              color: fg,
-              opacity: 0.7,
-              cursor: 'pointer',
-              padding: 4,
-              display: 'inline-flex',
-            }}
-          >
-            <X size={16} />
-          </button>
-        </div>
 
         {/* Existing rules list */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -566,27 +516,16 @@ export const ConditionalRulesModal: React.FC<ConditionalRulesModalProps> = ({
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button
-              type="button"
+            <DialogButton
+              variant="primary"
               disabled={!canAdd}
               onClick={handleAdd}
-              style={{
-                ...btnStyle,
-                padding: '6px 14px',
-                background: '#2563eb',
-                borderColor: '#3b82f6',
-                color: '#ffffff',
-                fontWeight: 600,
-                opacity: canAdd ? 1 : 0.45,
-                cursor: canAdd ? 'pointer' : 'not-allowed',
-              }}
             >
               <Plus size={13} />
               <span>{t('rules.addRule')}</span>
-            </button>
+            </DialogButton>
           </div>
         </div>
-      </div>
-    </div>
+    </DialogShell>
   );
 };

@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Package, X } from 'lucide-react';
+import { Package } from 'lucide-react';
 import { defaultBundleFileName } from '@metatext-editor/core';
+import { useI18n } from '../i18n';
+import { DialogButton, DialogShell, DialogSwitchRow } from './ui/DialogPrimitives';
 
 export interface ExportBundleModalProps {
   open: boolean;
@@ -36,6 +38,7 @@ export const ExportBundleModal: React.FC<ExportBundleModalProps> = ({
   onConfirmExport,
 }) => {
   // Privacy-first default: OFF
+  const { t } = useI18n();
   const [includeHistory, setIncludeHistory] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -72,225 +75,131 @@ export const ExportBundleModal: React.FC<ExportBundleModalProps> = ({
   };
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 120,
-        background: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
+    <DialogShell
+      open={open}
+      onOpenChange={(next) => {
+        if (!next && !exporting) onClose();
       }}
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget && !exporting) onClose();
-      }}
-    >
-      <div
-        style={{
-          width: 440,
-          maxWidth: '92vw',
-          borderRadius: 10,
-          background: isDark ? '#1e1e22' : '#ffffff',
-          color: fg,
-          border: `1px solid ${border}`,
-          boxShadow: '0 16px 40px rgba(0,0,0,0.35)',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-        }}
-      >
+      isDark={isDark}
+      title={t('export.title')}
+      icon={<Package size={16} />}
+      maxWidth={460}
+      preventClose={exporting}
+      borderedHeader
+      paddedBody
+      footer={
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '10px 14px',
-            borderBottom: `1px solid ${border}`,
-            background: isDark ? '#252526' : '#f8fafc',
-            fontWeight: 600,
-            fontSize: 13,
+            width: '100%',
+            gap: 12,
           }}
         >
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
-            <Package size={15} />
-            <span>Export as .metatext.zip</span>
-          </span>
-          <button
-            type="button"
-            disabled={exporting}
-            onClick={onClose}
-            aria-label="Close"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 24,
-              height: 24,
-              border: 'none',
-              borderRadius: 4,
-              background: 'transparent',
-              color: fg,
-              cursor: exporting ? 'default' : 'pointer',
-              opacity: 0.75,
-            }}
-          >
-            <X size={14} />
-          </button>
-        </div>
-
-        <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 12, fontSize: 12.5 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <div style={{ fontSize: 11.5, color: mutedFg }}>Package archive</div>
-            <div
-              style={{
-                fontFamily: monoFont,
-                fontSize: 12,
-                padding: '6px 8px',
-                borderRadius: 5,
-                background: isDark ? '#141416' : '#f1f5f9',
-                border: `1px solid ${border}`,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {bundleName}
-            </div>
-          </div>
-
-          {hasUnsavedChanges && (
-            <div
-              style={{
-                padding: '6px 8px',
-                borderRadius: 5,
-                background: isDark ? 'rgba(245, 158, 11, 0.16)' : 'rgba(245, 158, 11, 0.12)',
-                border: '1px solid rgba(245, 158, 11, 0.5)',
-                color: isDark ? '#fcd34d' : '#92400e',
-                fontSize: 11.5,
-              }}
-            >
-              Unsaved changes exist. Export packages the latest saved file on disk (press Ctrl+S first to include recent edits).
-            </div>
-          )}
-
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 6,
-              padding: '8px 10px',
-              borderRadius: 6,
-              border: `1px solid ${border}`,
-              background: isDark ? '#18181b' : '#f8fafc',
-              fontFamily: monoFont,
-              fontSize: 11.5,
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>manifest.json</span>
-              <span style={{ color: mutedFg }}>required</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>data/{fileName}</span>
-              <span style={{ color: mutedFg }}>{formatBytes(dataBytes)}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>data/{fileName}.metatext.jsonc</span>
-              <span style={{ color: mutedFg }}>{formatBytes(metaBytes)}</span>
-            </div>
-          </div>
-
-          <label
-            style={{
-              display: 'flex',
-              alignItems: 'flex-start',
-              justifyContent: 'space-between',
-              gap: 10,
-              padding: '8px 10px',
-              borderRadius: 6,
-              border: `1px solid ${border}`,
-              cursor: hasHistory ? 'pointer' : 'default',
-              opacity: hasHistory ? 1 : 0.55,
-            }}
-          >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <span style={{ fontWeight: 600 }}>
-                Include history/ ({hasHistory ? formatBytes(historyBytes) : 'none'})
-              </span>
-              <span style={{ fontSize: 11, color: mutedFg }}>
-                Default OFF to avoid accidentally sharing intermediate edits or notes.
-              </span>
-            </div>
-            <input
-              type="checkbox"
-              disabled={!hasHistory || exporting}
-              checked={includeHistory && hasHistory}
-              onChange={(e) => setIncludeHistory(e.target.checked)}
-              style={{ marginTop: 3 }}
-            />
-          </label>
-
-          {errorMsg && (
-            <div style={{ color: '#ef4444', fontSize: 11.5, wordBreak: 'break-word' }}>{errorMsg}</div>
-          )}
-        </div>
-
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '10px 14px',
-            borderTop: `1px solid ${border}`,
-            background: isDark ? '#252526' : '#f8fafc',
-          }}
-        >
-          <span style={{ fontSize: 11, fontFamily: monoFont, color: mutedFg }}>
-            Raw total: ~{formatBytes(totalRaw)}
+          <span style={{ fontSize: 11.5, fontFamily: monoFont, color: mutedFg }}>
+            {t('export.rawTotal', { size: formatBytes(totalRaw) })}
           </span>
           <div style={{ display: 'inline-flex', gap: 8 }}>
-            <button
-              type="button"
-              disabled={exporting}
-              onClick={onClose}
-              style={{
-                padding: '5px 12px',
-                fontSize: 12,
-                borderRadius: 5,
-                border: `1px solid ${border}`,
-                background: 'transparent',
-                color: fg,
-                cursor: exporting ? 'default' : 'pointer',
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
+            <DialogButton variant="outline" disabled={exporting} onClick={onClose}>
+              {t('common.cancel')}
+            </DialogButton>
+            <DialogButton
+              variant="primary"
               disabled={exporting}
               onClick={() => void handleExport()}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '5px 14px',
-                fontSize: 12,
-                fontWeight: 600,
-                borderRadius: 5,
-                border: '1px solid #3b82f6',
-                background: '#2563eb',
-                color: '#ffffff',
-                cursor: exporting ? 'wait' : 'pointer',
-                opacity: exporting ? 0.75 : 1,
-              }}
+              style={{ cursor: exporting ? 'wait' : 'pointer' }}
             >
               <Package size={13} />
-              <span>{exporting ? 'Exporting...' : 'Export'}</span>
-            </button>
+              <span>{exporting ? t('export.exportingBtn') : t('export.exportBtn')}</span>
+            </DialogButton>
           </div>
         </div>
+      }
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+        <div style={{ fontSize: 11.5, fontWeight: 500, color: mutedFg }}>
+          {t('export.packageArchive')}
+        </div>
+        <div
+          style={{
+            fontFamily: monoFont,
+            fontSize: 12,
+            padding: '7px 10px',
+            borderRadius: 7,
+            background: isDark ? '#141417' : '#f4f4f5',
+            border: `1px solid ${border}`,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {bundleName}
+        </div>
       </div>
-    </div>
+
+      {hasUnsavedChanges && (
+        <div
+          style={{
+            padding: '8px 10px',
+            borderRadius: 7,
+            background: isDark ? 'rgba(245, 158, 11, 0.14)' : 'rgba(245, 158, 11, 0.10)',
+            border: '1px solid rgba(245, 158, 11, 0.45)',
+            color: isDark ? '#fcd34d' : '#92400e',
+            fontSize: 12,
+            lineHeight: 1.45,
+          }}
+        >
+          {t('export.unsavedWarning')}
+        </div>
+      )}
+
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 6,
+          padding: '10px 12px',
+          borderRadius: 8,
+          border: `1px solid ${border}`,
+          background: isDark ? '#141417' : '#fafafa',
+          fontFamily: monoFont,
+          fontSize: 11.5,
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <span>manifest.json</span>
+          <span style={{ color: mutedFg }}>{t('export.required')}</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <span>data/{fileName}</span>
+          <span style={{ color: mutedFg }}>{formatBytes(dataBytes)}</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <span>data/{fileName}.metatext.jsonc</span>
+          <span style={{ color: mutedFg }}>{formatBytes(metaBytes)}</span>
+        </div>
+      </div>
+
+      <DialogSwitchRow
+        label={t('export.includeHistory', {
+          size: hasHistory ? formatBytes(historyBytes) : t('export.none'),
+        })}
+        description={t('export.includeHistoryDesc')}
+        bold
+        checked={includeHistory && hasHistory}
+        disabled={!hasHistory || exporting}
+        onCheckedChange={setIncludeHistory}
+        style={{
+          padding: '10px 12px',
+          borderRadius: 8,
+          border: `1px solid ${border}`,
+        }}
+      />
+
+      {errorMsg && (
+        <div style={{ color: '#ef4444', fontSize: 12, wordBreak: 'break-word' }}>{errorMsg}</div>
+      )}
+    </DialogShell>
   );
 };
